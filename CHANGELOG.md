@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A bundle's summary leads with its price tiers and what it adds to your library, so a phone shows them without a swipe
 - Number columns (ratings, hours, prices, discounts, counts) align right, so their digits line up.
 - Tables show separate chips for a column both grouped and sorted, no pager when everything fits on one page, and "≥ 5.0" for an open-ended range.
+- Expired bundles stay dimmed even with the Bundle column hidden, and a phone's Filter pane sits centred.
 
 ### Fixed
 

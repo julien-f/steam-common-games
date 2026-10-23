@@ -104,13 +104,9 @@ function renderCovers(_value: unknown, row: BundleRow): Node {
   return wrap;
 }
 
-// Also the marker CSS uses to dim a whole expired row (`.dt-tr:has(.bundle-expired)` in
-// style.css): the table library exposes no per-row class hook, so the row's own expired-ness has
-// to reach CSS through one of its cells. The Bundle column is the one to hang it on — it's the
-// identity column nobody hides, and `:has()` stops matching if its carrier column is hidden.
-function renderBundleTitle(value: unknown, row: BundleRow): Node {
+function renderBundleTitle(value: unknown): Node {
   const span = document.createElement('span');
-  span.className = row.status === 'Expired' ? 'bundle-title bundle-expired' : 'bundle-title';
+  span.className = 'bundle-title';
   span.textContent = value == null || value === '' ? '—' : String(value);
   return span;
 }
@@ -172,7 +168,7 @@ function renderEnds(value: unknown): Node {
     rel.style.color =
       urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--muted)';
   }
-  // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
+  // An expired row is dimmed as a whole (the table's rowClass), so nothing further here.
   return renderDateTime(value, rel);
 }
 
@@ -197,7 +193,6 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     key: 'games',
     label: 'Games',
     type: 'number',
-    align: 'end',
     groupable: true,
     format: fmt.num,
     defaultSortDir: 'desc',
@@ -213,7 +208,6 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     key: 'price',
     label: 'Cheapest Tier',
     type: 'number',
-    align: 'end',
     groupable: true,
     // Sorted, filtered and bucketed in the region's currency (currency.ts's approximate rates):
     // some shops only price in USD, and "$6 < €10" is not an order. Shown in the shop's own.
@@ -230,7 +224,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     compare: compareNumMissingLast,
     ...priceTierGroup(() => regionCurrency(), 'Varies'),
   },
-  { key: 'tierCount', label: 'Tiers', type: 'number', align: 'end', groupable: true, format: fmt.num },
+  { key: 'tierCount', label: 'Tiers', type: 'number', groupable: true, format: fmt.num },
   // Published before Ends — a bundle's own life order, and the default sort's column sits next to
   // the ones it's read against rather than at the far end of the row.
   {
@@ -514,6 +508,7 @@ export default function BundlesBrowseRoute() {
           <DataTableView<BundleRow>
             table={table}
             rowKey="id"
+            rowClass={(row) => (row.status === 'Expired' ? 'bundle-row--expired' : undefined)}
             onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
             toolbarEnd={
               <ViewActions

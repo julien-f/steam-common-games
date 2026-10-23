@@ -1462,6 +1462,8 @@ test('L4 edge: Recently Looked Up lists the latest lookup first, and says it kee
   await expect(rows(page)).toHaveCount(2);
   await expect(rows(page).first()).toContainText('Valheim');
   await expect(page.locator('.list-hero')).toContainText('last 10');
+  // A number column whose cells read as text ("Latest") stays start-aligned.
+  await expect(page.locator('.dt-td[data-col-key="lookedUp"]').first()).toHaveCSS('text-align', 'start');
 });
 
 test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled", async ({ page }) => {
@@ -2042,6 +2044,19 @@ test('B1 edge: figures line up: number columns align to the end, text to the sta
   for (const key of ['tierPrice', 'bestDealCut', 'steamdbRating'])
     await expect(page.locator(`.dt-td[data-col-key="${key}"]`).first()).toHaveCSS('text-align', 'end');
   await expect(page.locator('.dt-td[data-col-key="name"]').first()).not.toHaveCSS('text-align', 'end');
+});
+
+test('B1 edge: an expired bundle is dimmed as a whole row', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route('**/api/bundles?*', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    body.bundles[0].expiry = new Date(Date.now() - 86400_000).toISOString();
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/bundles');
+  await expect(page.locator('.dt-tr.bundle-row--expired')).toHaveCount(1);
+  await expect(page.locator('.dt-tr.bundle-row--expired')).toHaveCSS('opacity', '0.45');
 });
 
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
@@ -3713,6 +3728,8 @@ test('F2 edge: /search shows an image column only when a result has an image', a
   await expect(page.locator('.search-table .game-search-thumb')).toHaveCount(1);
   await expect(columns).toHaveCount(2);
   await expect(columns.last()).toHaveAttribute('data-col-key', 'name');
+  // The page's own box is the search: the table shows no toolbar of its own.
+  await expect(page.locator('.search-table .dt-toolbar')).toHaveCount(0);
 });
 
 test('F2 edge: /search marks an owned result even when the library lands after the results', async ({ page }) => {

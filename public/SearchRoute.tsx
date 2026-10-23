@@ -278,10 +278,6 @@ export default function SearchRoute() {
                 </p>
               }
             >
-              {/* search-table: hides the Columns/Sort/Search/Filter toolbar (style.css) — none of
-                  it applies to a single, unsortable, unfilterable column, and its own "Search…"
-                  box would sit confusingly right under this page's real one. The row-count line
-                  above the table stays (`.dt-active-bar`, outside the toolbar). */}
               <div
                 class="table-container search-table"
                 // `on:keydown`, not `onKeyDown` — see the search input's own comment on why:
@@ -305,6 +301,10 @@ export default function SearchRoute() {
                 <DataTableView<GameSearchResult>
                   table={table}
                   rowKey="appid"
+                  // This page's own box is the search, and its columns are fixed: with both off no
+                  // toolbar control applies, so none renders.
+                  showSearch={false}
+                  showColumns={false}
                   onRowClick={(r) => openResult(r.appid, r.name, r.tinyImage)}
                   currentRow={results().find((r) => r.appid === getPanelGame()?.appid) ?? null}
                 />
