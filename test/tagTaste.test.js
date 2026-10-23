@@ -37,7 +37,8 @@ test("similarGames: nothing without the target's tag weights, and skips games wi
   );
 });
 
-const owned = (appid, playtime, tagWeights) => ({ appid, playtime, details: { tagWeights } });
+const owned = (appid, playtime, tagWeights) => ({ appid, name: `Game ${appid}`, playtime, details: { tagWeights } });
+const tagsOf = (top) => top.map((t) => t.tag);
 
 test('topPlayedTags: the tags most played for, ignoring unplayed games and tags every game has', () => {
   const games = [
@@ -48,10 +49,42 @@ test('topPlayedTags: the tags most played for, ignoring unplayed games and tags 
     owned(5, 2, { Puzzle: 1, Singleplayer: 0.5 }),
     owned(6, 0, { Horror: 1, Singleplayer: 0.5 }),
   ];
-  const top = topPlayedTags(games, 3);
+  const top = tagsOf(topPlayedTags(games, 3));
   assert.deepEqual(top.slice(0, 2), ['Roguelike', 'Deckbuilder']);
   assert.ok(!top.includes('Singleplayer'));
-  assert.ok(!topPlayedTags(games, 10).includes('Horror'));
+  assert.ok(!tagsOf(topPlayedTags(games, 10)).includes('Horror'));
+});
+
+test('topPlayedTags: weights relative to the top tag shown, even when a Production Tier scores higher', () => {
+  const games = [
+    owned(1, 100, { A: 1 }),
+    owned(2, 50, { A: 1, B: 1 }),
+    owned(3, 10, { C: 1 }),
+    owned(4, 5, { D: 1 }),
+    owned(5, 2, { E: 1 }),
+  ].map((g) => ({ ...g, productionTier: 'Indie' }));
+  const weights = topPlayedTags([...games, owned(6, 0, { F: 1 })], 5).map((t) => t.weight);
+  assert.equal(weights[0], 1);
+  for (let i = 1; i < weights.length; i++) assert.ok(weights[i] > 0 && weights[i] <= weights[i - 1]);
+});
+
+test('topPlayedTags: the games behind a tag, by their share of it rather than by hours', () => {
+  const games = [
+    owned(1, 500, { Roguelike: 0.1, Shooter: 1 }),
+    owned(2, 20, { Roguelike: 1 }),
+    owned(3, 10, { Roguelike: 1 }),
+    owned(4, 5, { Roguelike: 1 }),
+    owned(5, 2, { Puzzle: 1 }),
+    owned(6, 0, { Roguelike: 1 }),
+  ];
+  const roguelike = topPlayedTags(games, 5).find((t) => t.tag === 'Roguelike');
+  assert.deepEqual(roguelike.games, [
+    { name: 'Game 2', hours: 20 },
+    { name: 'Game 3', hours: 10 },
+    { name: 'Game 4', hours: 5 },
+  ]);
+  const puzzle = topPlayedTags(games, 5).find((t) => t.tag === 'Puzzle');
+  assert.deepEqual(puzzle.games, [{ name: 'Game 5', hours: 2 }]);
 });
 
 test('topPlayedTags: no profile from fewer than 5 played games', () => {
@@ -95,7 +128,7 @@ test('similarGames: a shared Production Tier breaks a tie between equally tagged
 
 test("topPlayedTags: Production Tier shapes the profile but isn't a tag to show", () => {
   const games = [1, 2, 3, 4, 5].map((id) => ({ ...owned(id, 10, { [`T${id}`]: 1 }), productionTier: 'Indie' }));
-  assert.ok(!topPlayedTags([...games, owned(6, 0, { X: 1 })], 10).some((t) => t.startsWith('tier:')));
+  assert.ok(!tagsOf(topPlayedTags([...games, owned(6, 0, { X: 1 })], 10)).some((t) => t.startsWith('tier:')));
 });
 
 test("tasteOf/fitTo: a game outside the library scores by closeness to the account's play profile", () => {

@@ -51,6 +51,10 @@ export function similarGames<T extends Tagged>(target: T, games: readonly T[], l
 // Below this many played games, a profile says more about chance than taste.
 const MIN_PLAYED_FOR_PROFILE = 5;
 
+function playedOf<T extends Omit<Tagged, 'appid'> & { playtime?: number }>(weighted: readonly T[]) {
+  return weighted.filter((g) => g.playtime).map((game) => ({ game, hours: game.playtime!, weights: featuresOf(game) }));
+}
+
 // Tag weights × log playtime (one 2000 h game can't drown the rest) × rarity; null if too few played.
 function playProfile(played: readonly { hours: number; weights: TagWeights }[], idf: (tag: string) => number) {
   if (played.length < MIN_PLAYED_FOR_PROFILE) return null;
@@ -60,18 +64,36 @@ function playProfile(played: readonly { hours: number; weights: TagWeights }[], 
   return profile;
 }
 
+export interface PlayedTag {
+  tag: string;
+  weight: number; // relative to the top shown tag's score, 0–1
+  games: { name: string; hours: number }[]; // the played games counting most toward it
+}
+
+const GAMES_PER_TAG = 3;
+
 export function topPlayedTags(
-  games: readonly (Omit<Tagged, 'appid'> & { playtime?: number })[],
+  games: readonly (Omit<Tagged, 'appid'> & { name: string; playtime?: number })[],
   limit: number,
-): string[] {
+): PlayedTag[] {
   const weighted = games.filter((g) => g.details?.tagWeights);
   const idf = inverseFrequency(weighted.map(featuresOf));
-  const played = weighted.filter((g) => g.playtime).map((g) => ({ hours: g.playtime!, weights: featuresOf(g) }));
-  return [...(playProfile(played, idf) ?? [])]
+  const played = playedOf(weighted);
+  const top = [...(playProfile(played, idf) ?? [])]
     .filter(([tag, score]) => score > 0 && !tag.startsWith(TIER_PREFIX))
     .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([tag]) => tag);
+    .slice(0, limit);
+  return top.map(([tag, score]) => ({
+    tag,
+    weight: score / top[0][1],
+    // A tag's idf is the same for every game, so this orders them by their share of its score.
+    games: played
+      .map(({ game, hours, weights }) => ({ name: game.name, hours, share: (weights[tag] ?? 0) * Math.log1p(hours) }))
+      .filter((g) => g.share > 0)
+      .sort((a, b) => b.share - a.share)
+      .slice(0, GAMES_PER_TAG)
+      .map(({ name, hours }) => ({ name, hours })),
+  }));
 }
 
 export interface PlayerFits {
@@ -137,8 +159,7 @@ export function tasteOf(games: readonly (Tagged & { name: string; playtime?: num
   if (!weighted.length) return null;
   const corpus = weighted.map(featuresOf);
   const idf = inverseFrequency(corpus);
-  const played = weighted.filter((g) => g.playtime).map((g) => ({ hours: g.playtime!, weights: featuresOf(g) }));
-  const profile = playProfile(played, idf);
+  const profile = playProfile(playedOf(weighted), idf);
   const tags = new Set(corpus.flatMap(Object.keys));
   return {
     at,
