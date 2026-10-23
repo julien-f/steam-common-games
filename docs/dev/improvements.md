@@ -35,10 +35,17 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Taste profile
 
+- **U208 · minor · A5, F3** — the no-playtime button's "what to play next" list counts and ranks unreleased and free-to-play games with the rest: on Dave's Owned, Someday Saga (coming soon) and Counter-Strike 2 (free) top it, above the two games actually waiting to be played. Leave coming-soon games out (and say free ones apart), in both the count and the filter.
+- **U212 · polish · A5** — "Plays 7 of 9 story games for as long as their main story" doesn't say which; the two that fell short are the actionable part ("pick Sekiro back up?"). **Why these?** lists the story games reached and fell short, each opening its panel.
 - **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
 
 ## Comparing
 
+- **U209 · minor · C7, I1** — on a phone, opening **Players** moves the table from 572 to 825 px of 844, so tapping a player's tag filters a table that's off-screen: nothing visible changes. Bring the table into view after a tag tap from Players (or fold the section), as the status line would.
+- **U210 · minor · C7** — each player's "more than the others" tags mostly repeat their top 3 shown just before (Dave's are identical: Open World, Story Rich, RPG), while the shared count in the summary and **In common** say the same thing twice. Once two players have a profile, show each player's own tags in place of their top tags, and fold In common into the summary ("share 2 of their top 10 tags: Action, FPS").
+- **U211 · minor · C7** — **Suggest to** starts on a player without a profile when that's the first one ("too few games played here for a profile"), and counts the current account as "not me" when no ★ account is set, so in Alice vs. Dave vs. Erin as Alice it opens on Alice. Start on the first player with a profile who is neither my ★ nor the current account.
+- **U213 · polish · C7, C1** — **Players** is open by default on desktop and costs ~210 px every visit (the table starts at 638 of 900 px). Remember the viewer's open/closed choice (a per-viewer convenience).
+- **U214 · polish · C7** — a player without a profile is said twice: in **Players** and in the status line's "Group fit leaves out Alice". Drop the status note while Players says it.
 - **U207 · minor · C1, C5, C6** — a comparison's Players section says where tastes meet, not what everyone can run or play together. Add the group's hard constraints: worst ProtonDB tier, co-op modes, controller support.
 - **U170 · major · C3, L2** — saving a comparison names a player who isn't a stored account by steam64 id: the formula reads "Alice — Owned ∪ 76561198000000002 — Owned", and so do its group labels and Home's tree, though the comparison's own title said "Alice vs. Bob" and a reload doesn't fix it. Store or resolve each source account's name when the list is saved.
 - **U196 · minor · C5, F1** — a Deck player has only ProtonDB's crowd tier to go on. A **Deck rating** from `GetAppReviews`' `primarily_steam_deck` (Steam reviews by mostly-Deck players), beside ProtonDB; one more review call per uncached game, and many games will have too few reviews — measure how many of a typical library get one first.
