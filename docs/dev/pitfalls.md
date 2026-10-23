@@ -110,12 +110,11 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the session scratchpad is shared by every agent, so a generic file name is overwritten between one agent's write and its commit.
 - **Fix**: name message files per agent or lane (`msg-<lane>.txt`).
 
-## A phone e2e layout test fails in CI only, by a few pixels
+## An e2e layout test fails in CI only
 
-- **Symptom**: a position check like I1's `expect(top).toBeLessThan(520)` gets `Received: 524.5` in CI, yet passes locally and in the `mcr.microsoft.com/playwright` image.
-- **Cause**: the GitHub runner's system font is DejaVu Sans, wider than Fedora's and with a shorter `normal` line height, so a row at its 390 px limit wraps, a column sized in px overflows, or a control drops under a 24px tap there only.
-- **Fix**: reproduce exactly with DejaVu Sans's `.ttf` files in a directory and a `fonts.conf` that includes `/etc/fonts/fonts.conf`, adds that `<dir>` and puts DejaVu Sans first for `system-ui`, `sans-serif` (and DejaVu Sans Mono for `monospace`) with `<alias binding="strong">`; then `FONTCONFIG_FILE=<that file> npx playwright test …`. Fix the CSS (size to content, set a line height), not the threshold: Debian and Ubuntu users get the same font.
-- **Also**: to find the change that broke it, diff against the last green run's commit (`gh run view <id> --json headSha`), not just the newest commit: one push can carry many.
+- **Symptom**: a position or size check passes locally and fails in CI by a few pixels.
+- **Cause**: something other than the committed fonts drives the layout there (the e2e browser already renders with `e2e/fonts/`, testing.md): a glyph DejaVu lacks falling back to a system font, or a Chromium version gap.
+- **Fix**: fix the CSS (size to content, set a line height), not the threshold. To find the change that broke it, diff against the last green run's commit (`gh run view <id> --json headSha`), not just the newest commit: one push can carry many.
 
 ## A closed `[popover]` panel shows anyway
 

@@ -26,6 +26,8 @@ export default defineConfig({
     reducedMotion: 'reduce',
     // `E2E_SHOTS=1 npm run test:e2e` keeps every test's final screen in test-results/, to look at a UI change under mocks.
     screenshot: process.env.E2E_SHOTS ? 'on' : 'off',
+    // The committed DejaVu fonts, not the machine's: layouts measure the same locally and in CI (Linux only: fontconfig).
+    launchOptions: { env: { ...process.env, FONTCONFIG_FILE: path.join(__dirname, 'e2e/fonts/fonts.conf') } },
   },
   // The two sizes ux-review checks.
   projects: [

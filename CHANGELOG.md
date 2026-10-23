@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The long-comment check lets an existing comment be rewrapped when its words are unchanged
 - setup-facts' per-agent gate and tool times no longer read NaN
 - Setup facts count skills that subagents follow, and no longer take background task notifications for prompts
+- End-to-end tests render with bundled DejaVu fonts, so layout checks measure the same locally and in CI
 
 ## [0.11.0] - 2026-10-14
 
