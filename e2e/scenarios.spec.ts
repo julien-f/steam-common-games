@@ -660,7 +660,9 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await expect(coop).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('A5.1-2: Plays mostly says how many played games it is built from, leaving software out', async ({ page }) => {
+test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
+  page,
+}) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
@@ -668,6 +670,12 @@ test('A5.1-2: Plays mostly says how many played games it is built from, leaving 
   // 15 played, minus Wallpaper Engine's 3000 h.
   await expect(note).toContainText('from 14 played games');
   await expect(note.locator('.list-plays-mostly-tag')).not.toContainText(['Utilities']);
+  // Sekiro and Hogwarts Legacy fell short; Dead Cells and Slay the Spire are endless.
+  await expect(page.locator('.list-profile-facts')).toHaveText(
+    'Mostly single-player games · Plays 7 of 9 story games for as long as their main story',
+  );
+  await note.getByRole('button', { name: 'Why these?' }).click();
+  await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
 });
 
 test('A5 edge: an account with no playtime at all says why it has no profile', async ({ page }) => {

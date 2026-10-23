@@ -635,6 +635,11 @@
     border-color: var(--accent);
     color: var(--accent);
   }
+  .list-profile-facts {
+    margin: 4px 0 0;
+    font-size: var(--fs-label);
+    font-style: normal;
+  }
   .list-plays-mostly-count {
     color: var(--muted);
   }

@@ -65,6 +65,7 @@ import { createTableState, DataTableView, datePartGroup } from '@vates/data-tabl
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
 import { fitTo, playerFits, similarGames, tasteOf, topPlayedTags, type PlayerFits, type Taste } from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
+import { playStyle, storyGames, storySentence, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -3253,71 +3254,102 @@ export default function ListRoute() {
   const playtimeHidden = createMemo(
     () => loadFraction() == null && tableData().length > 0 && !tableData().some((g) => g.playtime),
   );
+  const profileFacts = createMemo(() => {
+    if (loadFraction() != null) return { style: null, story: null };
+    const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
+    return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
+  });
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
     const pct = (weight: number) => `${Math.round(weight * 100)}%`;
     const hours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
     return (
-      <Show
-        when={playsMostly().length}
-        fallback={
-          <Show when={playtimeHidden()}>
-            <div class="list-plays-mostly">No playtime to profile: it's private, or nothing was played yet.</div>
-          </Show>
-        }
-      >
-        <div class="list-plays-mostly">
-          Plays mostly:{' '}
-          <For each={playsMostly()}>
-            {({ tag, weight }, i) => (
-              <button
-                type="button"
-                class="list-plays-mostly-tag"
-                classList={{ active: tableReady() && isTagActive('tags', tag) }}
-                aria-pressed={tableReady() && isTagActive('tags', tag)}
-                title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
-                onClick={() => onTagClick('tags', tag)}
-              >
-                {tag}
-                <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
-              </button>
-            )}
-          </For>
-          <span class="list-plays-mostly-count">from {playsMostlyProfile().played} played games</span>
-          <button
-            type="button"
-            class="list-plays-mostly-why"
-            aria-expanded={playsMostlyWhy()}
-            aria-controls="plays-mostly-breakdown"
-            onClick={() => setPlaysMostlyWhy((open) => !open)}
-          >
-            Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
-          </button>
-        </div>
-        <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
-          <p>
-            Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
-            players tagged it).
-          </p>
-          <ul>
+      <>
+        <Show
+          when={playsMostly().length}
+          fallback={
+            <Show when={playtimeHidden()}>
+              <div class="list-plays-mostly">No playtime to profile: it's private, or nothing was played yet.</div>
+            </Show>
+          }
+        >
+          <div class="list-plays-mostly">
+            Plays mostly:{' '}
             <For each={playsMostly()}>
-              {({ tag, weight, games }) => (
-                <li>
-                  <span class="list-plays-mostly-name">{tag}</span>
-                  <span class="list-plays-mostly-bar">
-                    <span style={{ width: pct(weight) }} />
-                    <span class="visually-hidden">{pct(weight)}</span>
-                  </span>
-                  <span class="list-plays-mostly-games">
-                    {games.map((g) => `${g.name} ${hours(g.hours)}`).join(' · ')}
-                  </span>
-                </li>
+              {({ tag, weight }, i) => (
+                <button
+                  type="button"
+                  class="list-plays-mostly-tag"
+                  classList={{ active: tableReady() && isTagActive('tags', tag) }}
+                  aria-pressed={tableReady() && isTagActive('tags', tag)}
+                  title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
+                  onClick={() => onTagClick('tags', tag)}
+                >
+                  {tag}
+                  <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
+                </button>
               )}
             </For>
-          </ul>
-        </div>
-      </Show>
+            <span class="list-plays-mostly-count">from {playsMostlyProfile().played} played games</span>
+            <button
+              type="button"
+              class="list-plays-mostly-why"
+              aria-expanded={playsMostlyWhy()}
+              aria-controls="plays-mostly-breakdown"
+              onClick={() => setPlaysMostlyWhy((open) => !open)}
+            >
+              Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
+            </button>
+          </div>
+        </Show>
+        <Show when={profileFacts().style || profileFacts().story}>
+          <p class="list-profile-facts">
+            {[
+              profileFacts().style && STYLE_SENTENCES[profileFacts().style!],
+              profileFacts().story && storySentence(profileFacts().story!),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </Show>
+        <Show when={playsMostly().length}>
+          <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
+            <p>
+              Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
+              players tagged it).
+            </p>
+            <Show when={profileFacts().style}>
+              <p>
+                Play style: the kind of game (single-player, co-op, PvP) holding over half the played games' weight, by
+                log hours; a game with several modes goes by the one players tag it most for.
+              </p>
+            </Show>
+            <Show when={profileFacts().story}>
+              <p>
+                Story games: single-player games with a How Long To Beat main story and no endless tag (roguelike,
+                sandbox…), counted when played for at least 80% of it.
+              </p>
+            </Show>
+            <ul>
+              <For each={playsMostly()}>
+                {({ tag, weight, games }) => (
+                  <li>
+                    <span class="list-plays-mostly-name">{tag}</span>
+                    <span class="list-plays-mostly-bar">
+                      <span style={{ width: pct(weight) }} />
+                      <span class="visually-hidden">{pct(weight)}</span>
+                    </span>
+                    <span class="list-plays-mostly-games">
+                      {games.map((g) => `${g.name} ${hours(g.hours)}`).join(' · ')}
+                    </span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
+      </>
     );
   }
 

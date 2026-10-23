@@ -1,0 +1,119 @@
+import { isSoftware } from './tagTaste.ts';
+
+// Facts about how an account plays, beyond Plays mostly's tags: said as sentences, each silent
+// below the number of games it needs to mean anything.
+
+export interface ProfileGame {
+  appid: number;
+  genres?: string[];
+  categories?: string[];
+  hltbMain?: number | null;
+  details?: { tagWeights?: Record<string, number | null> | null } | null;
+}
+
+export type PlayStyle = 'solo' | 'coop' | 'pvp' | 'multiplayer';
+
+// Below an hour, a launch says little about how the game is played.
+const MIN_HOURS = 1;
+// Fewer played (or story) games than this, and a share is mostly chance.
+const MIN_GAMES = 8;
+// Hours at or past this share of HLTB's main story count as played through it.
+const STORY_SHARE = 0.8;
+
+const MODE_CATEGORIES: Record<Exclude<PlayStyle, 'solo'>, string[]> = {
+  pvp: ['PvP', 'Online PvP', 'LAN PvP', 'Shared/Split Screen PvP'],
+  coop: ['Co-op', 'Online Co-op', 'LAN Co-op', 'Shared/Split Screen Co-op'],
+  multiplayer: ['Multi-player', 'MMO', 'Cross-Platform Multiplayer'],
+};
+const MODE_TAGS: Record<PlayStyle, string[]> = {
+  solo: ['Singleplayer'],
+  coop: ['Co-op', 'Online Co-Op', 'Local Co-Op'],
+  pvp: ['PvP', 'Online PvP'],
+  multiplayer: ['Multiplayer', 'Massively Multiplayer', 'Local Multiplayer'],
+};
+// Played without end, so hours say nothing about reaching the end of a story.
+const ENDLESS_TAGS = [
+  'Roguelike',
+  'Roguelite',
+  'Sandbox',
+  'Simulation',
+  'Open World Survival Craft',
+  'MMORPG',
+  'Massively Multiplayer',
+  'Grand Strategy',
+  '4X',
+  'City Builder',
+  'Colony Sim',
+];
+
+const isPlayed = (g: ProfileGame, hours: number) => hours >= MIN_HOURS && !isSoftware(g);
+
+// The modes a game's categories offer, solo included; empty when the store page didn't answer.
+function modesOf(g: ProfileGame): PlayStyle[] {
+  const categories = new Set(g.categories ?? []);
+  const modes = (['pvp', 'coop'] as const).filter((m) =>
+    MODE_CATEGORIES[m].some((c) => categories.has(c)),
+  ) as PlayStyle[];
+  // "Multi-player" comes with every co-op and PvP game: a mode of its own only without them.
+  if (!modes.length && MODE_CATEGORIES.multiplayer.some((c) => categories.has(c))) modes.push('multiplayer');
+  if (categories.has('Single-player')) modes.push('solo');
+  return modes;
+}
+
+// A game offering several modes goes by its strongest mode tag (players tag what they play it
+// for); with no tag to tell, it says nothing about its player.
+export function playStyleOf(g: ProfileGame): PlayStyle | null {
+  const modes = modesOf(g);
+  if (modes.length <= 1) return modes[0] ?? null;
+  const weights = g.details?.tagWeights ?? {};
+  const strength = (m: PlayStyle) => Math.max(0, ...MODE_TAGS[m].map((tag) => weights[tag] ?? 0));
+  const [best, next] = modes.map((m) => ({ m, w: strength(m) })).sort((a, b) => b.w - a.w);
+  return best.w > next.w ? best.m : null;
+}
+
+// The play style holding at least half the played games' weight (log hours, so one 2000 h game
+// can't decide alone); null below MIN_GAMES or without a majority.
+export function playStyle(games: readonly ProfileGame[], hours: (g: ProfileGame) => number): PlayStyle | null {
+  const weights = new Map<PlayStyle, number>();
+  let total = 0;
+  let counted = 0;
+  for (const g of games) {
+    const h = hours(g);
+    const style = isPlayed(g, h) ? playStyleOf(g) : null;
+    if (!style) continue;
+    const w = Math.log1p(h);
+    weights.set(style, (weights.get(style) ?? 0) + w);
+    total += w;
+    counted++;
+  }
+  if (counted < MIN_GAMES) return null;
+  const [style, w] = [...weights].sort((a, b) => b[1] - a[1])[0];
+  return w >= total / 2 ? style : null;
+}
+
+const isStoryGame = (g: ProfileGame) => {
+  const modes = modesOf(g);
+  const weights = g.details?.tagWeights ?? {};
+  return modes.length === 1 && modes[0] === 'solo' && !!g.hltbMain && !ENDLESS_TAGS.some((tag) => weights[tag] != null);
+};
+
+// Of the played single-player games with an end, how many were played for their main story's
+// length; hours can't say the story was finished, only that it could have been.
+export function storyGames(
+  games: readonly ProfileGame[],
+  hours: (g: ProfileGame) => number,
+): { reached: number; of: number } | null {
+  const story = games.filter((g) => isPlayed(g, hours(g)) && isStoryGame(g));
+  if (story.length < MIN_GAMES) return null;
+  return { reached: story.filter((g) => hours(g) >= STORY_SHARE * g.hltbMain!).length, of: story.length };
+}
+
+export const STYLE_SENTENCES: Record<PlayStyle, string> = {
+  solo: 'Mostly single-player games',
+  coop: 'Mostly co-op games',
+  pvp: 'Mostly PvP games',
+  multiplayer: 'Mostly multiplayer games',
+};
+
+export const storySentence = ({ reached, of }: { reached: number; of: number }) =>
+  `Plays ${reached} of ${of} story games for as long as their main story`;
