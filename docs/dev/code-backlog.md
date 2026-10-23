@@ -21,10 +21,15 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C176 · minor · M** — table views persist three ways: user lists auto-sync their `tableView`, system lists stay local behind a Save/Revert baseline (`public/tableViewSync.ts`, `public/tableViewPrefs.ts`, 224 lines), `?tv=` has its Keep/Use my own banner. Auto-syncing every view like user lists would drop the baseline machinery.
 - **C177 · minor · M** — soft-delete (`deletedAt`/`removedAt`, the sweep) duplicates the dangling-source handling the formula hero already has: hard-delete and flag the source, or refuse the delete naming the referencing lists. Likewise `orphanBundle`/`orphanOf` could fall back to the bundle snapshot on a 404 as on any other failure, instead of converting it to a manual list.
 - **C178 · cleanup · M** — Taste fit and a comparison's Group fit are one score at different arities (Group fit: the least-suited player's). One "Fit" column, per account or min over players, would be one notion.
+- **C191 · cleanup · S** — `public/combine.ts:62` holds a literal NUL byte inside a string, so editing tools refuse the file (a fix had to move `isCombineOp` to `public/listsStore.ts` instead). Write it as the `\0` escape.
+- **C192 · cleanup · M** — the combine op set is stated three times: `OP_LABELS` (`public/listLabels.ts`), `COMBINE_OPS` in `public/listsStore.ts` (for `isCombineOp`) and a differently shaped `COMBINE_OPS` in `public/CombineForm.tsx`. Move the op table to a small module both stores import (`public/listLabels.ts` importing `public/listsStore.ts` rules out the direct way).
+- **C193 · cleanup · M** — the panel's More links menu hand-rolls window-capture Esc, outside-click and focus-leave closing (`public/panel.tsx`), a second copy of what `bindNavPopover` (`public/navPopover.ts`) does, already diverged. Make it a native popover bound with `bindNavPopover`.
 
 ## Correctness
 
 - **C154 · minor · S** — the panel's ↻ Refresh does nothing on `/search`: `public/SearchRoute.tsx:252` registers no `refreshGame` (`public/AppShell.tsx:202` calls `routeHandlers.refreshGame?.`), so the spinner-less click is silently dropped. Register one that refetches `/api/game-details/:appid?refresh=1` and updates the shown result, sharing RankRoute's once its follow-up lands.
+- **C194 · minor · S** — a list stored or synced with an unknown combine op before `isCombineOp` existed still fails to resolve on every device: nothing checks `op` when lists are read back (`public/listsStore.ts`). Drop or repair such a list on load, with a `[lists]` warning.
+- **C195 · minor · S** — `fmtLastPlayed` (`public/utils.ts:289`) gives the UTC day while Released and the Taste fit date use `fmtLocalDate`'s local day: a game played at 20:00 in UTC-8 shows tomorrow's date. Use `fmtLocalDate`.
 
 ## Security
 
@@ -43,6 +48,7 @@ None open.
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
 - **C188 · major · M** — the Taste cache (`saveTaste`, `public/tagTaste.ts`) writes one key per account ever loaded, `?u=` visits included, and nothing prunes them; once storage is full, `writeEntries` silently drops every list and pref edit. Keep only the most recent few accounts, evict on a failed write, and surface a failed pref write. Unverified: how many libraries it takes to fill a browser's quota.
 - **C190 · minor · M** — a shared `?f=` or compare link with many account sources fires all their `/api/common-games` calls at once (`resolveListWithSources`, `public/listResolve.ts:152`): past `SEARCH_RATE_LIMIT_MAX` they 429, the whole list fails, and the viewer's search budget is spent for a minute. Dedupe and cap sources at decode with a clear message, or resolve with bounded concurrency.
+- **C196 · minor · S** — table views from storage or sync (`store.load()` in `public/tableViewPrefs.ts:33`, `public/BundlesBrowseRoute.tsx:316`, a list's synced `tableView`, the revert baseline) reach `setViewState` unchecked, while a `?tv=` link now goes through `isTableViewState`: a view written by an older or newer build throws there. Run them through the same check. Upstream, `@vates/data-table-solid`'s `setViewState` (and its own URL view sync) could validate instead; worth an issue.
 
 ## Compliance
 
@@ -53,6 +59,8 @@ None open.
 
 - **C171 · minor · S** — `test/clipboard.test.js:89` ("restores a label made of several nodes") waits `COPIED_MS + 10` ms of real time for a restore timer that starts only after the copy promise settles, so under load it can assert before the restore: it failed once in a pre-commit run on 2026-10-12, then passed unchanged. Drive the timer with `node:test`'s `mock.timers` instead of sleeping.
 - **C172 · minor · S** — `e2e/scenarios.spec.ts` "I2 edge: Esc closing the panel returns focus to the row it was showing" presses ArrowDown as soon as `.game-panel` is visible, which can be before the table's rows load, so `stepGame` finds no next row, the press is lost and the URL keeps `game=1145360`: it failed once in a pre-commit run on 2026-10-12 and 3 times in 840 repeats. Wait for the rows before pressing.
+- **C197 · minor · S** — `e2e/scenarios.spec.ts:2123` ("B2 edge: another region's prices state their own age…") expects "just now" but got "Updated 1 min ago" in three lanes' runs under load on 2026-10-23, passing on re-run. Freeze the clock (`page.clock`) or accept either label.
+- **C198 · minor · S** — no mock game has the Steam Workshop category (`e2e/mockApi.ts`), so the panel's Workshop link is untested. Give one fixture game that category and assert the link.
 
 ## Docs
 
