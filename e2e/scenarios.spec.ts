@@ -1493,6 +1493,36 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
   await expect(menu).toHaveAccessibleName('Weighted Rating options');
 });
 
+const SHORT_VIEW = { id: 'short', name: 'Short', tableView: { rangeFilters: { playtime: { min: '', max: '2' } } } };
+
+test('L5.4: a view keeps its edits until Save or Revert', async ({ page }) => {
+  await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW] } });
+  await page.goto('/lists/owned?view=short');
+  await expect(rows(page)).toHaveCount(4); // played 2 h or less
+  await expect(page.getByRole('button', { name: 'Default view' })).toHaveCount(0); // Revert does it
+
+  await page.getByRole('button', { name: /Clear all/ }).click();
+  await expect(rows(page)).toHaveCount(6);
+  const banner = page.locator('.pref-unsaved-banner');
+  await expect(banner).toContainText('Unsaved changes to Short (Sort, Filters)'); // Clear all drops the sort too
+  await banner.getByRole('button', { name: 'Revert' }).click();
+  await expect(rows(page)).toHaveCount(4);
+  await expect(banner).toHaveCount(0);
+
+  await page.getByRole('button', { name: /Clear all/ }).click();
+  await banner.getByRole('button', { name: 'Save' }).click();
+  await expect(banner).toHaveCount(0);
+  await page.reload();
+  await expect(rows(page)).toHaveCount(6);
+});
+
+test('L5 edge: a link to a deleted view shows the whole list, and says so', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?view=gone');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.getByText('This view no longer exists')).toBeVisible();
+});
+
 test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 10', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

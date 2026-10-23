@@ -5,10 +5,17 @@ import { game, type Player } from './fixtures.ts';
 // whatever the test did since. `withLabel: false` stores it the way an old slot was: id only.
 // `recentGames`: Recently Looked Up's appids, newest first. `updatedAt`: every key's last-write time.
 // `otherAccounts`: names of extra known accounts (display only: they resolve to nothing).
+// `listViews`: the listViews.ts pref, saved views per kind.
 export async function asPlayer(
   page: Page,
   player: Player,
-  { withLabel = true, recentGames = [] as number[], updatedAt = 0, otherAccounts = [] as string[] } = {},
+  {
+    withLabel = true,
+    recentGames = [] as number[],
+    updatedAt = 0,
+    otherAccounts = [] as string[],
+    listViews = undefined as object | undefined,
+  } = {},
 ): Promise<void> {
   const slot = {
     id: player.steamid,
@@ -28,6 +35,7 @@ export async function asPlayer(
     ...(recentGames.length
       ? { recentGames: entry(recentGames.map((appid) => ({ appid, name: game(appid).name, tinyImage: null }))) }
       : {}),
+    ...(listViews ? { listViews: entry(listViews) } : {}),
   };
   await page.addInitScript((blob) => {
     if (sessionStorage.getItem('e2e-seeded')) return;

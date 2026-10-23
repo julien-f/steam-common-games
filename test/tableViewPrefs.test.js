@@ -296,3 +296,23 @@ test('shareTableView: adds extra params, but never over one the URL already sets
     if (originalNavDesc) Object.defineProperty(globalThis, 'navigator', originalNavDesc);
   }
 });
+
+test('shareTableView: drops the params the recipient has no use for', async () => {
+  const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  try {
+    await withLocation('?u=alice&view=abc', async () => {
+      let copied = null;
+      const stubNav = { clipboard: { writeText: async (text) => (copied = text) } };
+      Object.defineProperty(globalThis, 'navigator', { value: stubNav, configurable: true });
+      shareTableView(fakeTable({}), { textContent: 'Share view', childNodes: [], replaceChildren() {} }, {}, ['view']);
+      await Promise.resolve();
+      await Promise.resolve();
+      const params = new URL(copied).searchParams;
+      assert.equal(params.has('view'), false);
+      assert.equal(params.get('u'), 'alice');
+      assert.equal(location.search, '?u=alice&view=abc', 'live URL left untouched');
+    });
+  } finally {
+    if (originalNavDesc) Object.defineProperty(globalThis, 'navigator', originalNavDesc);
+  }
+});

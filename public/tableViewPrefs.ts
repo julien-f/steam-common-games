@@ -87,9 +87,15 @@ export function bindViewPersistence(
 // user makes one more change to the table, silently showing a snapshot that no longer matches
 // what's on screen. The stored pref (bindViewPersistence above) already captures live state on
 // every change; this link is only for handing the *current* view to someone else.
-// `extraParams` are added only where the URL doesn't already set them.
-export function shareTableView(table: ViewStateApi, btn: HTMLElement, extraParams: Record<string, string> = {}): void {
+// `extraParams` are added only where the URL doesn't already set them; `dropParams` mean nothing to the recipient.
+export function shareTableView(
+  table: ViewStateApi,
+  btn: HTMLElement,
+  extraParams: Record<string, string> = {},
+  dropParams: string[] = [],
+): void {
   const params = new URLSearchParams(location.search);
+  for (const key of dropParams) params.delete(key);
   for (const [key, value] of Object.entries(extraParams)) if (!params.has(key)) params.set(key, value);
   const view = table.getViewState();
   // An unchanged view is the defaults: sending `{}` would only show the recipient a "shared layout" banner.

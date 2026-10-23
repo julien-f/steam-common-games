@@ -8,7 +8,6 @@ const {
   setBaseline,
   clearBaseline,
   resetBaselines,
-  isUnsaved,
   summarizeViewDiff,
   stripTransientViewFields,
 } = require('../public/tableViewSync.ts');
@@ -70,30 +69,30 @@ test('stripTransientViewFields: undefined input yields an empty object', () => {
   assert.deepEqual(stripTransientViewFields(undefined), {});
 });
 
-// ── isUnsaved / summarizeViewDiff ────────────────────────────────────────────
+// ── summarizeViewDiff / diffViewLabels ────────────────────────────────────────────
 
-test('isUnsaved: false when the current value equals the baseline', () => {
+test('summarizeViewDiff: false when the current value equals the baseline', () => {
   const view = { sorts: [{ key: 'name', dir: 'asc' }] };
   setBaseline('ownedListView', { value: view, updatedAt: 1 });
-  assert.equal(isUnsaved('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] }), false);
+  assert.equal(summarizeViewDiff('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] }).length > 0, false);
 });
 
-test('isUnsaved: true when the current value differs from the baseline', () => {
+test('summarizeViewDiff: true when the current value differs from the baseline', () => {
   setBaseline('ownedListView', { value: { sorts: [{ key: 'name', dir: 'asc' }] }, updatedAt: 1 });
-  assert.equal(isUnsaved('ownedListView', { sorts: [{ key: 'rating', dir: 'desc' }] }), true);
+  assert.equal(summarizeViewDiff('ownedListView', { sorts: [{ key: 'rating', dir: 'desc' }] }).length > 0, true);
 });
 
-test('isUnsaved: with no baseline at all, an empty current value is not unsaved', () => {
-  assert.equal(isUnsaved('ownedListView', {}), false);
+test('summarizeViewDiff: with no baseline at all, an empty current value is not unsaved', () => {
+  assert.equal(summarizeViewDiff('ownedListView', {}).length > 0, false);
 });
 
-test('isUnsaved: with no baseline at all, any non-empty current value is unsaved', () => {
-  assert.equal(isUnsaved('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] }), true);
+test('summarizeViewDiff: with no baseline at all, any non-empty current value is unsaved', () => {
+  assert.equal(summarizeViewDiff('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] }).length > 0, true);
 });
 
-test('isUnsaved/summarizeViewDiff: ignores page and searchQuery', () => {
+test('summarizeViewDiff: ignores page and searchQuery', () => {
   setBaseline('ownedListView', { value: { pageSize: 25, page: 1 }, updatedAt: 1 });
-  assert.equal(isUnsaved('ownedListView', { pageSize: 25, page: 3, searchQuery: 'portal' }), false);
+  assert.equal(summarizeViewDiff('ownedListView', { pageSize: 25, page: 3, searchQuery: 'portal' }).length > 0, false);
 });
 
 test('summarizeViewDiff: empty when nothing differs', () => {
@@ -113,4 +112,11 @@ test('summarizeViewDiff: names each differing field, deduped and grouped under a
     excludeFilters: { tag: ['Horror'] },
   });
   assert.deepEqual(diff, ['Sort', 'Filters']);
+});
+
+test('diffViewLabels: compares against any saved view, page and searchQuery aside', () => {
+  const { diffViewLabels } = require('../public/tableViewSync.ts');
+  const saved = { sorts: [{ key: 'name', dir: 'asc' }] };
+  assert.deepEqual(diffViewLabels(saved, { ...saved, page: 2, searchQuery: 'x' }), []);
+  assert.deepEqual(diffViewLabels(saved, { rangeFilters: { playtime: { min: '', max: '2' } } }), ['Sort', 'Filters']);
 });

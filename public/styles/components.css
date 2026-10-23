@@ -896,6 +896,12 @@
     font-size: var(--fs-ui);
   }
 
+  .list-note {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+
   /* Share view / Default view, in the table toolbar's end slot. */
   .list-view-actions {
     position: relative;
