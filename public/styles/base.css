@@ -248,8 +248,7 @@
     }
   }
 
-  /* Animations near-zero rather than none: the lightbox waits for animationend. Transitions 0s: a
-     transitioning table dropdown freezes the page (vatesfr/data-table#43, pitfalls.md). */
+  /* Animations near-zero rather than none: the lightbox waits for animationend. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

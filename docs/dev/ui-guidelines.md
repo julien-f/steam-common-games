@@ -73,7 +73,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 ## Motion
 
 - Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/base.css`; motion explains a change (something opening, arriving, pressed), never decorates.
-- Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate. Never transition a table dropdown's (`.dt-dd`) transform: it freezes the page ([pitfalls.md](pitfalls.md)).
+- Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate.
 - Press feedback: buttons give to `scale: 0.98` while held, clickable rows to `0.995` (a full-width row would jump at 0.98), and both snap back on release, so a menu the click opens measures its trigger at full size.
 - An image fades in once loaded (`fadeInOnLoad`), so a row or the panel never flashes a half-drawn picture; a cached one shows at once.
 - View Transitions only for a shared element (row thumbnail → panel hero, hero → lightbox), through `viewTransition.ts`'s `morph`: feature-detected, skipped under reduced motion or while a top-layer popover or dialog is open, its `view-transition-name` set on the two elements only for the transition's length, the root cross-fade off, focus moved after `updateCallbackDone`. Not for route changes: the router has no hook, and a lazy route would freeze the screen while its chunk loads.
