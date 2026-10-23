@@ -98,8 +98,9 @@ const isStoryGame = (g: ProfileGame) => {
 };
 
 export interface StoryGames {
-  reached: number[]; // appids played for their main story's length
-  fellShort: number[]; // the others, most played first
+  // Appids, most played first: played for their main story's length, and the others.
+  reached: number[];
+  fellShort: number[];
 }
 
 // Of the played single-player games with an end, which were played for their main story's
@@ -108,12 +109,10 @@ export function storyGames(games: readonly ProfileGame[], hours: (g: ProfileGame
   const story = games.filter((g) => isPlayed(g, hours(g)) && isStoryGame(g));
   if (story.length < MIN_GAMES) return null;
   const reached = (g: ProfileGame) => hours(g) >= STORY_SHARE * g.hltbMain!;
+  const byHours = story.sort((a, b) => hours(b) - hours(a));
   return {
-    reached: story.filter(reached).map((g) => g.appid),
-    fellShort: story
-      .filter((g) => !reached(g))
-      .sort((a, b) => hours(b) - hours(a))
-      .map((g) => g.appid),
+    reached: byHours.filter(reached).map((g) => g.appid),
+    fellShort: byHours.filter((g) => !reached(g)).map((g) => g.appid),
   };
 }
 

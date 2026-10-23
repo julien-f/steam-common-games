@@ -58,8 +58,8 @@ const story = (appid, main, tagWeights = { 'Story Rich': 1 }) =>
 test('storyGames: single-player games with an end, played for 80% of their main story', () => {
   const games = [1, 2, 3, 4, 5, 6, 7, 8].map((id) => story(id, 10));
   const hours = hoursFrom({ 1: 8, 2: 9, 3: 20, 4: 2, 5: 7.9, 6: 30, 7: 10, 8: 1 });
-  // Fell short: most played first, the closest to their main story's length.
-  assert.deepEqual(storyGames(games, hours), { reached: [1, 2, 3, 6, 7], fellShort: [5, 4, 8] });
+  // Most played first in both.
+  assert.deepEqual(storyGames(games, hours), { reached: [6, 3, 7, 2, 1], fellShort: [5, 4, 8] });
 });
 
 test('storyGames: endless, multiplayer, unknown-length and unplayed games are not story games', () => {

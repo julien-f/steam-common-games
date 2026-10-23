@@ -705,6 +705,10 @@ test('A5 edge: Why these? names the story games that fell short of their main st
   await page.getByRole('button', { name: 'Why these?' }).click();
   const short = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'Fell short:' });
   await expect(short.getByRole('button')).toHaveText(['Sekiro: Shadows Die Twice', 'Hogwarts Legacy']);
+  // Capped, as a library may have hundreds: 5 of Dave's 7, then how many more.
+  const reached = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'reached:' });
+  await expect(reached.getByRole('button')).toHaveCount(5);
+  await expect(reached).toContainText('+2 more');
   await short.getByRole('button', { name: 'Hogwarts Legacy' }).click();
   await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
 });

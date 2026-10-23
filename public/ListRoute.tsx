@@ -654,6 +654,8 @@ const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: nul
 const PLAYS_MOSTLY_SHOWN = 6;
 const fmtHours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
 const PLAYER_TAGS_SHOWN = 3;
+// A large library may have hundreds of story games: the first few say enough.
+const STORY_GAMES_SHOWN = 5;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -3576,7 +3578,10 @@ export default function ListRoute() {
                     {({ label, appids }) => (
                       <Show when={appids.length}>
                         <p class="list-profile-story">
-                          {label} <For each={appids}>{gameButton}</For>
+                          {label} <For each={appids.slice(0, STORY_GAMES_SHOWN)}>{gameButton}</For>
+                          <Show when={appids.length > STORY_GAMES_SHOWN}>
+                            <span class="list-players-none">+{appids.length - STORY_GAMES_SHOWN} more</span>
+                          </Show>
                         </p>
                       </Show>
                     )}
