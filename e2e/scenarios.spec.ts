@@ -686,8 +686,12 @@ test('C1 edge: Tag match averages the filtered tags, or with All takes the weake
   await page.getByRole('checkbox', { name: 'Co-op', exact: true }).click();
   // Portal 2: Action 100%, Co-op 30%.
   await expect(row(page, 'Portal 2').getByRole('cell', { name: '65%' })).toBeVisible();
+  const chip = page.locator('.dt-chip--filter', { hasText: 'Tags' });
+  await expect(chip).toContainText('Action, Co-op');
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(row(page, 'Portal 2').getByRole('cell', { name: '30%' })).toBeVisible();
+  // The chip tells All from Any.
+  await expect(chip).toContainText('Action & Co-op');
 });
 
 test("C1 edge: a game looked up outside the list can't sort the list by similarity to it", async ({ page }) => {
