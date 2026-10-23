@@ -118,6 +118,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
 - `prefs.ts` / `StorageFullBanner.tsx` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the banner when storage refuses a write of it; the Preferences panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
+- `listViews.ts` / `ViewTabs.tsx` — Owned/Wishlist's saved views and their templates; the tabs, the active view's ⋯ and the hero's New view menu.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
 - `types.ts` — `Game`, `ReadonlyGame`, and the account/list interfaces; the single source of truth for row shape.
@@ -230,6 +231,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
   - On Owned/Wishlist it also adds `u=` for the effective account unless the URL has one; other kinds don't, since `u=` there would only swap the recipient's ownership markers.
   - Disabled on a saved user list (`shareViewFailure`, shown under the buttons): `/lists/<id>` only resolves in the browser holding it.
 - An incoming `tv` wins for that visit only: `restoreTableView` applies it without storing it and strips it from the URL, and the route pauses view persistence behind `SharedViewBanner` until the viewer keeps it (saving what's on screen) or goes back to their own. Consuming it matters because a table is rebuilt far more often than on page load.
+- A **saved view** (`?view=<id>` on Owned/Wishlist, `listViews.ts`) is the table's `ViewStore` instead of the kind's pref key, with `save` writing only an in-memory draft per view id: table rebuilds keep unsaved edits, and only the banner's Save (`UnsavedChangesBanner`, signed in or not) writes the pref. A `?view=` change re-applies the new view in place, without a reload, dropping the drafts. Default view is hidden there (Revert does it); Share view drops `view=`.
 - A signed-in device never auto-syncs a table-view key; edits stay local until an explicit Save. See [lists-and-accounts.md](lists-and-accounts.md) for the Save/Revert flow (`tableViewSync.ts`, `tableViewPrefs.ts`'s `saveTableViewToServer`/`revertTableViewToServer`).
 
 ## Each list kind, in practice
@@ -353,6 +355,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 - `?u=` repeated — **several** slots: a comparison, one `u=` per player, comma-joined identifiers within a slot for a Family (the old Comparison page's spelling). Not an account override, so nothing resolves it as one and `withAccountParam` doesn't forward it. `/lists/compare` is its address; `normalizeSlots`/`compareUrl` (`urlState.ts`) write it, canonicalized to server-resolved steam64 ids. `&op=` picks the combine op, omitted for the default.
 - `?game=<appid>` / `&shot=<idx>` — which game the current list has open, and which screenshot; Recently Looked Up writes the game into its path (`/game/<appid>`) instead. Rewritten with `replaceState`; the one entry pushed per open overlay is `overlayHistory.ts`'s. `/game/:appid` is the canonical address for a game; the panel's 🔗 copy-link omits `?u=`, so a shared game link doesn't send recipients into the sender's account.
 - `?tv=` — a shared table-view snapshot, consumed once on arrival (see the game table).
+- `?view=<id>` — Owned/Wishlist's saved view; not forwarded by nav links (Owned opens All games), and a deleted one falls back to the whole list with a note.
 - `?q=` — `/search`'s term. Read on mount, written back (`setSearchQueryParam`, `urlState.ts`) as the on-page box is edited, debounced like the nav-bar box. Always `replaceState`.
 - `reorderUrlParams` (`urlState.ts`) puts every URL through one canonical param order, so the same state always serializes to the same string; `urlWithParams` is the single place a `URLSearchParams` becomes a URL, returning a bare path once the last param is deleted.
 

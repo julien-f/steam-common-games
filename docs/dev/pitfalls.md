@@ -163,3 +163,15 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: `boundingBox()` (or another one-shot read) returns `null` under load, e.g. F1's "a DLC's capsule that fails to load hides" failing 3 in 60 runs beside another suite.
 - **Cause**: a prop passed as `body={body()}` is a getter, so every signal `body()` reads rebuilds its whole DOM; the DLC card swapped its streamed list for a new one when loading finished, detaching the element the locator had found.
 - **Fix**: build the JSX once (`body={body}`) with `<Show>`/`<For>` inside, over one memo for every state, so entries already shown keep their element (as `DlcSection` in `panel.tsx`).
+
+## `<A> and 'use' router primitives can be only used inside a Route.` from a table toolbar
+
+- **Symptom**: that uncaught error, from a component using `useNavigate`/`useLocation`/`<A>` in a list's table toolbar.
+- **Cause**: `ListRoute.tsx` renders the table (and its `toolbarEnd`) with its own `render()` call, outside the router's context.
+- **Fix**: pass a callback from the route instead, or render the control in the route's own JSX (the hero).
+
+## A Playwright `page.route('**/api/prices', …)` never fires
+
+- **Symptom**: the handler (holding or failing a response) is skipped and the real mock answers, sometimes making a test flaky rather than failing.
+- **Cause**: a glob matches the whole URL, query included, so `**/api/prices` misses `/api/prices?country=…`.
+- **Fix**: end the glob with `**` (`**/api/prices**`), or spell out the query.
