@@ -82,6 +82,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Each git worktree runs end-to-end tests on its own port, so agents testing in parallel don't collide.
 - Each worktree's mock server runs on its own port, and `node scripts/worktree.js <branch>` sets up a worktree in one step.
 - Two mock players with rich libraries, Dave and Erin, for the profile and comparison tests
+- The long-comment check also catches a comment grown past two lines by an edit
 
 ## [0.11.0] - 2026-10-14
 

@@ -58,3 +58,25 @@ test('longComments: a comment reflowed with its words unchanged passes, one with
   assert.deepEqual(longComments(reflowed), []);
   assert.deepEqual(longComments(reflowed.replace('+// beside it', '+// beside it now')), ['public/a.ts:5']);
 });
+
+test('longComments: lines added to a comment count its unchanged lines too, unless it only stays as long', () => {
+  // Line 65 is unchanged; 66 is replaced by 66–67: a two-line comment grown to three.
+  const grown = '+++ b/public/a.ts\n@@ -66 +66,2 @@\n-// two\n+// two, edited\n+// three\n';
+  const file = ['', ...Array(64).fill('const x = 1;'), '// one', '// two, edited', '// three', 'const y = 2;'];
+  assert.deepEqual(
+    longComments(grown, () => file),
+    ['public/a.ts:65'],
+  );
+  // One line of an existing three-line comment edited in place: left alone, like other long-form comments.
+  const edited = '+++ b/public/a.ts\n@@ -66 +66 @@\n-// two\n+// two, edited\n';
+  assert.deepEqual(
+    longComments(edited, () => file),
+    [],
+  );
+  // A line added to an already long-form comment: left alone too.
+  const longer = ['', ...Array(63).fill('const x = 1;'), '// zero', ...file.slice(65)];
+  assert.deepEqual(
+    longComments(grown, () => longer),
+    [],
+  );
+});

@@ -24,9 +24,13 @@ const words = (texts) =>
     .filter(Boolean)
     .join(' ')} `;
 
-// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines,
-// except one whose words the diff also removes in order: a moved, re-indented or reflowed comment isn't new.
-function longComments(diff) {
+const isCommentLine = (text) => text !== undefined && /^(\/\/|\/\*|\*|\{\/\*)/.test(text.trim());
+
+// `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines, except one whose
+// words the diff also removes in order: a moved, re-indented or reflowed comment isn't new.
+// `fileLines(file)`, the new file's lines indexed by line number, also flags a comment the diff grows past the
+// limit through its unchanged lines: -U0 shows only the added ones.
+function longComments(diff, fileLines) {
   const removed = words(
     diff
       .split('\n')
@@ -37,9 +41,20 @@ function longComments(diff) {
   let file = null;
   let block = null;
   let inBlock = false;
+  let hunkRemoved = 0;
   const flush = () => {
-    if (block && block.lines >= MAX_LINES + 1 && !removed.includes(words(block.texts)))
-      found.push(`${file}:${block.start}`);
+    if (!block) return;
+    let start = block.start;
+    let end = block.next - 1;
+    const lines = fileLines?.(file);
+    if (lines) {
+      while (isCommentLine(lines[start - 1])) start--;
+      while (isCommentLine(lines[end + 1])) end++;
+    }
+    // Grown past the limit, not an already long-form comment edited (CLAUDE.md leaves those alone).
+    const total = end - start + 1;
+    const grown = total > MAX_LINES && total - (block.lines - hunkRemoved) <= MAX_LINES;
+    if ((block.lines > MAX_LINES || grown) && !removed.includes(words(block.texts))) found.push(`${file}:${start}`);
     block = null;
   };
   let line = 0;
@@ -53,9 +68,11 @@ function longComments(diff) {
     if (hunk) {
       flush();
       inBlock = false;
+      hunkRemoved = 0;
       line = Number(hunk[1]);
       continue;
     }
+    if (raw.startsWith('-') && !raw.startsWith('---') && isCommentLine(raw.slice(1))) hunkRemoved++;
     if (!raw.startsWith('+') || raw.startsWith('+++')) continue;
     const text = raw.slice(1).trim();
     const opens = /\/\*/.test(text) && !/\*\//.test(text.slice(text.indexOf('/*') + 2));
@@ -88,7 +105,15 @@ if (require.main === module) {
     git(...args, '--', 'public'),
     ...untracked.filter(Boolean).map((file) => addedFileDiff(file, readFileSync(file, 'utf8'))),
   ].join('');
-  const found = longComments(diff);
+  const cache = new Map();
+  const fileLines = (file) => {
+    if (!cache.has(file)) {
+      const text = base ? git('show', `:${file}`) : readFileSync(file, 'utf8');
+      cache.set(file, ['', ...text.split('\n')]);
+    }
+    return cache.get(file);
+  };
+  const found = longComments(diff, fileLines);
   if (found.length) {
     console.error(
       `Comments over ${MAX_LINES} lines (CLAUDE.md: one line, two at most, the why):\n${found.map((f) => `  ${f}`).join('\n')}`,
