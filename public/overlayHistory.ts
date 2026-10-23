@@ -37,8 +37,8 @@ export function pushOverlayEntry(name: Overlay, close: () => void, toBase: ToBas
     const url = location.href;
     history.replaceState(history.state, '', toBase(location));
     history.pushState(history.state, '', url);
-    // The router's `history.length - 1` alone stops growing at Chromium's 50-entry cap, and the
-    // entry below alone may have lost its stamp (tableViewPrefs.ts replaces its state).
+    // The router's `history.length - 1` stops growing at the 50-entry cap (solidjs/solid-router#694),
+    // and the entry below alone may have lost its stamp (tableViewPrefs.ts replaces its state).
     const depth = Math.max(history.length - 1, currentDepth() + 1);
     history.replaceState({ ...history.state, _depth: depth, overlay: name }, '');
   }
