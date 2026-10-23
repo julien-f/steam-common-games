@@ -223,3 +223,92 @@ test('a refused rarity lookup logs no [achievements] line', async (t) => {
     [],
   );
 });
+
+// Answers every upstream a game's details reach; `gate`, when given, holds ProtonDB until it resolves.
+function detailsFetch(gate) {
+  const json = (body) => ({ ok: true, status: 200, json: async () => body });
+  return async (url) => {
+    url = String(url);
+    const appid = url.match(/appids=(\d+)/)?.[1];
+    if (url === 'https://example.com/') return json({});
+    if (url.includes('appreviews'))
+      return json({ query_summary: { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' } });
+    if (url.includes('appdetails')) return json({ [appid]: { success: true, data: { name: 'Portal' } } });
+    if (url.includes('IStoreBrowseService')) return json({ response: { store_items: [{ success: 1, tagids: [1] }] } });
+    if (url.includes('ajaxgetstoretags')) return json({ tags: [{ tagid: 1, name: 'Action' }] });
+    if (url.includes('protondb.com')) {
+      await gate;
+      return json({ tier: 'gold', confidence: 'strong', total: 5 });
+    }
+    if (url.includes('search/site/init')) return json({ token: 't', hpKey: 'k', hpVal: 'v' });
+    if (url.includes('search/site')) return json({ data: [] });
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+}
+
+const spendStore = (client) =>
+  runAsClient(client, async () => {
+    for (let i = 0; i < 2; i++) await createTrackedFetch('steam-store')('spend', 'https://example.com/');
+  });
+
+const sseEvents = (res) =>
+  res.text
+    .split('\n\n')
+    .filter((c) => c.startsWith('data: '))
+    .map((c) => JSON.parse(c.slice(6)));
+
+test('the stream says once that this client is past its share, and still ends', async (t) => {
+  const { warn } = setup(t, detailsFetch());
+  await spendStore('203.0.113.5');
+  const res = await api
+    .post('/api/game-details/stream')
+    .set('X-Forwarded-For', '203.0.113.5')
+    .send({ games: [{ appid: 30 }, { appid: 31 }, { appid: 32 }] })
+    .buffer(true)
+    .parse((r, done) => {
+      let text = '';
+      r.on('data', (c) => (text += c));
+      r.on('end', () => done(null, text));
+    });
+  const events = sseEvents({ text: res.body });
+  const limited = events.filter((e) => e.limited);
+  assert.equal(limited.length, 1);
+  assert.match(limited[0].limited, /your network/);
+  const rows = events.filter((e) => e.appid);
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((e) => !('limited' in e) && e.failed.includes('meta')));
+  assert.equal(events.at(-1).done, true);
+  assert.deepEqual(
+    warn.mock.calls.map((c) => c.arguments[0]).filter((l) => /\[game-details\]/.test(l)),
+    [],
+  );
+});
+
+test('a client coalescing onto another client’s refused game details gets its own', async (t) => {
+  let open;
+  const gate = new Promise((r) => (open = r));
+  let protonAsked;
+  const asked = new Promise((r) => (protonAsked = r));
+  const answer = detailsFetch(gate);
+  setup(t, (url) => {
+    if (String(url).includes('protondb.com')) protonAsked();
+    return answer(url);
+  });
+  setCache('tagnames:all', { 1: 'Action' }); // so b's share covers the store calls it makes
+  await spendStore('203.0.113.6');
+  const a = api
+    .get('/api/game-details/40')
+    .set('X-Forwarded-For', '203.0.113.6')
+    .then((r) => r);
+  await asked;
+  const b = api
+    .get('/api/game-details/40')
+    .set('X-Forwarded-For', '203.0.113.7')
+    .then((r) => r);
+  await new Promise((r) => setTimeout(r, 50)); // b reaches the dedup while a is still in flight
+  open();
+  assert.ok((await a).body.failed.includes('meta'));
+  const other = await b;
+  assert.equal(other.body.meta?.name, 'Portal');
+  assert.equal(other.body.failed, undefined);
+});

@@ -15,11 +15,15 @@
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 //   creator-capped a developer's/publisher's list is Steam's first page of 523 games
 //   tagless        no game has Steam tags
+//   client-limited this client spent its share of the outbound budgets: details say so once, achievements and prices 429
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
 
 const NOW = Date.now();
+// server.js's message for a client past its share of the outbound budgets (lib/metrics.js).
+export const LIMITED =
+  "Too many new lookups from your network this hour. What's already loaded still works; try again later.";
 
 function findPlayer(identifier: string): Player | undefined {
   const id = identifier
@@ -268,21 +272,26 @@ export function respond(
     );
   if (states.has('upstream-down') && ITAD_ROUTE.test(path))
     return json({ error: 'IsThereAnyDeal request failed (mock: upstream-down)' }, 502);
+  const limited = states.has('client-limited');
+  if (limited && (path === '/api/prices' || path.startsWith('/api/achievements/')))
+    return json({ error: LIMITED }, 429);
   const slowMedia = states.has('slow-media');
   const detailsFor = (appid: number) =>
-    states.has('upstream-down')
-      ? {
-          ...details(appid, slowMedia),
-          rating: null,
-          hltb: null,
-          protondb: null,
-          failed: ['rating', 'hltb', 'protondb'],
-        }
-      : states.has('store-down')
-        ? { ...details(appid, slowMedia), meta: null, failed: ['meta'] }
-        : states.has('tagless')
-          ? { ...details(appid, slowMedia), tags: [], tagWeights: {} }
-          : details(appid, slowMedia);
+    limited
+      ? { ...details(appid, slowMedia), rating: null, hltb: null, failed: ['rating', 'hltb'] }
+      : states.has('upstream-down')
+        ? {
+            ...details(appid, slowMedia),
+            rating: null,
+            hltb: null,
+            protondb: null,
+            failed: ['rating', 'hltb', 'protondb'],
+          }
+        : states.has('store-down')
+          ? { ...details(appid, slowMedia), meta: null, failed: ['meta'] }
+          : states.has('tagless')
+            ? { ...details(appid, slowMedia), tags: [], tagWeights: {} }
+            : details(appid, slowMedia);
   const mediaPath = path.match(/^\/api\/mock-media\/(.+)\.svg$/);
   if (mediaPath)
     return {
@@ -335,6 +344,7 @@ export function respond(
 
   if (path === '/api/game-details/stream') {
     const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(detailsFor(g.appid))}\n\n`);
+    if (limited) lines.unshift(`data: ${JSON.stringify({ limited: LIMITED })}\n\n`);
     return {
       status: 200,
       contentType: 'text/event-stream',

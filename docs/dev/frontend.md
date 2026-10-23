@@ -194,6 +194,8 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **Failed sources are marked apart from no data.** `GET /api/game-details` lists rejected sources in `failed` (absent when none did), kept as `row.failedSources` by `applyDetailsEvent`. The rating, HLTB, ProtonDB, store-page (`meta`) and tag columns (`markFailedSources`) show ⚠ with a tooltip instead of "—", the status line counts them per source (`failedSummary`), and the panel's glance chips say "didn't answer" — its Refresh details retries, since failed sources aren't cached. A failed price batch sets `row.pricesFailed` (`nullMissingPriceFields`): the price columns show the same ⚠ and the Price card says IsThereAnyDeal didn't answer; the Prices tile's refresh retries.
 
+**A refusal is said once, in the server's words.** Past this client's share of the outbound budgets ([observability.md](observability.md#outbound-budgets)), the details stream sends one `{ limited }` event: the status line shows its message instead of `failedSummary`'s per-source counts. A 429 on the list's prices, or on the panel's achievements or price (`refusalMessage`, kept per key by `panelData.ts`), shows the server's message instead of "didn't answer".
+
 **Price columns group by bucket, not exact value** (a raw price is near-unique per row):
 
 - Every price column (Tier Price, Steam Full Price, Best Deal, the three lows) buckets against `PRICE_TIERS` (`[0, 5, 15, 30, 50, 75, 100]`), matching Steam's common price points ($4.99/$14.99/$29.99/$49.99/$74.99), which neither a linear step nor `bucketLogRange` reproduces. A real `$0` is its own "Free" bucket.

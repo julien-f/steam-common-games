@@ -106,6 +106,7 @@ import {
   oldestFetchedAt,
   scoreColor,
   fmtLocalDate,
+  refusalMessage,
 } from './utils.ts';
 import {
   restoreTableView,
@@ -622,6 +623,7 @@ const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see load
 interface DetailsEvent {
   appid: number;
   done?: boolean;
+  limited?: string; // its own event, with no appid: see detailsLimited
   fetchedAt?: number | null;
   fetchedAts?: DetailsAges | null;
   rating: Rating | null;
@@ -722,6 +724,8 @@ export default function ListRoute() {
   let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
+  // The details stream's `{ limited }` message: this client spent its share, said once for the load.
+  const [detailsLimited, setDetailsLimited] = createSignal('');
   // kind === 'bundle' only: the currently open bundle's Steam-resolved games, kept at component
   // scope (not load()-local) so the Prices tile's own refresh can re-price exactly what's loaded without
   // re-resolving the bundle. Reset by load() itself on every (re)load.
@@ -840,6 +844,8 @@ export default function ListRoute() {
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
   // "HowLongToBeat didn't answer for 6 games", per source: a hidden column's failure still shows.
   const failedSummary = createMemo(() => {
+    // Refused for this client, not unanswered: one message, not a count per source.
+    if (detailsLimited()) return detailsLimited();
     const counts = new Map<string, number>();
     for (const row of rowsStore) for (const s of row.failedSources ?? []) counts.set(s, (counts.get(s) ?? 0) + 1);
     // Sources that failed for the same number of games share one phrase.
@@ -1785,6 +1791,10 @@ export default function ListRoute() {
             continue;
           }
           if (event.done) continue;
+          if (event.limited) {
+            setDetailsLimited(event.limited);
+            continue;
+          }
           unanswered.delete(event.appid);
           detailBatcher.push(event, gen);
           loaded++;
@@ -1852,7 +1862,7 @@ export default function ListRoute() {
         batch(() => {
           for (const g of chunk) rowStore.mutateRow(g.appid, (draft) => nullMissingPriceFields(draft));
         });
-        setPriceStatusText(PRICES_FAILED);
+        setPriceStatusText(refusalMessage(err) ?? PRICES_FAILED);
       }
     }
   }
@@ -2076,6 +2086,7 @@ export default function ListRoute() {
     loaded = 0;
     loadSamples = [];
     slowLoad = false;
+    setDetailsLimited('');
     setLoadFraction(null);
     // Prices are re-fetched for whatever this load lists; the previous list's age and error don't apply.
     setPriceFetchedAt(undefined);
@@ -3733,7 +3744,10 @@ export default function ListRoute() {
         </Show>
       </div>
       <Show when={hasPrices() || kind === 'bundle'}>
-        <div class="price-status" classList={{ 'list-failed': priceStatusText() === PRICES_FAILED }}>
+        <div
+          class="price-status"
+          classList={{ 'list-failed': !!priceStatusText() && priceStatusText() !== PRICES_UNAVAILABLE }}
+        >
           {priceStatusText()}
         </div>
       </Show>

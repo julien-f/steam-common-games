@@ -29,7 +29,7 @@
 // A factory plus a default instance, same shape (and same testability reasoning) as
 // myOwnership.ts's createMyOwnershipCache.
 import { applyPriceInfo, postPrices } from './priceLoading.ts';
-import { fetchJson } from './utils.ts';
+import { fetchJson, refusalMessage } from './utils.ts';
 import type { Achievements, NewsItem, PriceFields } from './types.ts';
 import type { PickAndMixTier } from './bundleRows.ts';
 
@@ -96,21 +96,27 @@ const DLC_CONCURRENCY = 4;
 
 // The cached value when there is one and `force` is unset, else a load that caches its result. A
 // failed load keeps whatever was last loaded rather than wiping it on a failed forced refresh;
-// `null` ("couldn't load") only the first time, when there's no fallback.
+// `null` ("couldn't load") only the first time, when there's no fallback. `refusals` keeps the
+// server's message for the key's last load when it was a 429 (refusalMessage).
 function sessionCached<K, V>(
   cache: Map<K, V | null>,
   key: K,
   load: () => Promise<V | null>,
   force: boolean,
+  refusals?: Map<K, string>,
 ): V | null | Promise<V | null> {
   const cached = cache.get(key);
   if (!force && cached !== undefined) return cached;
   return load().then(
     (value) => {
+      refusals?.delete(key);
       cache.set(key, value);
       return value;
     },
-    () => {
+    (err: unknown) => {
+      const refusal = refusalMessage(err);
+      if (refusal) refusals?.set(key, refusal);
+      else refusals?.delete(key);
       const value = cache.get(key) ?? null;
       cache.set(key, value);
       return value;
@@ -122,6 +128,9 @@ export function createPanelDataCache() {
   const news = new Map<number, PanelNews>();
   const achievements = new Map<string, PanelAchievements>();
   const price = new Map<string, PanelPrice>(); // keyed `region:appid`, like bundles
+  // Why a key's last achievements or price lookup was refused, keyed like its cache.
+  const achievementsRefused = new Map<string, string>();
+  const priceRefused = new Map<string, string>();
   const dlcEntries = new Map<number, DlcEntry | null>(); // null: the store has no entry for it
   const bundles = new Map<string, PanelBundles>();
 
@@ -211,6 +220,7 @@ export function createPanelDataCache() {
         return data;
       },
       force,
+      achievementsRefused,
     );
   }
 
@@ -231,6 +241,7 @@ export function createPanelDataCache() {
         return fields;
       },
       force,
+      priceRefused,
     );
   }
 
@@ -310,7 +321,10 @@ export function createPanelDataCache() {
   return {
     fetchNews,
     fetchAchievements,
+    achievementsRefusal: (appid: number, memberIds: string[]) =>
+      achievementsRefused.get(achievementsKey(appid, memberIds)),
     fetchPrice,
+    priceRefusal: (appid: number, region: string) => priceRefused.get(`${region}:${appid}`),
     fetchBundles,
     fetchDlc,
     isItadConfigured,
@@ -321,7 +335,9 @@ export function createPanelDataCache() {
 const defaultCache = createPanelDataCache();
 export const fetchNews = defaultCache.fetchNews;
 export const fetchAchievements = defaultCache.fetchAchievements;
+export const achievementsRefusal = defaultCache.achievementsRefusal;
 export const fetchPrice = defaultCache.fetchPrice;
+export const priceRefusal = defaultCache.priceRefusal;
 export const fetchBundles = defaultCache.fetchBundles;
 export const fetchDlc = defaultCache.fetchDlc;
 export const isItadConfigured = defaultCache.isItadConfigured;

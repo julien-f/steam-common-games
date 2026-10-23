@@ -389,6 +389,10 @@ export class ApiError extends Error {
   }
 }
 
+// The server's own words for a 429 (this client asked too much), shown instead of "didn't answer".
+export const refusalMessage = (err: unknown): string | undefined =>
+  err instanceof ApiError && err.status === 429 ? err.message : undefined;
+
 // An /api call's JSON body. Throws its `error`, else `fallback` — also when the body isn't JSON
 // (a proxy's HTML error page), which would otherwise surface as a parse error.
 export async function fetchJson<T>(url: string, init: RequestInit | undefined, fallback: string): Promise<T> {

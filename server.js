@@ -673,7 +673,8 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
   }
 });
 
-const dedupDetails = createDedup();
+// A result that one client's spent share left short (`limited`) is fetched again for another client.
+const dedupDetails = createDedup(undefined, { isRefused: (details) => !!details.limited });
 // Steam app types HLTB doesn't time, so searching for them would only spend requests on a miss.
 // `dlc` and `mod` stay: HLTB lists some.
 const NOT_PLAYED_TYPES = new Set(['music', 'video', 'series', 'episode', 'hardware', 'demo', 'advertising']);
@@ -739,6 +740,10 @@ function fetchGameDetails(appid, { force = false } = {}) {
       })
         .filter(([, r]) => r.status === 'rejected')
         .map(([source]) => source);
+      // A source refused because this client spent its share: the stream says so once, not per game.
+      const refused = [ratingRes, hltbRes, metaRes, tagsRes, demoRes, protondbRes].find(
+        (r) => r.status === 'rejected' && r.reason?.isClientBudgetExhausted,
+      );
       // A game that isn't out yet has no reviews, ProtonDB reports or HLTB times; those misses
       // expire like any other miss, so they fill in after release instead of a year later.
       if (metaRes.value?.comingSoon) {
@@ -770,6 +775,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
         demo: demoRes.status === 'fulfilled' ? demoRes.value : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
         ...(failed.length && { failed }),
+        ...(refused && { limited: refused.reason.message }),
       };
     });
   });
@@ -1165,13 +1171,19 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   // STREAM_CONCURRENCY appids are ever in flight for one request, and `closed` is re-checked
   // before each one — so a disconnect stops the work within one appid per worker.
   let next = 0;
+  // Said once per stream; the workers go on, since cached games still fill in.
+  let limitedSent = false;
   const worker = async () => {
     while (!closed) {
       const i = next++;
       if (i >= validated.length) return;
       const appid = validated[i];
       try {
-        const result = await fetchGameDetails(appid);
+        const { limited, ...result } = await fetchGameDetails(appid);
+        if (limited && !limitedSent) {
+          limitedSent = true;
+          send({ limited });
+        }
         send({ appid, ...result });
       } catch (err) {
         // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should

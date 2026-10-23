@@ -54,12 +54,13 @@ test('fetchDlc: a DLC that fails to load is left out', async (t) => {
 
 // Answers the panel's routes from `data`, or fails every one but /api/health while `state.down`.
 function mockPanelRoutes(t, data, { itadConfigured = true } = {}) {
-  const state = { down: false, urls: [] };
+  const state = { down: false, limited: false, urls: [] };
   t.mock.method(globalThis, 'fetch', async (url) => {
     state.urls.push(url);
     const json = (body, ok = true) => ({ ok, status: ok ? 200 : 502, json: async () => body });
     if (url === '/api/health') return json({ itadConfigured });
     if (state.down) return json({ error: 'upstream down' }, false);
+    if (state.limited) return { ok: false, status: 429, json: async () => ({ error: LIMITED }) };
     if (url.startsWith('/api/game-news/')) return json({ news: data.news });
     if (url.startsWith('/api/achievements/')) return json(data.achievements);
     if (url.startsWith('/api/prices')) return json({ prices: { 620: data.price } });
@@ -68,6 +69,8 @@ function mockPanelRoutes(t, data, { itadConfigured = true } = {}) {
   });
   return state;
 }
+
+const LIMITED = 'Too many new lookups from your network this hour.';
 
 const DATA = {
   news: [{ title: 'Patch' }],
@@ -131,6 +134,29 @@ test("a source that fails before loading anything reads as null (didn't answer)"
     ]),
     [null, null, null, null],
   );
+});
+
+test("a lookup refused past this client's share keeps the server's message until one succeeds", async (t) => {
+  const state = mockPanelRoutes(t, DATA);
+  const cache = createPanelDataCache();
+  const members = ['76561198000000001'];
+  state.down = true;
+  await Promise.all([cache.fetchAchievements(620, members), cache.fetchPrice(620, 'FR')]);
+  assert.equal(cache.achievementsRefusal(620, members), undefined, 'a plain failure is no refusal');
+  state.down = false;
+  state.limited = true;
+  const force = { force: true };
+  assert.deepEqual(
+    await Promise.all([cache.fetchAchievements(620, members, force), cache.fetchPrice(620, 'FR', force)]),
+    [null, null],
+  );
+  assert.equal(cache.achievementsRefusal(620, members), LIMITED);
+  assert.equal(cache.priceRefusal(620, 'FR'), LIMITED);
+  assert.equal(cache.priceRefusal(620, 'US'), undefined);
+  state.limited = false;
+  await Promise.all([cache.fetchAchievements(620, members, force), cache.fetchPrice(620, 'FR', force)]);
+  assert.equal(cache.achievementsRefusal(620, members), undefined);
+  assert.equal(cache.priceRefusal(620, 'FR'), undefined);
 });
 
 test('fetchAchievements: achievementCount 0 answers "no achievements" without a request', async (t) => {

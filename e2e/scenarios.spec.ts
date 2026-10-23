@@ -1,6 +1,6 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { DEMO_OF, mockApi, respond } from './mockApi.ts';
+import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
 import { ALICE, BOB, BUNDLE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
@@ -2320,6 +2320,23 @@ test('D2 edge: failed prices warn like the other sources, in plain words', async
   await expect(status).toHaveText("IsThereAnyDeal didn't answer for prices — refresh them on the Prices tile");
   const warnColor = await page.locator('.list-status .list-failed').evaluate((el) => getComputedStyle(el).color);
   await expect(status).toHaveCSS('color', warnColor);
+});
+
+test('D2 edge: past its share of lookups, the list says so once, as do the Price and Achievements cards', async ({
+  page,
+}) => {
+  await mockApi(page, { states: ['client-limited'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  const status = page.locator('.list-status');
+  await expect(status.locator('.list-failed')).toHaveText(LIMITED);
+  await expect(status).not.toContainText("didn't answer");
+  await expect(page.locator('.price-status')).toHaveText(LIMITED);
+  await expect(page.locator('.price-status')).toHaveClass(/list-failed/);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-section-price')).toContainText(LIMITED);
+  await expect(page.locator('#panel-section-achievements')).toContainText(LIMITED);
 });
 
 test("D2.3: once the upstream is back, the panel's Refresh details fills in what didn't answer", async ({ page }) => {
