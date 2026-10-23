@@ -206,7 +206,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **Plays mostly** (Owned's hero note, `playsMostlyNote`): `tagTaste.ts`'s `topPlayedTags` over the rows once `loadFraction()` is null, so it doesn't reshuffle while details stream; its tags call `onTagClick` like the panel's pills.
 
-**Taste fit** (`tasteFit`, `tasteFitColumn` in `ListRoute.tsx`): `tagTaste.ts`'s `fitTo` against the current account's stored `Taste` ([lists-and-accounts.md](lists-and-accounts.md#storage-schema)), read once per table build; Owned saves it (`tasteOf`) once its details finish loading. While the column shows, the list status (`scoreNotes`, `tasteFitNote`) says whose taste and how old, or why there's none.
+**Taste fit** (`tasteFit`, `tasteFitColumn` in `ListRoute.tsx`): `tagTaste.ts`'s `fitTo` against the current account's stored `Taste` ([lists-and-accounts.md](lists-and-accounts.md#storage-schema)), read once per table build; Owned saves it (`tasteOf`) once its details finish loading. While the column shows, the list status (`scoreNotes`, `tasteFitNote`) says whose taste and how old, or why there's none — but not "open Owned" on a `?u=` link to another account (`linked`).
 
 **Group fit** (compare only, `groupFitColumn` in `ListRoute.tsx`): the minimum over players of `tagTaste.ts`'s `playerFits` (cosine of the game against each player's play profile), computed once details finish loading; the cell names the least suited player, its `title` lists everyone's score, and the list status (`scoreNotes`) names players left out for lack of a profile.
 

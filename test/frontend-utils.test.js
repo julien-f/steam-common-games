@@ -11,6 +11,7 @@ const {
   fmtTime,
   fmtPlaytime,
   fmtLastPlayed,
+  fmtLocalDate,
   countryFlag,
   esc,
   computeSteamdbRating,
@@ -180,6 +181,17 @@ test('fmtLastPlayed: returns empty string for 0/null/undefined', () => {
 
 test('fmtLastPlayed: formats a Unix timestamp as an ISO date', () => {
   assert.equal(fmtLastPlayed(1751846400), '2025-07-07');
+});
+
+test('fmtLocalDate: the local calendar day, not the UTC one', () => {
+  const tz = process.env.TZ;
+  process.env.TZ = 'America/Los_Angeles';
+  try {
+    assert.equal(fmtLocalDate(new Date('2026-10-24T03:00:00Z')), '2026-10-23');
+  } finally {
+    if (tz === undefined) delete process.env.TZ;
+    else process.env.TZ = tz;
+  }
 });
 
 // ── countryFlag ────────────────────────────────────────────────────────────────
