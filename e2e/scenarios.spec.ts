@@ -507,7 +507,7 @@ test("C1 edge: the panel's Steam tags show how strongly players tagged the game 
   const coop = page.locator('.panel-tags').getByRole('button', { name: 'Co-op, tag', exact: true });
   await expect(coop).toHaveAttribute('title', "30% of the top tag's votes");
   const ratio = await coop.evaluate(
-    (el) => el.querySelector('.panel-tag-weight')!.getBoundingClientRect().width / el.getBoundingClientRect().width,
+    (el) => el.querySelector('.tag-weight')!.getBoundingClientRect().width / el.getBoundingClientRect().width,
   );
   expect(ratio).toBeCloseTo(0.3, 1);
 });
@@ -579,13 +579,26 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   });
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
-  const tags = page.locator('.list-plays-mostly').getByRole('button');
+  const note = page.locator('.list-plays-mostly');
+  const tags = note.locator('.list-plays-mostly-tag');
   // Singleplayer: on fewer games, so rarer here than Action and Co-op.
   await expect(tags).toHaveText(['Singleplayer', 'Action', 'Co-op']);
-  await tags.getByText('Co-op').click();
+  await expect(tags.first()).toHaveAttribute('title', /· the top tag$/);
+
+  const why = note.getByRole('button', { name: 'Why these?' });
+  const breakdown = page.locator('#plays-mostly-breakdown');
+  await expect(breakdown).toBeHidden();
+  await why.click();
+  await expect(why).toHaveAttribute('aria-expanded', 'true');
+  await expect(breakdown.getByRole('listitem').first()).toContainText(/^Singleplayer\d+%.+ 10h/);
+  await why.click();
+  await expect(breakdown).toBeHidden();
+
+  const coop = note.getByRole('button', { name: 'Co-op' });
+  await coop.click();
   await expect(rows(page)).toHaveCount(4);
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
-  await expect(tags.getByText('Co-op')).toHaveClass(/active/);
+  await expect(coop).toHaveAttribute('aria-pressed', 'true');
 });
 
 test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {

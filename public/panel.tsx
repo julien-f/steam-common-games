@@ -845,9 +845,7 @@ function TagCloud(props: {
               const kindName = `${v}, ${TAG_KIND_META[kind].label.toLowerCase()}`;
               const title = w == null ? undefined : `${Math.round(w * 100)}% of the top tag's votes`;
               const gauge =
-                w == null ? null : (
-                  <span class={`panel-tag-weight panel-tag-weight--${kind}`} style={{ width: `${w * 100}%` }} />
-                );
+                w == null ? null : <span class={`tag-weight tag-weight--${kind}`} style={{ width: `${w * 100}%` }} />;
               return (
                 <Show
                   when={panelOptions.tagsFilterable()}

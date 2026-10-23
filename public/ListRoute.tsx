@@ -93,6 +93,7 @@ import {
   focusGameRow,
   gameRowEl,
   formatMoney,
+  fmtH,
   hoursFromMinutes,
   oldestFetchedAt,
   scoreColor,
@@ -3236,24 +3237,61 @@ export default function ListRoute() {
   });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
   const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
+  // Out here: the hero note re-renders, which would close the breakdown.
+  const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
+    const pct = (weight: number) => `${Math.round(weight * 100)}%`;
+    const hours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
     return (
       <Show when={playsMostly().length}>
         <div class="list-plays-mostly">
           Plays mostly:{' '}
           <For each={playsMostly()}>
-            {({ tag }) => (
+            {({ tag, weight }, i) => (
               <button
                 type="button"
                 class="list-plays-mostly-tag"
                 classList={{ active: tableReady() && isTagActive('tags', tag) }}
-                title={`Filter by ${tag}, ranked by Tag match`}
+                aria-pressed={tableReady() && isTagActive('tags', tag)}
+                title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
                 onClick={() => onTagClick('tags', tag)}
               >
                 {tag}
+                <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
               </button>
             )}
           </For>
+          <button
+            type="button"
+            class="list-plays-mostly-why"
+            aria-expanded={playsMostlyWhy()}
+            aria-controls="plays-mostly-breakdown"
+            onClick={() => setPlaysMostlyWhy((open) => !open)}
+          >
+            Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
+          </button>
+        </div>
+        <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
+          <p>
+            Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
+            players tagged it).
+          </p>
+          <ul>
+            <For each={playsMostly()}>
+              {({ tag, weight, games }) => (
+                <li>
+                  <span class="list-plays-mostly-name">{tag}</span>
+                  <span class="list-plays-mostly-bar">
+                    <span style={{ width: pct(weight) }} />
+                    <span class="visually-hidden">{pct(weight)}</span>
+                  </span>
+                  <span class="list-plays-mostly-games">
+                    {games.map((g) => `${g.name} ${hours(g.hours)}`).join(' · ')}
+                  </span>
+                </li>
+              )}
+            </For>
+          </ul>
         </div>
       </Show>
     );

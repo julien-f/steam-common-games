@@ -616,6 +616,8 @@
     font-style: normal;
   }
   .list-plays-mostly-tag {
+    position: relative;
+    overflow: hidden;
     min-height: 24px;
     padding: 2px 8px;
     border: 1px solid var(--line-control);
@@ -632,6 +634,65 @@
   .list-plays-mostly-tag.active {
     border-color: var(--accent);
     color: var(--accent);
+  }
+  .list-plays-mostly-why {
+    min-height: 24px;
+    padding: 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .list-plays-mostly-breakdown {
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: var(--fs-meta);
+    font-style: normal;
+  }
+  /* Its display: grid would otherwise win over the attribute. */
+  .list-plays-mostly-breakdown[hidden] {
+    display: none;
+  }
+  .list-plays-mostly-breakdown p {
+    margin: 0;
+  }
+  .list-plays-mostly-breakdown ul {
+    display: grid;
+    grid-template-columns: max-content 80px minmax(0, 1fr);
+    gap: 6px 12px;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .list-plays-mostly-breakdown li {
+    display: contents;
+  }
+  .list-plays-mostly-name {
+    color: var(--text);
+  }
+  .list-plays-mostly-bar {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--line);
+  }
+  .list-plays-mostly-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--kind-tag);
+  }
+  @media (max-width: 480px) {
+    .list-plays-mostly-breakdown ul {
+      grid-template-columns: max-content 60px;
+    }
+    .list-plays-mostly-games {
+      grid-column: 1 / -1;
+      margin-bottom: 4px;
+    }
   }
   .list-formula {
     display: flex;
@@ -1837,19 +1898,19 @@
     border-radius: 50%;
   }
   .panel-tag-dot--tags,
-  .panel-tag-weight--tags {
+  .tag-weight--tags {
     background: var(--kind-tag);
   }
   .panel-tag-dot--genres,
-  .panel-tag-weight--genres {
+  .tag-weight--genres {
     background: var(--kind-genre);
   }
   .panel-tag-dot--categories,
-  .panel-tag-weight--categories {
+  .tag-weight--categories {
     background: var(--kind-category);
   }
   .panel-tag-dot--devpub,
-  .panel-tag-weight--devpub {
+  .tag-weight--devpub {
     background: var(--kind-devpub);
   }
   .panel-tag-dot--genres {
@@ -1864,7 +1925,8 @@
     border-radius: 0;
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
-  .panel-tag-weight {
+  /* A Steam tag's weight, along the bottom edge of its pill (the panel's, Plays mostly's). */
+  .tag-weight {
     position: absolute;
     bottom: 0;
     left: 0;
