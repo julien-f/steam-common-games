@@ -27,6 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Friends' profile links and a bundle's IsThereAnyDeal and Fanatical links open only plain web addresses
 - Game search ignores malformed results from Steam instead of showing them
 - Taste fit's note says when the account has too few games played, dates its taste as YYYY-MM-DD, and no longer asks a link's viewer to open the sender's Owned list
+- A comparison link with an unknown combine operation opens as the default comparison, and saving it no longer stores a list that never loads
+- Signing in on a browser whose storage is full or disabled no longer reloads the page forever
 
 ### Development
 

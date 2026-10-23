@@ -245,6 +245,7 @@ import {
   listHasRefreshableSource,
   listHasBundleSource,
   rankingsOf,
+  isCombineOp,
   listDeps,
 } from './listsStore.ts';
 import { ranks, progress, pendingFocus, rerank, exclude, type RankingState, type RankingProgress } from './ranking.ts';
@@ -1255,7 +1256,7 @@ export default function ListRoute() {
   const compareSlots = (): string[][] => normalizeSlots(parseUrlState(routerLocation.search).slots);
   function compareOp(): CombineOp {
     const raw = new URLSearchParams(routerLocation.search).get('op');
-    return raw && raw in OP_LABELS ? (raw as CombineOp) : (DEFAULT_COMPARE_OP as CombineOp);
+    return raw && isCombineOp(raw) ? raw : DEFAULT_COMPARE_OP;
   }
   // The comparison a load has already done, in both spellings of it — see load()'s own guard.
   let loadedCompareKeys = new Set<string>();

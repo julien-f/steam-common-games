@@ -209,6 +209,14 @@ test('createList: a dynamic list can be created with no name at all (labeled by 
   assert.equal('name' in getList(l.id), false);
 });
 
+test('createList: rejects an unknown op, an inherited Object key included, and stores nothing', () => {
+  const { createList, getLists } = store();
+  for (const op of ['constructor', 'toString', 'nope']) {
+    assert.throws(() => createList({ kind: 'dynamic', op, sources: [{ kind: 'recent-games' }] }), /unknown op/);
+  }
+  assert.deepEqual(getLists(), []);
+});
+
 test('renameList: an undefined name clears the field, rather than storing an empty one', () => {
   const { createList, renameList, getList } = store();
   const l = createList({ name: 'Named', kind: 'dynamic', op: 'union', sources: [{ kind: 'recent-games' }] });

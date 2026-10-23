@@ -150,6 +150,18 @@ test('syncPrefsWithServer (first sync): marks this device as synced, so a later 
   assert.equal(global.localStorage.getItem(`steam.isonoe.net:prefs-synced:${STEAMID}`), '1');
 });
 
+test("syncPrefsWithServer (first sync): an adoption storage can't keep leaves the device unsynced, so its stale value can't later win", async (t) => {
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+  t.mock.method(console, 'warn', () => {});
+  const setItem = global.localStorage.setItem;
+  global.localStorage.setItem = (k, v) => {
+    if (k.includes('prefs-synced')) setItem(k, v);
+    else throw new Error('QuotaExceededError');
+  };
+  await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
+  assert.equal(global.localStorage.getItem(`steam.isonoe.net:prefs-synced:${STEAMID}`), null);
+});
+
 // -- ongoing sync (this device has already synced with this account before) --
 
 test('syncPrefsWithServer (ongoing): local newer than server for the same key pushes, does not adopt', async (t) => {
@@ -352,6 +364,20 @@ test('initAuth (signed in): adopting server prefs reloads the page, and leaves t
   assert.equal(prefs().getPref('region'), 'GB');
   assert.deepEqual(auth().getAuthUser(), { steamid: STEAMID });
   assert.ok(!calls.some((c) => c.url === '/api/common-games'), 'no account resolve before the reload');
+});
+
+test("initAuth (signed in): an adoption storage can't keep doesn't reload, so a full storage can't reload forever", async (t) => {
+  const seen = withBrowser(t);
+  global.localStorage.setItem = () => {
+    throw new Error('QuotaExceededError');
+  };
+  const warn = t.mock.method(console, 'warn', () => {});
+  mockMeFetch(t, { steamid: STEAMID, prefs: { region: { value: 'GB', updatedAt: 500 } } });
+
+  await auth().initAuth();
+
+  assert.equal(seen.reloads, 0);
+  assert.ok(warn.mock.calls.some((c) => String(c.arguments[0]).startsWith('[auth]')));
 });
 
 test('initAuth (signed in): with nothing to adopt, fills in the account from the login and syncs later edits', async (t) => {

@@ -24,6 +24,18 @@ import type { Folder, GameList, ListRef, CombineOp } from './types.ts';
 const LISTS_KEY = 'lists';
 const FOLDERS_KEY = 'folders';
 
+const COMBINE_OPS: Record<CombineOp, true> = {
+  union: true,
+  intersect: true,
+  subtract: true,
+  'group-by-membership': true,
+};
+
+// Own keys only: `in` would let `?op=constructor` through.
+export function isCombineOp(raw: string): raw is CombineOp {
+  return Object.hasOwn(COMBINE_OPS, raw);
+}
+
 function genId(): string {
   return crypto.randomUUID();
 }
@@ -275,6 +287,7 @@ export function createList(input: CreateListInput): GameList {
   const parentId = input.parentId ?? null;
   const lists = readLists();
 
+  if (input.op !== undefined && !isCombineOp(input.op)) throw new Error('unknown op');
   if (wouldCreateCycle(id, listDeps(input), lists)) throw new CycleError();
 
   const now = Date.now();

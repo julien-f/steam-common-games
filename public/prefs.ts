@@ -54,11 +54,13 @@ function readEntries(): Record<string, PrefEntry> {
   return entries;
 }
 
-function writeEntries(entries: Record<string, PrefEntry>): void {
+// False when not persisted: private browsing, quota, storage unavailable.
+function writeEntries(entries: Record<string, PrefEntry>): boolean {
   try {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
+    return true;
   } catch {
-    /* not persisted this session — private browsing, quota, storage unavailable */
+    return false;
   }
 }
 
@@ -187,8 +189,9 @@ export function getAllPrefEntries(): Record<string, PrefEntry> {
 // Writes one key's value locally without pushing it back to the server — used when a merge finds
 // the server's copy of that key is newer than this device's own. Bypasses setPref specifically to
 // avoid that echo. Silent: the merge reloads the page after adopting, and Revert patches its table itself.
-export function adoptPrefEntry(key: string, value: unknown, updatedAt: number): void {
+// Returns whether the write was persisted.
+export function adoptPrefEntry(key: string, value: unknown, updatedAt: number): boolean {
   const entries = readEntries();
   entries[key] = { value, updatedAt };
-  writeEntries(entries);
+  return writeEntries(entries);
 }

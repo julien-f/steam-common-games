@@ -98,21 +98,27 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
     ),
   );
   let adopted = false;
+  let unkept = false;
   const pushes: Promise<void>[] = [];
 
   for (const key of keys) {
     const local = localEntries[key];
     const server = serverEntries[key];
     if (server && (!local || firstSync || server.updatedAt > local.updatedAt)) {
-      adoptPrefEntry(key, server.value, server.updatedAt);
-      adopted = true;
+      // Counted only once persisted: a reload re-reads storage, so an unkept adoption would reload forever.
+      if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted = true;
+      else {
+        unkept = true;
+        console.warn(`[auth] couldn't store the account's "${key}" pref locally; this device keeps its own`);
+      }
     } else if (local && (!server || local.updatedAt > server.updatedAt)) {
       pushes.push(pushPrefToServer(key, local.value, local.updatedAt));
     }
   }
 
   await Promise.all(pushes);
-  markSyncedBefore(steamid);
+  // Still unsynced while a server value isn't kept, or a later sync would let the stale local one win.
+  if (!unkept) markSyncedBefore(steamid);
   return adopted;
 }
 
