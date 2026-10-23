@@ -1462,6 +1462,8 @@ test('L4 edge: Recently Looked Up lists the latest lookup first, and says it kee
   await expect(rows(page)).toHaveCount(2);
   await expect(rows(page).first()).toContainText('Valheim');
   await expect(page.locator('.list-hero')).toContainText('last 10');
+  // A number column whose cells read as text ("Latest") stays start-aligned.
+  await expect(page.locator('.dt-td[data-col-key="lookedUp"]').first()).toHaveCSS('text-align', 'start');
 });
 
 test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled", async ({ page }) => {

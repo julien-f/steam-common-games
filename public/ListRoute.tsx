@@ -289,7 +289,6 @@ const PLAYTIME_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'playtime',
   label: 'Played (h)',
   type: 'number',
-  align: 'end',
   groupable: true,
   format: (v) => ((v as number) > 0 ? Number(v).toFixed(1) : '—'),
   rangePresets: [{ label: 'never played', max: 0 }],
@@ -343,7 +342,6 @@ function tasteFitColumn(source: TasteSource): ColumnDef<Record<string, any>> {
     key: TASTE_FIT_KEY,
     label: 'Taste fit',
     type: 'number',
-    align: 'end',
     value: (row) => (taste ? fitTo(taste, row) : null),
     format: fmtPercent,
     compare: compareNumMissingLast,
@@ -367,6 +365,7 @@ function groupFitColumn(fits: () => PlayerFits | null, labels: string[]): Column
     key: GROUP_FIT_KEY,
     label: 'Group fit',
     type: 'number',
+    align: 'start', // its cells read as text
     value: (row) => least(row.appid)?.score ?? null,
     format: fmtPercent,
     // Names the least suited player; the title has everyone's score.
@@ -406,7 +405,6 @@ const WISHLIST_RANK_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'priority',
   label: 'Wishlist Rank',
   type: 'number',
-  align: 'end',
   groupable: false,
   format: fmt.num,
 };
@@ -442,6 +440,7 @@ const LOOKED_UP_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'lookedUp',
   label: 'Looked up',
   type: 'number',
+  align: 'start', // its cells read as text
   groupable: false,
   filterable: false,
   format: (v) => (v == null ? '—' : v === 1 ? 'Latest' : `#${v}`),
@@ -519,7 +518,6 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'tierPrice',
   label: 'Tier Price',
   type: 'number',
-  align: 'end',
   groupable: true,
   format: (v) => (v == null ? 'Varies' : v === 0 ? 'Free' : Number(v).toFixed(2)),
   render: renderTierPrice,
@@ -588,7 +586,6 @@ const RANK_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'rank',
   label: 'Rank',
   type: 'number',
-  align: 'end',
   groupable: false,
   format: fmt.num,
   compare: compareNumMissingLast,
