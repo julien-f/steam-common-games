@@ -97,15 +97,24 @@ const isStoryGame = (g: ProfileGame) => {
   return modes.length === 1 && modes[0] === 'solo' && !!g.hltbMain && !ENDLESS_TAGS.some((tag) => weights[tag] != null);
 };
 
-// Of the played single-player games with an end, how many were played for their main story's
+export interface StoryGames {
+  reached: number[]; // appids played for their main story's length
+  fellShort: number[]; // the others, most played first
+}
+
+// Of the played single-player games with an end, which were played for their main story's
 // length; hours can't say the story was finished, only that it could have been.
-export function storyGames(
-  games: readonly ProfileGame[],
-  hours: (g: ProfileGame) => number,
-): { reached: number; of: number } | null {
+export function storyGames(games: readonly ProfileGame[], hours: (g: ProfileGame) => number): StoryGames | null {
   const story = games.filter((g) => isPlayed(g, hours(g)) && isStoryGame(g));
   if (story.length < MIN_GAMES) return null;
-  return { reached: story.filter((g) => hours(g) >= STORY_SHARE * g.hltbMain!).length, of: story.length };
+  const reached = (g: ProfileGame) => hours(g) >= STORY_SHARE * g.hltbMain!;
+  return {
+    reached: story.filter(reached).map((g) => g.appid),
+    fellShort: story
+      .filter((g) => !reached(g))
+      .sort((a, b) => hours(b) - hours(a))
+      .map((g) => g.appid),
+  };
 }
 
 export const STYLE_SENTENCES: Record<PlayStyle, string> = {
@@ -115,5 +124,5 @@ export const STYLE_SENTENCES: Record<PlayStyle, string> = {
   multiplayer: 'Mostly multiplayer games',
 };
 
-export const storySentence = ({ reached, of }: { reached: number; of: number }) =>
-  `Plays ${reached} of ${of} story games for as long as their main story`;
+export const storySentence = ({ reached, fellShort }: StoryGames) =>
+  `Plays ${reached.length} of ${reached.length + fellShort.length} story games for as long as their main story`;

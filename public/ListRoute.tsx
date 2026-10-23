@@ -3547,10 +3547,39 @@ export default function ListRoute() {
               </p>
             </Show>
             <Show when={profileFacts().story}>
-              <p>
-                Story games: single-player games with a How Long To Beat main story and no endless tag (roguelike,
-                sandbox…), counted when played for at least 80% of it.
-              </p>
+              {(story) => (
+                <>
+                  <p>
+                    Story games: single-player games with a How Long To Beat main story and no endless tag (roguelike,
+                    sandbox…), counted when played for at least 80% of it.
+                  </p>
+                  <For
+                    each={[
+                      { label: 'Main story length reached:', appids: story().reached },
+                      { label: 'Fell short:', appids: story().fellShort },
+                    ]}
+                  >
+                    {({ label, appids }) => (
+                      <Show when={appids.length}>
+                        <p class="list-profile-story">
+                          {label}{' '}
+                          <For each={appids}>
+                            {(appid) => (
+                              <button
+                                type="button"
+                                class="list-players-game"
+                                onClick={() => openGame(rowStore.getRow(appid)!)}
+                              >
+                                {rowStore.getRow(appid)?.name}
+                              </button>
+                            )}
+                          </For>
+                        </p>
+                      </Show>
+                    )}
+                  </For>
+                </>
+              )}
             </Show>
             <ul>
               <For each={playsMostly()}>

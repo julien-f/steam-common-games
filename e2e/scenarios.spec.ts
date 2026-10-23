@@ -697,6 +697,18 @@ test('A5.4: the no-playtime count lists those games, best Taste fit first, on a 
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
 });
 
+test('A5 edge: Why these? names the story games that fell short of their main story, each opening its panel', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await page.getByRole('button', { name: 'Why these?' }).click();
+  const short = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'Fell short:' });
+  await expect(short.getByRole('button')).toHaveText(['Sekiro: Shadows Die Twice', 'Hogwarts Legacy']);
+  await short.getByRole('button', { name: 'Hogwarts Legacy' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
+});
+
 test("A5 edge: what to play next leaves out games that aren't out yet", async ({ page }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');

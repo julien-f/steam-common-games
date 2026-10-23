@@ -737,6 +737,12 @@
   .list-plays-mostly-breakdown p {
     margin: 0;
   }
+  .list-profile-story {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 4px;
+  }
   .list-plays-mostly-breakdown ul {
     display: grid;
     grid-template-columns: max-content 80px minmax(0, 1fr);

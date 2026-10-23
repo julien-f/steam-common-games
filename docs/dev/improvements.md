@@ -35,7 +35,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Taste profile
 
-- **U212 · polish · A5** — "Plays 7 of 9 story games for as long as their main story" doesn't say which; the two that fell short are the actionable part ("pick Sekiro back up?"). **Why these?** lists the story games reached and fell short, each opening its panel.
+- **U215 · minor · F3, A5, I1** — on a phone, **Why these?** overflows the page by 46 px: its tag list's phone grid (`max-content 60px`, the games line spanning both) sizes the first column to the games line's unwrapped width. `fit-content(70%) 60px` fits it (measured: no overflow at 390 px).
 - **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
 
 ## Comparing
