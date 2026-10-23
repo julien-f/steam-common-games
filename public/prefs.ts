@@ -72,11 +72,10 @@ function version(key: string): { track: () => void; notify: () => void } {
   return v;
 }
 
-// setPref writes storage refused since the last one it kept; AppShell.tsx's banner says so.
-const [prefsWriteFailures, setPrefsWriteFailures] = createSignal(0);
+// Whether storage refused setPref's last write; AppShell.tsx's banner says so.
+const [writeFailing, setWriteFailing] = createSignal(false);
 const [dismissed, setDismissed] = createSignal(false);
-export { prefsWriteFailures };
-export const prefsWriteFailed = (): boolean => prefsWriteFailures() > 0 && !dismissed();
+export const prefsWriteFailed = (): boolean => writeFailing() && !dismissed();
 // Until a write succeeds again: the next edits would most likely fail too.
 export function dismissPrefsWriteFailure(): void {
   setDismissed(true);
@@ -96,14 +95,13 @@ export function setPref(key: string, value: unknown): void {
   const entries = readEntries();
   const updatedAt = Date.now();
   entries[key] = { value, updatedAt };
-  if (writeEntries(entries)) {
-    setPrefsWriteFailures(0);
-    setDismissed(false);
-  } else {
-    console.warn(`[prefs] storage refused "${key}": the change isn't saved on this device`);
-    setPrefsWriteFailures((n) => n + 1);
-  }
+  const written = writeEntries(entries);
+  setWriteFailing(!written);
+  if (written) setDismissed(false);
+  else console.warn(`[prefs] storage refused "${key}": the change isn't saved on this device`);
   version(key).notify();
+  // Not pushed either: the edit snaps back here, and a debounced push would send the stored value.
+  if (!written) return;
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
   // same time (different tabs/devices) can't race each other's writes. A table-view key is never
@@ -166,7 +164,7 @@ export function setSignedInSteamid(steamid: string | null): void {
 // naming convention as lib/cache.js/lib/metrics.js's own test-only resets.
 export function _resetPrefsState(): void {
   signedInSteamid = null;
-  setPrefsWriteFailures(0);
+  setWriteFailing(false);
   setDismissed(false);
 }
 

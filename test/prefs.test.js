@@ -354,18 +354,18 @@ function refuseWrites() {
   };
 }
 
-test('setPref: a write storage refuses is counted and warned until one succeeds', (t) => {
+test('setPref: a write storage refuses is flagged and warned until one succeeds', (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
-  const { setPref, prefsWriteFailures } = require('../public/prefs.ts');
+  const { setPref, prefsWriteFailed } = require('../public/prefs.ts');
   const { setItem } = global.localStorage;
   refuseWrites();
   setPref('region', 'DE');
   setPref('region', 'GB');
-  assert.equal(prefsWriteFailures(), 2);
+  assert.equal(prefsWriteFailed(), true);
   assert.match(warn.mock.calls[0].arguments[0], /^\[prefs\]/);
   global.localStorage.setItem = setItem;
   setPref('region', 'US');
-  assert.equal(prefsWriteFailures(), 0);
+  assert.equal(prefsWriteFailed(), false);
 });
 
 test('dismissPrefsWriteFailure: hides failures until a write succeeds, then the next one shows', (t) => {
@@ -386,9 +386,32 @@ test('dismissPrefsWriteFailure: hides failures until a write succeeds, then the 
   assert.equal(prefsWriteFailed(), true);
 });
 
-test('adoptPrefEntry: a refused write is not counted (authStore.ts warns)', () => {
-  const { adoptPrefEntry, prefsWriteFailures } = require('../public/prefs.ts');
+test('setPref: a write storage refuses is not pushed, debounced or not', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { setPref, setSignedInSteamid, adoptPrefEntry } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  adoptPrefEntry('lists', [{ id: 'a', name: 'old' }], 1);
+  refuseWrites();
+  setPref('region', 'DE');
+  setPref('lists', [{ id: 'a', name: 'renamed' }]);
+  t.mock.timers.tick(3000);
+  // A debounced push re-reads storage, so it would send the old value.
+  assert.deepEqual(seen, []);
+});
+
+test('adoptPrefEntry: a refused write is not flagged (authStore.ts warns)', () => {
+  const { adoptPrefEntry, prefsWriteFailed } = require('../public/prefs.ts');
   refuseWrites();
   assert.equal(adoptPrefEntry('region', 'DE', 1), false);
-  assert.equal(prefsWriteFailures(), 0);
+  assert.equal(prefsWriteFailed(), false);
 });
