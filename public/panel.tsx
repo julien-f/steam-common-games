@@ -158,7 +158,7 @@ const [panelGame, setPanelGame] = createSignal<ReadonlyGame | null>(null);
 const [heroIdx, setHeroIdx] = createSignal(0);
 let panelPrevFocus: HTMLElement | null = null;
 const [panelRefreshing, setPanelRefreshing] = createSignal(false); // true while the host's onRefresh() is in flight
-const [moreLinksOpen, setMoreLinksOpen] = createSignal(false); // whether the header's "⋯" overflow menu (News/Workshop/Website) is open
+const [moreLinksOpen, setMoreLinksOpen] = createSignal(false); // whether the header's "⋯" overflow menu (Workshop/Website) is open
 
 // Stack of {appid, name} for games navigated away from via a DLC link or "DLC for <Base Game>"
 // link click (see navigateToGame/panelGoBack below) — NOT touched by an ordinary panel open (a
@@ -2298,7 +2298,13 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
 
   return (
     <Show when={items().length}>
-      <div class="panel-icon-more">
+      <div
+        class="panel-icon-more"
+        // Else a menu left open behind focus would outlive the Esc meant for it (that closes the game).
+        onFocusOut={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setMoreLinksOpen(false);
+        }}
+      >
         <button
           type="button"
           class="panel-icon-link panel-icon-more-btn"

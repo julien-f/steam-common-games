@@ -3694,6 +3694,17 @@ test("F1 edge: the panel's More links menu holds only links found nowhere else, 
   await expect(page.locator('#panel-title')).toBeHidden();
 });
 
+test("F1 edge: the panel's More links menu closes once focus leaves it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await page.getByRole('button', { name: 'More links' }).click();
+  const menu = page.locator('.panel-icon-more-menu');
+  await page.keyboard.press('Tab');
+  await expect(menu.getByRole('link')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(menu).toBeHidden();
+});
+
 test("F1 edge: Esc goes to what's above the panel's More links menu, and to nothing once the panel is gone", async ({
   page,
 }) => {

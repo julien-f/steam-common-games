@@ -2,7 +2,8 @@
 // the innermost one instead of leaving the page. Stepping games or shots inside an overlay still
 // only rewrites the URL (urlState.ts), so Back never walks through every game looked at.
 // Entries are told apart by the `_depth` @solidjs/router stamps on each one (its index in the
-// session history, until Chromium's 50-entry cap; ours stamp one above the entry below), which survives the router's own replace navigations — the `overlay` marker
+// session history, until Chromium's 50-entry cap; ours stamp one above the entry below), which
+// survives the router's own replace navigations — the `overlay` marker
 // of ours beside it does not, so it only serves to reuse an entry.
 // The entry an overlay closes back onto holds the address from when it opened, so a close rewrites
 // it to the current one with the overlay stripped: a game stepped to in the lightbox stays open.
