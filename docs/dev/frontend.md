@@ -245,7 +245,7 @@ Every route opens with a **hero** (`ListHero.tsx`, a `<header>`, a flat section 
 - **Prices carries two actions**: its value (the region) opens the Preferences popover, its sub-line (the price age) re-fetches prices. With a `subOnClick` each half renders as its own button (HTML has no nested buttons); otherwise value and sub-line are one button.
 - **A refresh** (`load({ refresh: true })`) keeps the table, its rows' details and the selection until the new list resolves, then rebuilds with the kept details (`withKept`) and streams only new games. It keeps the previous age, a dynamic list's formula line and `heroTitle` (blanking it would tear down the tile being clicked).
 - Tiles render through `<Index>`, not `<For>`: recomputes build fresh tile objects, and by-reference keying would replace the activated button and drop its focus.
-- On a phone (≤ 768 px) tiles become one swipeable row, and `hero-secondary` actions (a bundle's IsThereAnyDeal link and Rank; a comparison's Edit players and Save) fold behind a More actions toggle (`secondaryActions`), so the table starts higher.
+- On a phone (≤ 768 px) tiles become one swipeable row, and `hero-secondary` actions (a bundle's IsThereAnyDeal link and Rank; a comparison's Edit players and Save) fold behind a More actions toggle (`secondaryActions`), so the table starts higher. A bundle's tiles lead with Tiers and New to you, Ends after, so the price shows without a swipe.
 
 Per kind:
 

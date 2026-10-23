@@ -2867,6 +2867,50 @@ export default function ListRoute() {
     const meta = bundleMeta();
     if (!meta) return [];
     const tiles: HeroTile[] = [];
+    // Price first, then what it adds, then the deadline: a phone's swipeable row shows only the first few.
+    if (meta.tiers.length > 0) {
+      tiles.push({
+        label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
+        value: (
+          <span class="bundle-tier-chips">
+            <For each={meta.tiers}>
+              {(tier) => (
+                <span
+                  class="bundle-tier-chip"
+                  classList={{
+                    'bundle-tier-chip--active': !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
+                  }}
+                  title={
+                    tier.quantity
+                      ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
+                      : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`
+                  }
+                >
+                  {tier.price == null
+                    ? 'Varies'
+                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`}
+                </span>
+              )}
+            </For>
+          </span>
+        ),
+      });
+    }
+    // What the bundle adds for the current account: its Steam games not in the library, and what
+    // those cost at their best deal right now (summed in the region's currency, currency.ts) —
+    // the "is it worth it" sum the table otherwise leaves to the reader. Once ownership is known.
+    const account = getEffectiveCurrentAccount();
+    if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
+      const fresh = rowsStore.filter((r) => !r.inLibrary);
+      const target = regionCurrency();
+      const total = sumBestDeals(fresh, target);
+      tiles.push({
+        label: 'New to you',
+        value: `${fresh.length} of ${rowsStore.length}`,
+        sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
+        title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
+      });
+    }
     if (meta.expiry) {
       const urgency = bundleUrgency(meta.expiry);
       const ended = urgency?.tier === 'ended';
@@ -2905,49 +2949,6 @@ export default function ListRoute() {
           unresolved > 0 ? `${bundleResolvedCount()} of ${bundleResolvedCount() + unresolved}` : bundleResolvedCount(),
         sub: unresolved > 0 ? 'on Steam' : undefined,
         title: meta.itadCount != null ? `IsThereAnyDeal lists ${meta.itadCount} in this bundle` : undefined,
-      });
-    }
-    // What the bundle adds for the current account: its Steam games not in the library, and what
-    // those cost at their best deal right now (summed in the region's currency, currency.ts) —
-    // the "is it worth it" sum the table otherwise leaves to the reader. Once ownership is known.
-    const account = getEffectiveCurrentAccount();
-    if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
-      const fresh = rowsStore.filter((r) => !r.inLibrary);
-      const target = regionCurrency();
-      const total = sumBestDeals(fresh, target);
-      tiles.push({
-        label: 'New to you',
-        value: `${fresh.length} of ${rowsStore.length}`,
-        sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
-        title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
-      });
-    }
-    if (meta.tiers.length > 0) {
-      tiles.push({
-        label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
-        value: (
-          <span class="bundle-tier-chips">
-            <For each={meta.tiers}>
-              {(tier) => (
-                <span
-                  class="bundle-tier-chip"
-                  classList={{
-                    'bundle-tier-chip--active': !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
-                  }}
-                  title={
-                    tier.quantity
-                      ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
-                      : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`
-                  }
-                >
-                  {tier.price == null
-                    ? 'Varies'
-                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`}
-                </span>
-              )}
-            </For>
-          </span>
-        ),
       });
     }
     // Date only — the hour matters for a deadline, not for when a bundle went live, and the

@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Screen readers tell a game's tags, genres and categories apart, and their dots differ by shape
 - Plays mostly shows how much each tag weighs, and **Why these?** lists the played games behind it.
 - On a phone, a game table keeps each game's name in view while you scroll its columns sideways.
+- A bundle's summary leads with its price tiers and what it adds to your library, so a phone shows them without a swipe.
 
 ### Fixed
 
