@@ -17,9 +17,9 @@ function makeMemoryLocalStorage() {
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
   delete require.cache[require.resolve('../public/prefs.ts')];
-  // require.cache deletion above doesn't reach signedInSteamid (a module-level `let`) — see
-  // _resetSignedInSteamid's own comment in prefs.ts.
-  require('../public/prefs.ts')._resetSignedInSteamid();
+  // require.cache deletion above doesn't reach prefs.ts's module-level state — see
+  // _resetPrefsState's own comment there.
+  require('../public/prefs.ts')._resetPrefsState();
 });
 
 test('getPref: returns the fallback when the key was never set', () => {
@@ -75,6 +75,31 @@ test('getPref/setPref: never throw when localStorage is unavailable', () => {
   const { getPref, setPref } = require('../public/prefs.ts');
   assert.doesNotThrow(() => setPref('region', 'DE'));
   assert.equal(getPref('region', 'fallback'), 'fallback');
+});
+
+test('setPref: on a full storage, evicts cached tastes to make room and persists', () => {
+  // Full while any taste is stored.
+  const store = new Map([
+    ['steam.isonoe.net:taste:a', '{"at":1}'],
+    ['steam.isonoe.net:taste:b', '{"at":2}'],
+  ]);
+  global.localStorage = {
+    get length() {
+      return store.size;
+    },
+    key: (i) => [...store.keys()][i] ?? null,
+    getItem: (k) => store.get(k) ?? null,
+    setItem(k, v) {
+      if ([...store.keys()].some((key) => key.startsWith('steam.isonoe.net:taste:')))
+        throw new DOMException('full', 'QuotaExceededError');
+      store.set(k, v);
+    },
+    removeItem: (k) => store.delete(k),
+  };
+  const { setPref } = require('../public/prefs.ts');
+  setPref('region', 'DE');
+  assert.deepEqual([...store.keys()], ['steam.isonoe.net:prefs']);
+  assert.equal(JSON.parse(store.get('steam.isonoe.net:prefs')).region.value, 'DE');
 });
 
 // ── v1 → v2 storage migration (raw value per key → {value, updatedAt} per key) ─────────────────
@@ -319,4 +344,74 @@ test('getPref is reactive per key: an effect reruns on its own key only', async 
   adoptPrefEntry('region', 'DE', 1); // silent: see adoptPrefEntry
   dispose();
   assert.deepEqual(seen, [null, 'GB']);
+});
+
+// ── failed writes ───────────────────────────────────────────────────────────────────────────────
+
+function refuseWrites() {
+  global.localStorage.setItem = () => {
+    throw new DOMException('full', 'QuotaExceededError');
+  };
+}
+
+test('setPref: a write storage refuses is flagged and warned until one succeeds', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const { setPref, prefsWriteFailed } = require('../public/prefs.ts');
+  const { setItem } = global.localStorage;
+  refuseWrites();
+  setPref('region', 'DE');
+  setPref('region', 'GB');
+  assert.equal(prefsWriteFailed(), true);
+  assert.match(warn.mock.calls[0].arguments[0], /^\[prefs\]/);
+  global.localStorage.setItem = setItem;
+  setPref('region', 'US');
+  assert.equal(prefsWriteFailed(), false);
+});
+
+test('dismissPrefsWriteFailure: hides failures until a write succeeds, then the next one shows', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { setPref, prefsWriteFailed, dismissPrefsWriteFailure } = require('../public/prefs.ts');
+  const { setItem } = global.localStorage;
+  refuseWrites();
+  setPref('region', 'DE');
+  assert.equal(prefsWriteFailed(), true);
+  dismissPrefsWriteFailure();
+  assert.equal(prefsWriteFailed(), false);
+  setPref('region', 'GB');
+  assert.equal(prefsWriteFailed(), false);
+  global.localStorage.setItem = setItem;
+  setPref('region', 'US');
+  refuseWrites();
+  setPref('region', 'FR');
+  assert.equal(prefsWriteFailed(), true);
+});
+
+test('setPref: a write storage refuses is not pushed, debounced or not', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { setPref, setSignedInSteamid, adoptPrefEntry } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  adoptPrefEntry('lists', [{ id: 'a', name: 'old' }], 1);
+  refuseWrites();
+  setPref('region', 'DE');
+  setPref('lists', [{ id: 'a', name: 'renamed' }]);
+  t.mock.timers.tick(3000);
+  // A debounced push re-reads storage, so it would send the old value.
+  assert.deepEqual(seen, []);
+});
+
+test('adoptPrefEntry: a refused write is not flagged (authStore.ts warns)', () => {
+  const { adoptPrefEntry, prefsWriteFailed } = require('../public/prefs.ts');
+  refuseWrites();
+  assert.equal(adoptPrefEntry('region', 'DE', 1), false);
+  assert.equal(prefsWriteFailed(), false);
 });

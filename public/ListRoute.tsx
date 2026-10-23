@@ -63,17 +63,8 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import {
-  fitTo,
-  loadTaste,
-  playerFits,
-  saveTaste,
-  similarGames,
-  tasteOf,
-  topPlayedTags,
-  type PlayerFits,
-  type Taste,
-} from './tagTaste.ts';
+import { fitTo, playerFits, similarGames, tasteOf, topPlayedTags, type PlayerFits, type Taste } from './tagTaste.ts';
+import { loadTaste, saveTaste } from './tasteCache.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -3229,7 +3220,8 @@ export default function ListRoute() {
     // Untracked: on an account switch the rows are still the previous account's until the reload.
     const account = untrack(getEffectiveCurrentAccount);
     const taste = account && tasteOf(tableData(), Date.now());
-    if (taste) saveTaste(account.id, taste);
+    const keep = untrack(() => [getMyAccount()?.id, getCurrentAccount()?.id]).filter((id) => id != null);
+    if (taste) saveTaste(account.id, taste, keep);
   });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
   const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));

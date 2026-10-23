@@ -30,8 +30,8 @@ beforeEach(() => {
   delete require.cache[require.resolve('../public/authStore.ts')];
   require('../public/accountsStore.ts').setAccountOverride(null);
   // require.cache deletion above doesn't reach signedInSteamid/the table-view baselines (both
-  // module-level state) — see _resetSignedInSteamid's own comment in prefs.ts.
-  require('../public/prefs.ts')._resetSignedInSteamid();
+  // module-level state) — see _resetPrefsState's own comment in prefs.ts.
+  require('../public/prefs.ts')._resetPrefsState();
   require('../public/tableViewSync.ts').resetBaselines();
 });
 

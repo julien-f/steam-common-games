@@ -28,6 +28,8 @@ import { AccountChip } from './AccountChip.tsx';
 import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
+import { StorageFullBanner } from './StorageFullBanner.tsx';
+import { prefsWriteFailed } from './prefs.ts';
 import { smoothScroll } from './utils.ts';
 import ArrowUp from 'lucide-solid/icons/arrow-up';
 import Settings from 'lucide-solid/icons/settings';
@@ -360,6 +362,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         >
           <ArrowUp />
         </button>
+      </Show>
+      <Show when={prefsWriteFailed()}>
+        <StorageFullBanner />
       </Show>
       <ShortcutsModal open={shortcutsOpen()} onClose={() => setShortcutsOpen(false)} />
     </div>

@@ -11,6 +11,7 @@
 // setPref below).
 import { createSignal } from 'solid-js';
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
+import { setItemMakingRoom } from './tasteCache.ts';
 
 export const PREFS_STORAGE_KEY = 'steam.isonoe.net:prefs';
 
@@ -54,14 +55,9 @@ function readEntries(): Record<string, PrefEntry> {
   return entries;
 }
 
-// False when not persisted: private browsing, quota, storage unavailable.
+// False when not persisted: private browsing, storage unavailable, or full even without the cached tastes.
 function writeEntries(entries: Record<string, PrefEntry>): boolean {
-  try {
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
-    return true;
-  } catch {
-    return false;
-  }
+  return setItemMakingRoom(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
 }
 
 // Per key, not one for the blob: table views and rankings are written on every edit, and would rerun every reader.
@@ -74,6 +70,15 @@ function version(key: string): { track: () => void; notify: () => void } {
     versions.set(key, (v = { track, notify: () => notify() }));
   }
   return v;
+}
+
+// Whether storage refused setPref's last write; AppShell.tsx's banner says so.
+const [writeFailing, setWriteFailing] = createSignal(false);
+const [dismissed, setDismissed] = createSignal(false);
+export const prefsWriteFailed = (): boolean => writeFailing() && !dismissed();
+// Until a write succeeds again: the next edits would most likely fail too.
+export function dismissPrefsWriteFailure(): void {
+  setDismissed(true);
 }
 
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
@@ -90,8 +95,13 @@ export function setPref(key: string, value: unknown): void {
   const entries = readEntries();
   const updatedAt = Date.now();
   entries[key] = { value, updatedAt };
-  writeEntries(entries);
+  const written = writeEntries(entries);
+  setWriteFailing(!written);
+  if (written) setDismissed(false);
+  else console.warn(`[prefs] storage refused "${key}": the change isn't saved on this device`);
   version(key).notify();
+  // Not pushed either: the edit snaps back here, and a debounced push would send the stored value.
+  if (!written) return;
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
   // same time (different tabs/devices) can't race each other's writes. A table-view key is never
@@ -150,10 +160,12 @@ export function setSignedInSteamid(steamid: string | null): void {
 // Test-only (see test/prefs.test.js) — this repo's usual "delete require.cache between tests"
 // reset doesn't reach a module-level `let` in a TS-stripped ESM file (confirmed live; same
 // caveat myOwnership.ts/accountOverride.ts document for their own module state), and unlike
-// those this one variable didn't seem worth a whole factory-function rewrite for. Same `_reset`
+// those this little state didn't seem worth a whole factory-function rewrite for. Same `_reset`
 // naming convention as lib/cache.js/lib/metrics.js's own test-only resets.
-export function _resetSignedInSteamid(): void {
+export function _resetPrefsState(): void {
   signedInSteamid = null;
+  setWriteFailing(false);
+  setDismissed(false);
 }
 
 // Fire-and-forget — a failed sync leaves the change on this device only, in localStorage, exactly

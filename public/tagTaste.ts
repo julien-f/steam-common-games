@@ -174,23 +174,3 @@ export function fitTo(taste: Taste, game: Omit<Tagged, 'appid'>): number | null 
   const v = vectorOf(featuresOf(game), idfOf(taste));
   return Math.round(cosine(profile, v) * 100);
 }
-
-// Its own localStorage key, not a pref: device-local cache, recomputed on each Owned visit, never synced.
-const TASTE_STORAGE_PREFIX = 'steam.isonoe.net:taste:';
-
-export function loadTaste(accountId: string): Taste | null {
-  try {
-    const taste = JSON.parse(localStorage.getItem(TASTE_STORAGE_PREFIX + accountId) ?? 'null');
-    return taste?.idf && taste.games ? taste : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveTaste(accountId: string, taste: Taste): void {
-  try {
-    localStorage.setItem(TASTE_STORAGE_PREFIX + accountId, JSON.stringify(taste));
-  } catch {
-    /* unavailable storage: Taste fit stays unknown elsewhere */
-  }
-}

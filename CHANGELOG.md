@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Enter in an empty player field on Compare adds the suggestion you pointed at, or else starts the comparison once two players are in
 - Keyboard focus stays in place after Look up, Add to list and stepping onto the last bundle
 - ArrowDown in a Compare player box steps through every suggestion instead of sticking on one
+- When the browser's storage is full, list and preference changes are no longer silently lost: cached tastes make room first, and a banner says when a change still couldn't be saved
 
 ### Development
 
