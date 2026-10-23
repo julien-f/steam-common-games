@@ -99,6 +99,7 @@ import {
   fetchJson,
   fmtAge,
   fmtLastPlayed,
+  focusGameRow,
   formatMoney,
   hoursFromMinutes,
   oldestFetchedAt,
@@ -1342,9 +1343,9 @@ export default function ListRoute() {
     setAddTarget('');
     setNewListName('');
     table?.selection.clear();
-    // Clearing the selection unmounts the bar that held focus: back to the table's current row, not
-    // the toast's Open list, which would hold the toast up for as long as it kept focus.
-    document.querySelector<HTMLElement>('main .dt-tr[tabindex="0"]')?.focus();
+    // Clearing the selection unmounts the bar that held focus: back to a row it added, not the
+    // toast's Open list, which would hold the toast up for as long as it kept focus.
+    if (!focusGameRow(document.querySelector('main'), appids[0])) document.querySelector<HTMLElement>('main')?.focus();
   }
 
   // Only ever called while viewing a manual list (`kind === 'user' && userList().kind ===

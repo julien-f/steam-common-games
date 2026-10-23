@@ -918,16 +918,17 @@ test('L1.1-3: select games, add them to a new list, open it', async ({ page }) =
   await expect(rows(page)).toHaveCount(2);
 });
 
-test('L1 edge: Add hands focus back to the table as the selection bar goes', async ({ page }) => {
+test('L1 edge: Add hands focus to the row it added as the selection bar goes', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
-  await row(page, 'Portal 2').getByRole('checkbox').check();
+  const added = rows(page).last();
+  await added.getByRole('checkbox').check();
   const toolbar = page.locator('.selection-toolbar');
   await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
   await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
   await toolbar.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('status').getByRole('link', { name: 'Open list' })).toBeVisible();
-  await expect(page.locator('main .dt-tr[tabindex="0"]')).toBeFocused();
+  await expect(added).toBeFocused();
 });
 
 test("L1 edge: the new list's toast stays while pointed at", async ({ page }) => {
