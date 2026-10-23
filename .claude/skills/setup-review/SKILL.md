@@ -45,7 +45,7 @@ Read [setup-backlog.md](../../../docs/dev/setup-backlog.md). Re-run each **Watch
 ## 3. Transcripts
 
 - `node scripts/setup-facts.js --transcripts=<DATE> --digest=<scratchpad>/digest`, DATE being the ledger's "Transcripts read up to" (`--transcripts` alone, the last 20 sessions, when it says never), counts what needs no judgment over the sessions since: largest outputs and slowest calls by command, command pairs repeated across sessions, calls the permission classifier denied or you rejected, each skill's runs, longest run, tokens and interrupts, interrupts, which docs were read and how often whole (subagents included), and how the user answered each skill's questions — a skill whose recommendation is often overridden, answered in free text or sent back to clarify recommends badly or asks what a default would settle.
-- One `Agent` subagent then reads the digests (one compact file per session; never the raw `.jsonl`) for what does need judgment, seen in at least two sessions:
+- Then read the digests (one compact file per session; never the raw `.jsonl`) for what does need judgment, seen in at least two sessions — yourself under about 50 KB in all, else one `Agent` subagent:
   - the user correcting the agent the same way (a rule missing, unclear or ignored), interrupts and rejections included;
   - the same command failing the same way (a pitfalls.md entry or a fix);
   - the script's repeated pairs that are a real procedure (a script or skill candidate);

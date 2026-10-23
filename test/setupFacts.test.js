@@ -14,6 +14,7 @@ const {
   linesSince,
   tokens,
   skillRuns,
+  skillReads,
   answerOutcome,
   sessionEvents,
   digest,
@@ -214,6 +215,41 @@ test('skillRuns counts slash commands and Skill calls of known skills, each runn
       { skill: 'ux-review', ms: 60_000 },
       { skill: 'ux-fix', ms: 120_000 },
     ],
+  );
+});
+
+test('a background task notification is not a prompt: it neither ends a skill run nor shows in the digest', () => {
+  const line = (timestamp, type, content) => JSON.stringify({ timestamp, type, message: { content } });
+  const lines = [
+    line('2026-01-01T00:00:00Z', 'user', '<command-name>/code-audit</command-name>'),
+    line('2026-01-01T00:01:00Z', 'user', '<task-notification> <task-id>a1</task-id> <status>completed</status>'),
+    line('2026-01-01T00:05:00Z', 'user', 'thanks'),
+  ];
+  assert.deepEqual(
+    skillRuns(lines, ['code-audit']).map((r) => r.ms),
+    [300_000],
+  );
+  assert.deepEqual(
+    sessionEvents(lines, ['code-audit']).map((e) => e.kind),
+    ['skill', 'prompt'],
+  );
+});
+
+test('skillReads: skills whose SKILL.md a Read call or a shell read opened', () => {
+  const use = (name, input) =>
+    JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } });
+  assert.deepEqual(
+    skillReads(
+      [
+        use('Read', { file_path: '/repo/.claude/skills/code-fix/SKILL.md' }),
+        use('Bash', { command: 'sed -n 1,40p .claude/skills/ux-fix/SKILL.md' }),
+        use('Bash', { command: 'grep -n x .claude/skills/release/SKILL.md' }),
+        use('Edit', { file_path: '/repo/.claude/skills/screenshots/SKILL.md' }),
+        use('Read', { file_path: '/repo/.claude/skills/unknown/SKILL.md' }),
+      ],
+      ['code-fix', 'ux-fix', 'release', 'screenshots'],
+    ),
+    new Set(['code-fix', 'ux-fix']),
   );
 });
 

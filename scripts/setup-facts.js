@@ -17,7 +17,7 @@
 //     --digest=DIR                                 also writes one file per session to DIR: prompts, the last
 //                                                  paragraph of the reply before each, skill runs, failed calls, interrupts, rejections
 //                                                  with the user's reason, questions and answers — long tokens
-//                                                  redacted, for the subagent that reads for judgment
+//                                                  redacted, for the reader judging them
 //                                                  and which docs were read, how often whole
 //   node scripts/setup-facts.js --agents[=ID]      per subagent of session ID (default: the newest with any):
 //                                                  time, turns, cache reads, failed calls, time in tests/e2e/commits, all tool time and its top commands
@@ -104,11 +104,12 @@ function commitCalls(sessions) {
   return sessions.flat().filter((c) => c.key === 'git commit' && !c.error).length;
 }
 
-// A user turn that is a prompt, not a tool result, a slash command's echo or a loaded skill's text.
+// A user turn that is a prompt, not a tool result, a slash command's echo, a background task's
+// notification or a loaded skill's text.
 function isPrompt(entry) {
   if (entry.type !== 'user' || entry.isMeta) return false;
   const content = entry.message?.content;
-  if (typeof content === 'string') return !/^\s*<(command|local-command)-/.test(content);
+  if (typeof content === 'string') return !/^\s*<(command|local-command|task-notification)\b/.test(content);
   return (
     Array.isArray(content) &&
     content.every((c) => c.type === 'text') &&
@@ -154,6 +155,27 @@ function skillRuns(lines, names) {
     });
   });
   return runs;
+}
+
+// One transcript's JSONL lines → the skills in `names` whose SKILL.md a Read call or a shell read opened:
+// a lane agent told to follow a skill reads it without starting it.
+function skillReads(lines, names) {
+  const read = new Set();
+  for (const line of lines) {
+    const content = JSON.parse(line).message?.content;
+    for (const part of Array.isArray(content) ? content : []) {
+      if (part.type !== 'tool_use') continue;
+      const target =
+        part.name === 'Read'
+          ? part.input.file_path
+          : part.name === 'Bash' && READER.test(part.input.command ?? '')
+            ? part.input.command
+            : '';
+      for (const [, name] of (target ?? '').matchAll(/\.claude\/skills\/([\w-]+)\/SKILL\.md/g))
+        if (names.includes(name)) read.add(name);
+    }
+  }
+  return read;
 }
 
 // One line, long tokens (keys, hashes) redacted, cut at `max` characters.
@@ -536,8 +558,21 @@ function transcripts({ limit, since }, digestDir) {
   for (const p of pairs) console.log(`  ${p.pair}: ${p.sessions} · ${p.count}`);
   console.log('\nDenied by the permission classifier · rejected by the user:');
   for (const d of denied) console.log(`  ${d.key}: ${d.denied} · ${d.rejected}`);
-  console.log('\nSkill runs (runs · sessions · longest run to the next prompt · tokens, main thread · interrupts):');
+  // Subagents act on the session's behalf, so their transcripts count for skills followed and docs read.
+  const subagentLogs = read.map(([id]) => {
+    const sub = path.join(dir, id, 'subagents');
+    return fs.existsSync(sub)
+      ? fs
+          .readdirSync(sub)
+          .filter((f) => f.endsWith('.jsonl'))
+          .map((f) => fs.readFileSync(path.join(sub, f), 'utf8').split('\n').filter(Boolean))
+      : [];
+  });
+  console.log(
+    '\nSkill runs (runs · sessions · longest run to the next prompt · tokens, main thread · interrupts · sessions whose subagents read its SKILL.md):',
+  );
   const runs = logs.map((lines) => skillRuns(lines, names));
+  const followed = subagentLogs.map((agents) => new Set(agents.flatMap((lines) => [...skillReads(lines, names)])));
   const interrupts = events.flat().filter((e) => e.kind === 'interrupt');
   for (const name of names) {
     const mine = runs.map((r) => r.filter((run) => run.skill === name));
@@ -548,7 +583,7 @@ function transcripts({ limit, since }, digestDir) {
       output: 0,
     });
     console.log(
-      `  ${name}: ${all.length} · ${mine.filter((r) => r.length).length} · ${longest} · ${mtok(used)} · ${interrupts.filter((e) => e.skill === name).length}`,
+      `  ${name}: ${all.length} · ${mine.filter((r) => r.length).length} · ${longest} · ${mtok(used)} · ${interrupts.filter((e) => e.skill === name).length} · ${followed.filter((s) => s.has(name)).length}`,
     );
   }
   console.log(
@@ -560,18 +595,8 @@ function transcripts({ limit, since }, digestDir) {
   for (const s of answerStats(events))
     console.log(`  ${s.name}: ${s.recommended} · ${s.other} · ${s.own} · ${s.clarify} · ${s.dismissed}`);
   console.log('\nDocs read (reads · whole · transcripts, subagents counted apart):');
-  // Subagents read docs on the session's behalf, so their transcripts count here.
-  const subagentLogs = read.flatMap(([id]) => {
-    const sub = path.join(dir, id, 'subagents');
-    return fs.existsSync(sub)
-      ? fs
-          .readdirSync(sub)
-          .filter((f) => f.endsWith('.jsonl'))
-          .map((f) => fs.readFileSync(path.join(sub, f), 'utf8').split('\n').filter(Boolean))
-      : [];
-  });
   const existing = (d) => fs.existsSync(path.join(ROOT, d.doc)); // not a test fixture's made-up path
-  for (const d of docReadStats([...logs, ...subagentLogs].map(docReads)).filter(existing))
+  for (const d of docReadStats([...logs, ...subagentLogs.flat()].map(docReads)).filter(existing))
     console.log(`  ${d.doc}: ${d.reads} · ${d.whole} · ${d.sessions}`);
   if (digestDir) console.log(`\nDigests: ${read.length} files in ${digestDir}`);
 }
@@ -632,6 +657,7 @@ module.exports = {
   linesSince,
   tokens,
   skillRuns,
+  skillReads,
   answerOutcome,
   sessionEvents,
   digest,
