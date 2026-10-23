@@ -78,7 +78,7 @@ import {
 } from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
 import { archetypeOf, playStyle, storyGames, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
-import { OwnedProfile, PlayerAvatar, ProfileBadge } from './PlayerProfile.tsx';
+import { GameArt, OwnedProfile, PlayerAvatar, ProfileBadge } from './PlayerProfile.tsx';
 import Gift from 'lucide-solid/icons/gift';
 import Heart from 'lucide-solid/icons/heart';
 import Users from 'lucide-solid/icons/users';
@@ -113,7 +113,6 @@ import {
   hoursFromMinutes,
   oldestFetchedAt,
   scoreColor,
-  fadeInOnLoad,
   fmtHours,
   fmtLocalDate,
   smoothScroll,
@@ -3369,20 +3368,16 @@ export default function ListRoute() {
   // A game as its store art, name and caption, opening its panel.
   const gameArt = (appid: number, caption: string) => (
     <button type="button" class="players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
-      <img
-        src={rowStore.getRow(appid)?.thumb ?? rowStore.getRow(appid)?.capsule ?? undefined}
-        alt=""
-        width="150"
-        height="56"
-        loading="lazy"
-        ref={fadeInOnLoad}
-      />
+      <GameArt art={artOf(appid)} large />
       <span class="players-game-name">{rowStore.getRow(appid)?.name}</span>
       <span class="players-game-caption">{caption}</span>
     </button>
   );
-  const sharedCount = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
-    profiles.players.length === 2 ? (profiles.ground.pairs[0].shared ?? 0) : profiles.ground.sharedCount;
+  // The table's larger capsule, else the smaller one.
+  const artOf = (appid: number) => {
+    const row = rowStore.getRow(appid);
+    return row?.thumb ?? row?.capsule ?? null;
+  };
   const tagButton = (tag: string) => (
     <button
       type="button"
@@ -3481,13 +3476,13 @@ export default function ListRoute() {
                     >
                       <span class="players-meter">
                         <span class="players-dots" aria-hidden="true">
-                          <For each={Array.from({ length: TOP_TAGS }, (_, k) => k < sharedCount(profiles()))}>
+                          <For each={Array.from({ length: TOP_TAGS }, (_, k) => k < profiles().ground.sharedCount)}>
                             {(on) => <i classList={{ on }} />}
                           </For>
                         </span>
                         {profiles().players.length === 2
-                          ? `${sharedCount(profiles())} of their top ${TOP_TAGS} tags`
-                          : `${sharedCount(profiles())} ${sharedCount(profiles()) === 1 ? 'tag' : 'tags'} in everyone's top ${TOP_TAGS}`}
+                          ? `${profiles().ground.sharedCount} of their top ${TOP_TAGS} tags`
+                          : `${profiles().ground.sharedCount} ${profiles().ground.sharedCount === 1 ? 'tag' : 'tags'} in everyone's top ${TOP_TAGS}`}
                       </span>
                       <span class="players-card-tags">
                         <For each={profiles().ground.sharedTags}>{tagButton}</For>
@@ -3582,22 +3577,24 @@ export default function ListRoute() {
     setTasteFitSource((source) => source && { ...source, taste });
   });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
+  // Owned's profile alone: no other list renders it.
+  const profileReady = () => kind === 'owned' && loadFraction() == null;
   const playsMostlyProfile = createMemo(() =>
-    loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 },
+    profileReady() ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 },
   );
   const playsMostly = () => playsMostlyProfile().tags;
   // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
   const playtimeHidden = createMemo(
-    () => loadFraction() == null && tableData().length > 0 && !tableData().some((g) => g.playtime),
+    () => profileReady() && tableData().length > 0 && !tableData().some((g) => g.playtime),
   );
   const profileFacts = createMemo(() => {
-    if (loadFraction() != null) return { style: null, story: null };
+    if (!profileReady()) return { style: null, story: null };
     const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
     return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
   });
   // The games Play next lists (listViews.ts), counted the same way so the two agree.
   const unplayed = createMemo(() =>
-    loadFraction() == null && !playtimeHidden()
+    profileReady() && !playtimeHidden()
       ? tableData().filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS).length
       : 0,
   );
@@ -3644,7 +3641,7 @@ export default function ListRoute() {
           return (
             row && {
               name: row.name,
-              art: row.thumb ?? row.capsule ?? null,
+              art: artOf(appid),
               hours: row.playtime ?? 0,
               main: row.hltbMain ?? null,
             }

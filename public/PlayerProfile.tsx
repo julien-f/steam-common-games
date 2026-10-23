@@ -113,8 +113,18 @@ export interface ProfileGameInfo {
 
 const STORY_GAMES_SHOWN = 5;
 
-function GameArt(props: { art: string | null }): JSX.Element {
-  return <img src={props.art ?? undefined} alt="" width="46" height="17" loading="lazy" ref={fadeInOnLoad} />;
+// A game's store art: a chip's thumbnail, or `large` for a comparison's games.
+export function GameArt(props: { art: string | null; large?: boolean }): JSX.Element {
+  return (
+    <img
+      src={props.art ?? undefined}
+      alt=""
+      width={props.large ? 150 : 46}
+      height={props.large ? 56 : 17}
+      loading="lazy"
+      ref={fadeInOnLoad}
+    />
+  );
 }
 
 // Story games with their hours against their main story's length, reached ones then those short of it.

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { playStyleOf, playStyle, storyGames } = require('../public/playerProfile.ts');
+const { archetypeOf, playStyleOf, playStyle, storyGames } = require('../public/playerProfile.ts');
 
 const SOLO = ['Single-player'];
 const COOP = ['Multi-player', 'Co-op', 'Online Co-op'];
@@ -75,7 +75,6 @@ test('storyGames: endless, multiplayer, unknown-length and unplayed games are no
 });
 
 test('archetypeOf: a title from the play style, story finishers among single-player profiles', () => {
-  const { archetypeOf } = require('../public/playerProfile.ts');
   const story = (reached, of) => ({ reached: Array(reached).fill(0), fellShort: Array(of - reached).fill(0) });
   assert.equal(archetypeOf('solo', story(4, 8)).name, 'Story finisher');
   assert.equal(archetypeOf('solo', story(3, 8)).name, 'Solo explorer');
