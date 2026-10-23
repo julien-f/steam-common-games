@@ -3275,6 +3275,20 @@ test('F1 edge: Back closes the open game, then leaves the list', async ({ page }
   await expect(page).toHaveURL(/\/about$/);
 });
 
+test("F1 edge: Back closes the open game in a tab past the browser's 50-entry history cap", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  // Stamped as the router stamps its pushes; Chromium stops growing `history.length` at 50.
+  await page.evaluate(() => {
+    for (let i = 0; i < 52; i++) history.pushState({ ...history.state, _depth: history.length - 1 }, '');
+  });
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page).toHaveURL(/\?game=1145360/);
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
+});
+
 test('F1 edge: Back closes the lightbox before the game behind it', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

@@ -36,8 +36,8 @@ export function pushOverlayEntry(name: Overlay, close: () => void, toBase: ToBas
     const url = location.href;
     history.replaceState(history.state, '', toBase(location));
     history.pushState(history.state, '', url);
-    // Stamped the way the router stamps its own pushes: the new entry is the last one.
-    history.replaceState({ ...history.state, _depth: history.length - 1, overlay: name }, '');
+    // One above the entry below, not the router's `history.length - 1`: Chromium caps that at 50.
+    history.replaceState({ ...history.state, _depth: currentDepth() + 1, overlay: name }, '');
   }
   opened.push({ name, depth: currentDepth(), close, toBase });
 }
