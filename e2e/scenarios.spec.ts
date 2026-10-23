@@ -3542,6 +3542,23 @@ test('F1 edge: Esc closes a nav popover or the search dropdown, not the open gam
   await expect(page.locator('#panel-title')).toBeHidden();
 });
 
+test("F1 edge: the panel's More links menu holds only links found nowhere else, and Esc closes it before the game", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const more = page.getByRole('button', { name: 'More links' });
+  await more.click();
+  const menu = page.locator('.panel-icon-more-menu');
+  await expect(menu.getByRole('link')).toHaveText(['Official website ↗']);
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(page.locator('#panel-title')).toBeVisible();
+  await expect(more).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#panel-title')).toBeHidden();
+});
+
 test('C1 edge: a wrapped game name keeps its ✓/☆ badge right after the last word', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'names wrap at phone width');
   await asPlayer(page, ALICE);

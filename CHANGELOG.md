@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The combined-list form fits a phone's width
 - A game's DLC no longer reorder and reload once they all arrive
 - Back closes the open game or screenshot in a tab with a long history, instead of only changing the address
+- The game panel's More links menu closes on Esc, leaving the game open, and no longer repeats Similar games' More like this on Steam link
 
 ### Development
 

@@ -75,7 +75,6 @@ import Link from 'lucide-solid/icons/link';
 import Newspaper from 'lucide-solid/icons/newspaper';
 import Package from 'lucide-solid/icons/package';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
-import Search from 'lucide-solid/icons/search';
 import ShoppingCart from 'lucide-solid/icons/shopping-cart';
 import Star from 'lucide-solid/icons/star';
 import Timer from 'lucide-solid/icons/timer';
@@ -269,6 +268,17 @@ export function initPanel(options: PanelOptions) {
     )
       setMoreLinksOpen(false);
   });
+  // Capture, as bindNavPopover: ahead of panelKeyboard.ts's Esc, which skips a handled one.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Escape' || !moreLinksOpen()) return;
+      e.preventDefault();
+      setMoreLinksOpen(false);
+      document.querySelector<HTMLElement>('#game-panel .panel-icon-more-btn')?.focus();
+    },
+    true,
+  );
 
   initPanelSwipe();
   initHeroSwipe();
@@ -2286,15 +2296,10 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
         },
       props.game.details?.meta?.website && {
         icon: Globe,
-        label: 'Official Website',
+        label: 'Official website',
         href: props.game.details.meta.website,
       },
-      {
-        icon: Search,
-        label: 'More Like This (Steam)',
-        href: steamMoreLikeUrl(props.game.appid),
-      },
-    ].filter((it): it is { icon: typeof Search; label: string; href: string } => !!it);
+    ].filter((it): it is { icon: typeof Globe; label: string; href: string } => !!it);
 
   return (
     <Show when={items().length}>
@@ -2316,7 +2321,7 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
               {(it) => (
                 <li>
                   <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
-                    <it.icon /> {it.label}
+                    <it.icon /> {it.label} ↗
                   </a>
                 </li>
               )}

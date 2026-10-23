@@ -142,7 +142,8 @@ function details(appid: number, slowMedia = false) {
       ...media(appid, slowMedia),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
-      website: null,
+      // So the panel's More links menu has an entry.
+      website: appid === MEDIA_APPID ? 'https://example.com/' : null,
       achievementCount: appid === MEDIA_APPID ? ACHIEVEMENTS.length : 0,
       platforms: { windows: true, mac: false, linux: false },
       languages: [],
