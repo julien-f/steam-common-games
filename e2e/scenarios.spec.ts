@@ -4055,7 +4055,13 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
 
   await page.goto('/lists/owned');
-  expect(await takes24pxTap(page.locator('.dt-th-sort').first())).toBe(true);
+  // A header sorts from anywhere in its cell, not just its label's button.
+  const header = page.locator('.dt-th[data-col-key="releaseDate"]');
+  expect(await takes24pxTap(header)).toBe(true);
+  const label = (await header.locator('.dt-th-sort').boundingBox())!;
+  const cell = (await header.boundingBox())!;
+  await page.mouse.click(label.x + 4, cell.y + cell.height - 3);
+  await expect(header).toHaveAttribute('aria-sort', /ascending|descending/);
   expect(await takes24pxTap(page.getByRole('link', { name: 'About' }))).toBe(true);
   await page.locator('.account-chip-btn').click();
   expect(await takes24pxTap(page.locator('.account-chip-panel').getByRole('link', { name: 'Wishlist' }))).toBe(true);

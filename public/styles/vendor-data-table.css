@@ -139,20 +139,6 @@ html:root {
   font-size: var(--fs-ui);
 }
 
-/* The 24 px tap area around a header's sort button only grows taller: wider, it would cover its column menu button. */
-.dt-th-sort {
-  position: relative;
-}
-.dt-th-sort::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  height: max(100%, 24px);
-  transform: translate(-50%, -50%);
-}
-
 /* Phone: the table library's toolbar spacing tightened, so the rows start higher. */
 @media (max-width: 768px) {
   /* Move the library's end slot up to the end of the first line (Columns/Group/Sort), ahead of the
