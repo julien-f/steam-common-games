@@ -3277,13 +3277,15 @@ export default function ListRoute() {
   const heroLead: JSX.Element | undefined =
     kind !== 'bundle' ? undefined : (
       <div class="list-hero-nav">
-        {/* aria-disabled, not disabled: a disabled button can't take focus back on the last bundle. */}
+        {/* aria-disabled at the list's ends: a disabled button can't take focus back on the last bundle.
+            Plainly disabled off the list (a deep link), where no step could have led. */}
         <button
           type="button"
           class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
-          aria-disabled={prevBundleId() == null ? 'true' : undefined}
+          disabled={bundleNavIndex() === -1}
+          aria-disabled={bundleNavIndex() !== -1 && prevBundleId() == null ? 'true' : undefined}
           onClick={(e) => stepBundle(prevBundleId(), e.currentTarget)}
         >
           <ChevronLeft />
@@ -3293,7 +3295,8 @@ export default function ListRoute() {
           class="btn"
           aria-label="Next bundle"
           title="Next bundle"
-          aria-disabled={nextBundleId() == null ? 'true' : undefined}
+          disabled={bundleNavIndex() === -1}
+          aria-disabled={bundleNavIndex() !== -1 && nextBundleId() == null ? 'true' : undefined}
           onClick={(e) => stepBundle(nextBundleId(), e.currentTarget)}
         >
           <ChevronRight />

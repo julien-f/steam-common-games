@@ -2080,6 +2080,15 @@ test('B1 edge: stepping onto the last bundle keeps focus on › Next bundle, mar
   await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
 });
 
+test('B1 edge: a deep-linked bundle with no browsed list around it disables ‹/› outright', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(page.getByRole('heading', { level: 1, name: BUNDLE.title })).toBeVisible();
+  // `disabled`, not just aria-disabled: no dead Tab stops.
+  await expect(page.getByRole('button', { name: 'Previous bundle' })).toHaveJSProperty('disabled', true);
+  await expect(page.getByRole('button', { name: 'Next bundle' })).toHaveJSProperty('disabled', true);
+});
+
 test("B1 edge: a failed ‹/› step doesn't pull focus back to it on a later load", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.route(`**/api/bundles/${PICK_BUNDLE.id}*`, (route) =>
