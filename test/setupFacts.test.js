@@ -218,6 +218,17 @@ test('skillRuns counts slash commands and Skill calls of known skills, each runn
   );
 });
 
+test('skillRuns ignores a Skill call replayed in an untimestamped api-request-blob', () => {
+  const lines = [
+    JSON.stringify({
+      type: 'api-request-blob',
+      message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill: 'ux-fix' } }] },
+    }),
+    JSON.stringify({ timestamp: '2026-01-01T00:00:00Z', type: 'user', message: { content: 'thanks' } }),
+  ];
+  assert.deepEqual(skillRuns(lines, ['ux-fix']), []);
+});
+
 test('a background task notification is not a prompt: it neither ends a skill run nor shows in the digest', () => {
   const line = (timestamp, type, content) => JSON.stringify({ timestamp, type, message: { content } });
   const lines = [

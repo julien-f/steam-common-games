@@ -2,7 +2,7 @@
 
 Proposals from `setup-review` runs about the Claude Code setup (skills, scripts, hooks, settings, CLAUDE.md, memory), so each run builds on the last instead of re-proposing. Effort S/M/L; numbered with `node scripts/backlog-next.js P`, never reusing a closed item's number.
 
-Last reviewed: 2026-10-23 · Transcripts read up to: 2026-10-23T11:19:03Z.
+Last reviewed: 2026-10-23 · Transcripts read up to: 2026-10-23T21:15:05Z.
 
 - **Watching**: applied, with the command that measures it, its baseline and its target. The next run re-measures: target met → remove the item; missed → move it to Open with what was learned.
 - **Open**: recommended, not yet picked.
@@ -11,13 +11,12 @@ Last reviewed: 2026-10-23 · Transcripts read up to: 2026-10-23T11:19:03Z.
 ## Watching
 
 - **P30 · batch.js · S** — `merge <branch>` takes the closed items from the branch's own backlog diff; a line the lane rewrote is kept as rewritten. 2026-10-12: narrowed items dropped by a hand-listed merge, U163–U165 re-added by hand. Measure: narrowed items re-added by hand in the next batch — 3 → 0.
-- **P31 · mock-server.js · S** — `up` restarts the server when git HEAD moved since it started. 2026-10-12: one stale measurement (search box full width, nav 94 px) after commits in the main checkout. Measure: stale-server measurements in the next ux-fix — 1 → 0.
-- **P33 · ux-fix · S** — visual or layout items get a before/after mockup page (CSS injected on dev:mock) approved before building. Evidence: one session, mockups asked for twice at go-ahead. Measure: mockup requests at a ux-fix go-ahead — 2 → 0.
 - **P46 · changelog-check.js · S** — a feature branch's commits skip the entry requirement; the `pre-merge-commit` hook checks the merge's whole diff instead. 2026-10-16: a step commit needed an entry for a half-built feature. Measure: half-feature entries rewritten at the next release consolidation — unknown → 0.
 - **P52 · setup-facts.js · S** — skill runs also list the sessions whose subagents read the skill's SKILL.md: fix-batch lanes follow code-fix and ux-fix without starting them. Measure: `--transcripts=2026-10-17T22:07:15Z` code-fix — never run, 0 → followed in 2 sessions (met when applied; watch that it keeps "nothing ran" from flagging a used skill).
-- **P53 · setup-facts.js · S** — a background task's notification is not a prompt: skill runs run past it, and digests leave it out. Measure: `--transcripts=2026-10-17T22:07:15Z` — digest notification lines 16 (24.0 KB) → 0 (13.6 KB), code-audit's longest run 2 → 95 min (met when applied).
-- **P54 · ~/.claude/CLAUDE.md · S** — a choice among visual options (colors, icons, layouts) is shown on a mockup page before asking. 2026-10-23: one redesign session, 12 questions on palette, icons and name dismissed over 3 rounds ("je ne vois pas les couleurs dans le terminal"), all answered at once on the mockup canvas. Measure: `--transcripts` dismissed questions about visual options — 12 → 0.
-- **P55 · setup-review · S** — the digests are read inline under about 50 KB, one subagent above. Measure: subagents launched for digests under 50 KB per setup-review run — 1 → 0.
+- **P56 · CLAUDE.md · S** — a user-facing feature's plan is also reviewed as the app's users (journeys.md's _Who / goal_): would they use it? 2026-10-23: persona or user-side reviews asked for by hand in 4 sessions, one correction ("Really review it as possible users for this app, to make sure it's worth it"). Measure: `--transcripts` prompts asking for a persona or user review — 4 sessions → 0.
+- **P57 · setup-facts.js · S** — skill runs skip replayed `api-request-blob` entries, which printed `NaN min` and counted runs twice. Measure: `--transcripts=2026-10-23T11:19:03Z` NaN rows — 3 → 0 (met when applied).
+- **P58 · session-end.js · S** — lists what's left before closing a session: unpushed commits, the main checkout's branch and changes, worktrees and merged branches, running background servers. 2026-10-23: "anything left before closing?" asked in 3 sessions, each answered with improvised git checks. Measure: sessions improvising end-of-session checks — 3 → 0.
+- **P59 · CLAUDE.md, worktree.js, ports.js · S** — applied outside a review (4fd6203, 77a6e4d, c7424fb): a branch is worked in its own worktree with its own ports, never by switching the main checkout. Adopted: `worktree.js` used in 5 sessions since. Measure: sessions switching the main checkout's branch — 1 → 0.
 
 ## Open
 

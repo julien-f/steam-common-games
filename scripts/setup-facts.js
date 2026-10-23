@@ -137,7 +137,8 @@ function tokens(entries) {
 // One session's JSONL lines → each run of a skill in `names`, by `/name` or the Skill tool:
 // `{ skill, ms, tokens }`, running to the next prompt (or the session's end); tokens of the main thread only.
 function skillRuns(lines, names) {
-  const entries = lines.map((line) => JSON.parse(line));
+  // Replayed calls have no timestamp (see parseSession): a run started from one would last NaN.
+  const entries = lines.map((line) => JSON.parse(line)).filter((entry) => entry.type !== 'api-request-blob');
   const runs = [];
   entries.forEach((entry, i) => {
     const content = entry.message?.content;
