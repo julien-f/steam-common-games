@@ -230,7 +230,6 @@ export function signedInPrefs(now: number) {
     members: [ALICE.steamid],
     rawInputs: [ALICE.vanity],
     label: ALICE.personaname,
-    lastUsedAt: 0,
   };
   const list = {
     id: 'synced-list',

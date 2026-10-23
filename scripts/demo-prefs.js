@@ -27,7 +27,6 @@ function demoPrefs(now = Date.now()) {
     rawInputs: [DEMO_STEAMID],
     label: DEMO_LABEL,
     avatarUrl: DEMO_AVATAR,
-    lastUsedAt: now,
   };
   const list = (id, parentId, order, fields) => ({ id, parentId, order, createdAt: now, updatedAt: now, ...fields });
   const values = {

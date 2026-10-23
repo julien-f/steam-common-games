@@ -27,7 +27,7 @@ const { createMyOwnershipCache } = require('../public/myOwnership.ts');
 const { setCurrentAccount, setAccountOverride } = require('../public/accountsStore.ts');
 
 function makeAccount(id, overrides = {}) {
-  return { id, members: [id], rawInputs: [id], lastUsedAt: 0, ...overrides };
+  return { id, members: [id], rawInputs: [id], ...overrides };
 }
 
 function withFetch(t, handler) {

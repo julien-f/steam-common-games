@@ -4,24 +4,27 @@ import { game, type Player } from './fixtures.ts';
 // Seeds `player` as both my ★ account and the current one, once per tab: later reloads keep
 // whatever the test did since. `withLabel: false` stores it the way an old slot was: id only.
 // `recentGames`: Recently Looked Up's appids, newest first. `updatedAt`: every key's last-write time.
+// `otherAccounts`: names of extra known accounts (display only: they resolve to nothing).
 export async function asPlayer(
   page: Page,
   player: Player,
-  { withLabel = true, recentGames = [] as number[], updatedAt = 0 } = {},
+  { withLabel = true, recentGames = [] as number[], updatedAt = 0, otherAccounts = [] as string[] } = {},
 ): Promise<void> {
   const slot = {
     id: player.steamid,
     members: [player.steamid],
     rawInputs: [player.vanity],
     ...(withLabel ? { label: player.personaname } : {}),
-    lastUsedAt: 0,
   };
   const entry = (value: unknown) => ({ value, updatedAt });
   const prefs = {
     schemaVersion: 2,
     myAccount: entry(slot),
     currentAccount: entry(slot),
-    recentAccounts: entry([slot]),
+    recentAccounts: entry([
+      slot,
+      ...otherAccounts.map((label, i) => ({ id: `${9000 + i}`, members: [`${9000 + i}`], rawInputs: [label], label })),
+    ]),
     ...(recentGames.length
       ? { recentGames: entry(recentGames.map((appid) => ({ appid, name: game(appid).name, tinyImage: null }))) }
       : {}),

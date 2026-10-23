@@ -312,7 +312,7 @@
     font-size: var(--fs-meta);
   }
   .account-chip-mine .lucide {
-    fill: currentColor; /* as Home's .recent-star--mine: an outline star there means "not mine" */
+    fill: currentColor; /* as Home's .account-star-btn.is-mine: an outline star there means "not mine" */
   }
   /* Owned/Wishlist sit in the header on desktop, in the popover on a phone: one pair at a time. */
   .account-chip-panel-links {
@@ -3108,7 +3108,8 @@
   }
 
   /* CopyButton.tsx: Home's accounts and the account chip. */
-  .copy-btn {
+  .copy-btn,
+  .account-star-btn {
     flex-shrink: 0;
     min-width: 24px;
     min-height: 24px;
@@ -3123,9 +3124,19 @@
       color var(--dur-1) var(--ease-out),
       border-color var(--dur-1) var(--ease-out);
   }
-  .copy-btn:hover {
+  .copy-btn:hover,
+  .account-star-btn:hover {
     border-color: var(--muted);
     color: var(--text);
+  }
+  /* Whose account is mine: a state, so the accent. */
+  .account-star-btn.is-mine,
+  .account-star-btn.is-mine:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .account-star-btn.is-mine .lucide {
+    fill: currentColor;
   }
   /* A confirmation, not a hover. */
   .copy-btn--copied,
@@ -3215,88 +3226,178 @@
     font-size: var(--fs-ui);
   }
 
-  /* Recent accounts: below a hairline, one pill each — star, name, remove. */
+  /* Accounts (AccountTiles.tsx): below a hairline, one tile each — face, name; ✕ on hover, focus or Edit. */
   .home-recents {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .recents-head {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
+    width: 100%;
   }
-  .home-recents > h3 {
-    flex-basis: 100%;
+  .recents-head > h3 {
+    flex: 1 1 auto;
     color: var(--muted);
     font-size: var(--fs-meta);
+  }
+  .recents-filter {
+    flex: 0 1 200px;
+    min-width: 0;
   }
   .home-recents > p {
     color: var(--muted);
     font-size: var(--fs-ui);
   }
-  .recent-accounts {
-    display: contents;
+  .account-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+    width: 100%;
   }
-  .recent-accounts li {
+  .account-tiles li {
+    position: relative;
+    min-width: 0;
+  }
+  .account-tile {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    min-width: 0;
-    max-width: 100%;
-    height: 32px;
-    padding-inline: 2px;
-    border: 1px solid var(--line-strong);
-    border-radius: 999px;
-  }
-  .recent-name {
-    min-width: 0;
-    height: 28px;
-    padding: 0 4px;
-    overflow: hidden;
-    border: 0;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    padding: 12px 6px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-3);
     background: none;
     color: var(--text);
     font-size: var(--fs-ui);
-    text-overflow: ellipsis;
-    white-space: nowrap;
     cursor: pointer;
+    transition:
+      background-color var(--dur-1) var(--ease-out),
+      border-color var(--dur-1) var(--ease-out);
   }
-  .recent-name:hover {
-    text-decoration: underline;
+  .account-tile:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
   }
-  .recent-icon-btn,
-  .recents-clear {
-    border: 0;
-    background: none;
-    color: var(--muted);
-    cursor: pointer;
+  .account-tile:active {
+    scale: 0.98;
   }
-  .recent-icon-btn {
-    display: grid;
+  /* The current account: a state, so the accent. */
+  .account-tile[aria-current='true'] {
+    border-color: var(--accent);
+  }
+  .account-tile-faces {
+    position: relative;
     flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+  }
+  .account-tile-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background: var(--line-strong);
+    box-shadow: 0 0 0 2px var(--surface);
+    color: var(--text);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+  }
+  /* A Family: its members' faces overlap along the diagonal. */
+  .account-tile-faces--family .account-tile-face {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-3);
+    translate: calc(20px * var(--i) / max(var(--n) - 1, 1)) calc(20px * var(--i) / max(var(--n) - 1, 1));
+  }
+  .account-tile-name {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+  .account-tile-sub {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .account-tile-mine {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--accent);
+    font-size: var(--fs-meta);
+  }
+  .account-tile-mine .lucide {
+    fill: currentColor;
+  }
+  /* Hidden but focusable (focus reveals it); no pointer events while hidden, so a tap on the corner picks the tile. */
+  .account-tile-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: grid;
     place-items: center;
     width: 28px;
     height: 28px;
     padding: 0;
+    border: 0;
     border-radius: 999px;
-    font-size: var(--fs-body);
-  }
-  .recent-icon-btn:hover,
-  .recents-clear:hover {
     background: var(--line);
     color: var(--text);
+    font-size: var(--fs-body);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-1) var(--ease-out);
   }
-  /* Whose account is mine: a state, so the accent. */
-  .recent-star--mine,
-  .recent-star--mine:hover {
-    color: var(--accent);
+  .account-tiles li:focus-within .account-tile-remove,
+  .account-tiles.is-editing .account-tile-remove {
+    opacity: 1;
+    pointer-events: auto;
   }
-  .recent-star--mine .lucide {
-    fill: currentColor;
+  @media (hover: hover) {
+    .account-tiles li:hover .account-tile-remove {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  .account-tile-remove:hover {
+    background: var(--line-strong);
   }
   .recents-clear {
     min-height: 24px;
     padding: 0 6px;
+    border: 0;
     border-radius: var(--radius-1);
+    background: none;
+    color: var(--muted);
     font-size: var(--fs-meta);
+    cursor: pointer;
+  }
+  .recents-clear:hover {
+    background: var(--line);
+    color: var(--text);
   }
 
   /* Explore: one card per list that isn't the user's own, the whole card its link's target. */

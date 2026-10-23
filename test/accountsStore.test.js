@@ -29,7 +29,7 @@ function store() {
 }
 
 function makeAccount(id, overrides = {}) {
-  return { id, members: [id], rawInputs: [id], lastUsedAt: 0, ...overrides };
+  return { id, members: [id], rawInputs: [id], ...overrides };
 }
 
 test('accountIdFor: sorts members so the same Family always produces the same id', () => {
@@ -59,16 +59,14 @@ test('setMyAccount/setCurrentAccount: round-trip independently, clearing recents
   assert.equal(getRecentAccounts().length, 0);
 });
 
-test('setCurrentAccount: upserts into recentAccounts (dedupe by id, bumps lastUsedAt)', async () => {
+test('setCurrentAccount: upserts into recentAccounts (dedupe by id)', () => {
   const { setCurrentAccount, getRecentAccounts } = store();
-  setCurrentAccount(makeAccount('acc1', { lastUsedAt: 1 }));
-  const firstStamp = getRecentAccounts()[0].lastUsedAt;
-  await new Promise((r) => setTimeout(r, 2));
-  setCurrentAccount(makeAccount('acc1', { lastUsedAt: 1 }));
+  setCurrentAccount(makeAccount('acc1'));
+  setCurrentAccount(makeAccount('acc1', { label: 'Alice' }));
 
   const recents = getRecentAccounts();
   assert.equal(recents.length, 1);
-  assert.ok(recents[0].lastUsedAt > firstStamp);
+  assert.equal(recents[0].label, 'Alice');
 });
 
 test('setMyAccount: also upserts into recentAccounts (starring is itself a use)', () => {
@@ -92,7 +90,7 @@ test('setCurrentAccount: a re-pick resolved without player summaries keeps the s
   setCurrentAccount(makeAccount('acc1', { rawInputs: ['typed'], vanities: {}, unresolved: ['acc1'] }));
 
   for (const slot of [getCurrentAccount(), getRecentAccounts()[0]]) {
-    assert.deepEqual({ ...slot, lastUsedAt: 0 }, makeAccount('acc1', { ...known, rawInputs: ['typed'] }));
+    assert.deepEqual(slot, makeAccount('acc1', { ...known, rawInputs: ['typed'] }));
   }
 });
 
@@ -102,7 +100,7 @@ test('setCurrentAccount: a resolved re-pick drops fields the user cleared on Ste
     makeAccount('acc1', { label: 'Alice', avatarUrl: 'https://avatars/a.jpg', vanities: { acc1: 'alice' } }),
   );
   setCurrentAccount(makeAccount('acc1', { label: 'Alice', vanities: {} }));
-  assert.deepEqual({ ...getCurrentAccount(), lastUsedAt: 0 }, makeAccount('acc1', { label: 'Alice', vanities: {} }));
+  assert.deepEqual(getCurrentAccount(), makeAccount('acc1', { label: 'Alice', vanities: {} }));
 });
 
 test('a stored slot with keys the app no longer writes still loads, and a re-pick drops them', () => {
@@ -117,7 +115,7 @@ test('a stored slot with keys the app no longer writes still loads, and a re-pic
   assert.equal(getRecentAccounts()[0].label, 'Alice');
 
   setCurrentAccount(makeAccount('acc1', { vanities: {}, unresolved: ['acc1'] }));
-  assert.deepEqual({ ...getCurrentAccount(), lastUsedAt: 0 }, makeAccount('acc1', { label: 'Alice', vanities: {} }));
+  assert.deepEqual(getCurrentAccount(), makeAccount('acc1', { label: 'Alice', vanities: {} }));
 });
 
 test('setCurrentAccount: a Family keeps only its unresolved members’ stored names', () => {
@@ -125,10 +123,15 @@ test('setCurrentAccount: a Family keeps only its unresolved members’ stored na
   const family = { members: ['a', 'b'], rawInputs: ['a', 'b'] };
   setCurrentAccount(makeAccount('a+b', { ...family, label: 'A + B', vanities: { a: 'old-a', b: 'bee' } }));
   setCurrentAccount(makeAccount('a+b', { ...family, vanities: {}, unresolved: ['b'] }));
-  assert.deepEqual(
-    { ...getCurrentAccount(), lastUsedAt: 0 },
-    makeAccount('a+b', { ...family, label: 'A + B', vanities: { b: 'bee' } }),
-  );
+  assert.deepEqual(getCurrentAccount(), makeAccount('a+b', { ...family, label: 'A + B', vanities: { b: 'bee' } }));
+});
+
+test("setCurrentAccount: a Family keeps only its unresolved members' stored faces", () => {
+  const { setCurrentAccount, getCurrentAccount } = store();
+  const family = { members: ['a', 'b'], rawInputs: ['a', 'b'] };
+  setCurrentAccount(makeAccount('a+b', { ...family, memberAvatars: { a: 'old-a.png', b: 'b.png' } }));
+  setCurrentAccount(makeAccount('a+b', { ...family, memberAvatars: { a: 'a.png' }, unresolved: ['b'] }));
+  assert.deepEqual(getCurrentAccount().memberAvatars, { a: 'a.png', b: 'b.png' });
 });
 
 test('setCurrentAccount: an unresolved pick finds the stored slot in myAccount too', () => {
@@ -139,15 +142,32 @@ test('setCurrentAccount: an unresolved pick finds the stored slot in myAccount t
   assert.equal(getCurrentAccount().label, 'Alice');
 });
 
-test('getRecentAccounts: most-recently-used first', async () => {
-  const { setCurrentAccount, getRecentAccounts } = store();
-  setCurrentAccount(makeAccount('older'));
-  await new Promise((r) => setTimeout(r, 2));
-  setCurrentAccount(makeAccount('newer'));
-
+test('getRecentAccounts: my account first, then by name, case- and accent-insensitive', () => {
+  const { setMyAccount, setCurrentAccount, getRecentAccounts } = store();
+  setCurrentAccount(makeAccount('1', { label: 'bob' }));
+  setCurrentAccount(makeAccount('2', { label: 'Zoé' }));
+  setCurrentAccount(makeAccount('3', { label: 'Émile' }));
+  setCurrentAccount(makeAccount('4+5', { members: ['4', '5'], label: 'Carol + Alice' })); // a Family sorts by its label
+  setCurrentAccount(makeAccount('6', { label: 'alice' }));
   assert.deepEqual(
     getRecentAccounts().map((a) => a.id),
-    ['newer', 'older'],
+    ['6', '1', '4+5', '3', '2'],
+  );
+
+  setMyAccount(makeAccount('2', { label: 'Zoé' }));
+  assert.deepEqual(
+    getRecentAccounts().map((a) => a.id),
+    ['2', '6', '1', '4+5', '3'],
+  );
+});
+
+test('getRecentAccounts: accounts with the same name keep one order, whatever order they were added in', () => {
+  const { setCurrentAccount, getRecentAccounts } = store();
+  setCurrentAccount(makeAccount('2', { label: 'Alex' }));
+  setCurrentAccount(makeAccount('1', { label: 'Alex' }));
+  assert.deepEqual(
+    getRecentAccounts().map((a) => a.id),
+    ['1', '2'],
   );
 });
 
@@ -347,7 +367,7 @@ test('accountIdentifiers: prefers the stored custom-URL name over the steam64 id
 
 test('accountIdentifiers: falls back to the steam64 id per member, including for accounts stored before vanities existed', () => {
   const { accountIdentifiers } = store();
-  const family = { id: '1+2', members: ['1', '2'], rawInputs: [], vanities: { 2: 'bob' }, lastUsedAt: 0 };
+  const family = { id: '1+2', members: ['1', '2'], rawInputs: [], vanities: { 2: 'bob' } };
   assert.deepEqual(accountIdentifiers(family), [
     { steamid: '1', identifier: '1' },
     { steamid: '2', identifier: 'bob' },
@@ -364,25 +384,21 @@ test('accountDisplayLabel: prefers the cached Steam label', () => {
 
 test('accountDisplayLabel: falls back to what the user typed, joined for a Family', () => {
   const { accountDisplayLabel } = store();
-  assert.equal(
-    accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: ['alice', 'bob'], lastUsedAt: 0 }),
-    'alice + bob',
-  );
+  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: ['alice', 'bob'] }), 'alice + bob');
 });
 
 test('accountDisplayLabel: falls back to the member ids when nothing else is known', () => {
   // A `?u=` link's account before its resolve lands carries neither a label nor typed inputs.
   const { accountDisplayLabel } = store();
-  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: [], lastUsedAt: 0 }), 'a + b');
+  assert.equal(accountDisplayLabel({ id: 'a+b', members: ['a', 'b'], rawInputs: [] }), 'a + b');
 });
 
 test('refreshAccountInfo: updates the account wherever it is stored, only when something changed', () => {
   const { setMyAccount, setCurrentAccount, getMyAccount, getCurrentAccount, getRecentAccounts, refreshAccountInfo } =
     store();
-  const slot = { id: '1', members: ['1'], rawInputs: ['1'], lastUsedAt: 5 };
+  const slot = { id: '1', members: ['1'], rawInputs: ['1'] };
   setMyAccount(slot);
   setCurrentAccount(slot);
-  const lastUsed = getRecentAccounts()[0].lastUsedAt;
 
   assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: 'a.png', vanities: { 1: 'alice' } }), true);
   for (const acc of [getMyAccount(), getCurrentAccount(), getRecentAccounts()[0]]) {
@@ -390,9 +406,10 @@ test('refreshAccountInfo: updates the account wherever it is stored, only when s
     assert.equal(acc.avatarUrl, 'a.png');
     assert.deepEqual(acc.vanities, { 1: 'alice' });
   }
-  assert.equal(getRecentAccounts()[0].lastUsedAt, lastUsed, 'not a new use of the account');
 
   assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: 'a.png' }), false, 'nothing new');
+  assert.equal(refreshAccountInfo('1', { memberAvatars: { 1: 'b.png' } }), true);
+  assert.deepEqual(getRecentAccounts()[0].memberAvatars, { 1: 'b.png' });
   assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: '' }), false, 'blank never erases');
   assert.equal(refreshAccountInfo('2', { label: 'Bob' }), false, 'unknown account');
 });

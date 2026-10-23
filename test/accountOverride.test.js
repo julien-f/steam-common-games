@@ -68,7 +68,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test('syncFromUrl: resolves ?u= into an override, leaving the stored account untouched', async (t) => {
   withFetch(t, fakeResolveFetch());
-  setCurrentAccount({ id: 'mine', members: ['9'], rawInputs: ['me'], lastUsedAt: 0 });
+  setCurrentAccount({ id: 'mine', members: ['9'], rawInputs: ['me'] });
   const sync = createAccountOverrideSync();
 
   sync.syncFromUrl('?u=alice');
@@ -84,7 +84,6 @@ test('syncFromUrl: resolves ?u= into an override, leaving the stored account unt
     label: 'Alice',
     avatarUrl: 'https://cdn/a.jpg',
     vanities: { 1: 'alice' }, // carried onto the slot, so the copyable identifier needs no fetch
-    lastUsedAt: getAccountOverride().lastUsedAt,
   });
   assert.equal(getEffectiveCurrentAccount().id, '1');
   assert.equal(require('../public/accountsStore.ts').getCurrentAccount().id, 'mine');

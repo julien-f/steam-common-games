@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Tables show separate chips for a column both grouped and sorted, no pager when everything fits on one page, and "≥ 5.0" for an open-ended range.
 - Expired bundles stay dimmed even with the Bundle column hidden, and a phone's Filter pane sits centred.
 - On search results, the open game's row is marked like in every other list, without an extra outline.
+- Home's recent accounts are now Accounts: one avatar tile each (overlapping faces for a Steam Family), yours first then by name everywhere, filterable past 8; star yours from the account card
 
 ### Fixed
 

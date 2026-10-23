@@ -52,7 +52,7 @@ interface ComparePlayersFormProps {
   invalid?: string[];
 }
 
-// Every account the app knows, most-recently-used first. `recentAccounts` already covers the
+// Every account the app knows, in getRecentAccounts' order. `recentAccounts` already covers the
 // starred and current ones (both setMyAccount and setCurrentAccount upsert into it), so the only
 // one that needs adding is a `?u=` link's — deliberately never stored, but obviously worth
 // offering while it's the account on screen. Picking one never writes anything back: comparing
