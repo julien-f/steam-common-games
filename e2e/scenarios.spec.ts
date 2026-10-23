@@ -1020,6 +1020,22 @@ test('L1 edge: Add hands focus to the row it added as the selection bar goes', a
   await expect(added).toBeFocused();
 });
 
+test('L1 edge: Add hands focus to an added row still on screen, not back to the first', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.setViewportSize({ width: page.viewportSize()!.width, height: 360 });
+  await page.goto('/lists/owned');
+  await rows(page).first().getByRole('checkbox').check();
+  const onScreen = rows(page).last();
+  await onScreen.scrollIntoViewIfNeeded();
+  await onScreen.getByRole('checkbox').check();
+  await expect(rows(page).first()).not.toBeInViewport();
+  const toolbar = page.locator('.selection-toolbar');
+  await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
+  await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
+  await toolbar.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(onScreen).toBeFocused();
+});
+
 test("L1 edge: the new list's toast stays while pointed at", async ({ page }) => {
   await page.clock.install();
   await asPlayer(page, ALICE);

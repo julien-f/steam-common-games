@@ -100,6 +100,7 @@ import {
   fmtAge,
   fmtLastPlayed,
   focusGameRow,
+  gameRowEl,
   formatMoney,
   hoursFromMinutes,
   oldestFetchedAt,
@@ -1352,10 +1353,17 @@ export default function ListRoute() {
     }
     setAddTarget('');
     setNewListName('');
+    const main = document.querySelector<HTMLElement>('main');
+    // One the user can see, so focusing it doesn't scroll back to the first one added.
+    const focusTo =
+      appids.find((appid) => {
+        const rect = gameRowEl(main, appid)?.getBoundingClientRect();
+        return rect && rect.bottom > 0 && rect.top < window.innerHeight;
+      }) ?? appids[0];
     table?.selection.clear();
     // Clearing the selection unmounts the bar that held focus: back to a row it added, not the
     // toast's Open list, which would hold the toast up for as long as it kept focus.
-    if (!focusGameRow(document.querySelector('main'), appids[0])) document.querySelector<HTMLElement>('main')?.focus();
+    if (!focusGameRow(main, focusTo)) main?.focus();
   }
 
   // Only ever called while viewing a manual list (`kind === 'user' && userList().kind ===
