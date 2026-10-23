@@ -68,6 +68,22 @@ test('saveTaste: keeps at most TASTE_CACHE_MAX tastes, evicting the oldest `at` 
   assert.deepEqual(tasteIds(), ['a', 'c', 'e', 'f', 'g']);
 });
 
+test("saveTaste: reads the age of tagTaste.ts's own tastes", () => {
+  // The age is read off the stored string's start, so tasteOf must keep `at` first.
+  const { tasteOf } = require('../public/tagTaste.ts');
+  const games = [{ appid: 1, name: 'A', details: { tagWeights: { RPG: 1 } } }];
+  for (const [id, at] of [
+    ['a', 2],
+    ['b', 1],
+    ['c', 3],
+    ['d', 4],
+    ['e', 5],
+    ['f', 6],
+  ])
+    saveTaste(id, tasteOf(games, at), []);
+  assert.deepEqual(tasteIds(), ['a', 'c', 'd', 'e', 'f']);
+});
+
 test('saveTaste: an unreadable entry counts as the oldest', () => {
   for (const [id, at] of [
     ['a', 1],
