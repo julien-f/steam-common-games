@@ -282,7 +282,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. sort by HLTB (shortest first) or rating
   5. **Pick a random game** (or **R**) for a random pick, or browse with ↑/↓
 - **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
-- **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?).
+- **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?); Plays mostly's **Why these?** on a phone (the games wrap under each bar, and their hours don't read as a sort order).
 
 ### F4 What else did this studio make?
 
