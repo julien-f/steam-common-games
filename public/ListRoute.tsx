@@ -96,6 +96,8 @@ import {
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
   SOURCE_NAMES,
+  endOfDay,
+  releasedBy,
 } from './gameColumns.ts';
 import {
   computeSteamdbRating,
@@ -3449,7 +3451,9 @@ export default function ListRoute() {
     return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
   });
   const unplayed = createMemo(() =>
-    loadFraction() == null && !playtimeHidden() ? tableData().filter((g) => !g.playtime && !g.comingSoon).length : 0,
+    loadFraction() == null && !playtimeHidden()
+      ? tableData().filter((g) => !g.playtime && releasedBy(g, endOfDay(new Date()))).length
+      : 0,
   );
   const backlogShown = () => {
     const t = filterTable();
@@ -3457,7 +3461,7 @@ export default function ListRoute() {
       tableReady() &&
       !!t &&
       t.filter.ranges().playtime?.max === '0' &&
-      !!t.filter.ranges().releaseDate?.max &&
+      t.filter.ranges().releaseDate?.max === endOfDay(new Date()) &&
       t.sort.entries()[0]?.key === TASTE_FIT_KEY
     );
   };
@@ -3473,7 +3477,7 @@ export default function ListRoute() {
     if (!t) return;
     t.filter.setRange('playtime', 'max', '0');
     // Not yet out: nothing to play next, though it shows no playtime either.
-    t.filter.setRange('releaseDate', 'max', fmtLocalDate(new Date()));
+    t.filter.setRange('releaseDate', 'max', endOfDay(new Date()));
     syncLeadColumn(t, TASTE_FIT_KEY, true);
   }
   // Out here: the hero note re-renders, which would close the breakdown.

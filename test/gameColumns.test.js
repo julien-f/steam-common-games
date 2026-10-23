@@ -13,7 +13,9 @@ registerHooks({
 });
 
 const {
+  endOfDay,
   endOfReleasePeriod,
+  releasedBy,
   fmtReleaseDate,
   releaseSortTimestamp,
   computePriceStatus,
@@ -229,4 +231,17 @@ test('tagMatchScore: no score without a tag filter or tag weights', () => {
   assert.equal(tagMatchScore({ Action: 1 }, undefined), null);
   assert.equal(tagMatchScore({ Action: 1 }, new Set()), null);
   assert.equal(tagMatchScore(null, new Set(['Action'])), null);
+});
+
+test("releasedBy: the Released filter's own rule, so the no-playtime count matches the rows it shows", () => {
+  const now = new Date(2026, 9, 23, 20, 0);
+  const bound = endOfDay(now);
+  assert.ok(releasedBy({ releaseDate: '23 Oct, 2026' }, bound), 'out today, in any timezone');
+  assert.ok(!releasedBy({ releaseDate: '24 Oct, 2026' }, bound));
+  assert.ok(!releasedBy({ releaseDate: 'Coming soon' }, bound));
+  assert.ok(!releasedBy({ releaseDate: null }, bound), 'no date: the filter hides it, so the count skips it');
+  assert.ok(
+    !releasedBy({ releaseDate: 'Oct 2026' }, bound),
+    'month only: counted from its last day, as the filter does',
+  );
 });

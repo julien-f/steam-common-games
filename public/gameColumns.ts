@@ -302,6 +302,15 @@ export function endOfReleasePeriod(str: string): number {
   return new Date(s).getTime();
 }
 
+// A Released range bound for "out by the end of today", local: data-table reads a bare YYYY-MM-DD
+// bound as UTC midnight but rows' dates as local days, which drops today's releases west of UTC.
+export const endOfDay = (now: Date) => `${fmtLocalDate(now)}T23:59:59`;
+
+// The range filter's own rule, so the no-playtime count matches the rows its button shows: no
+// date or "Coming soon" fails it, a coarse date counts from the end of its period.
+export const releasedBy = (g: { releaseDate?: string | null }, bound: string) =>
+  endOfReleasePeriod(String(g.releaseDate)) <= new Date(bound).getTime();
+
 // A day-precise release as YYYY-MM-DD, like every other date in the app; coarse ones ("Q4 2026") as Steam wrote them.
 export function fmtReleaseDate(str: string): string {
   const d = /\b\d{1,2}\b/.test(str) ? new Date(str) : null;
