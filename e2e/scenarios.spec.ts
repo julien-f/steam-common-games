@@ -2000,10 +2000,14 @@ test('B1 edge: a bundle game whose Steam lookup failed says so, rather than read
 test("B1 edge: on a phone, every game's name stays in view while the table scrolls sideways", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
   await page.goto('/lists/bundle/90002'); // owned, wishlisted and unowned games
   await expect(rows(page)).toHaveCount(5);
+  if (testInfo.project.name !== 'phone') {
+    // A desktop table has room for the figures: the name scrolls with them.
+    await expect(row(page, 'Hades').locator('td', { hasText: 'Hades' }).first()).toHaveCSS('position', 'static');
+    return;
+  }
   const wrap = page.locator('.dt-table-wrap');
   await wrap.evaluate((el) => (el.scrollLeft = 400));
   const wrapLeft = (await wrap.boundingBox())!.x;

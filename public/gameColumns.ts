@@ -901,7 +901,15 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // `format: fmt.str` handles a still-streaming-in name (Wishlist/Bundles rows only know a
   // placeholder name until store metadata resolves) the same way every other loading cell does;
   // harmless for the Library tab, whose owned-game names are always known upfront.
-  { key: 'name', label: 'Name', filterable: false, groupable: false, format: fmt.str, render: renderNameCell },
+  {
+    key: 'name',
+    label: 'Name',
+    filterable: false,
+    groupable: false,
+    pinned: true,
+    format: fmt.str,
+    render: renderNameCell,
+  },
 
   // ── Scores & reviews ────────────────────────────────────────────────────────
   // The default-visible score: a Bayesian-shrinkage formula adapted from SteamDB's own (see

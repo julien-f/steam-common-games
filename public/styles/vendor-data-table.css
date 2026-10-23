@@ -5,6 +5,8 @@
    are portaled onto <body>, outside .table-container, so only an actual ancestor reaches them. */
 html:root {
   --color-background-primary: var(--surface);
+  /* The table's own ground, under the pinned name; menus keep the surface above. */
+  --dt-pinned-background: var(--bg);
   --color-background-secondary: var(--line);
   --color-background-tertiary: var(--surface);
   --color-text-primary: var(--text);
@@ -59,23 +61,17 @@ html:root {
   border-bottom: 1px solid var(--line);
   font-variant-numeric: tabular-nums;
 }
-.dt-tr--odd .dt-td {
+/* Not the pinned cell: cells scrolling under it would show through. */
+.dt-tr--odd .dt-td:not(.dt-pinned) {
   background: none;
 }
-/* Phone: the name stays put while the table scrolls sideways, so each figure keeps its game.
-   Opaque, so the cells passing under it don't show through; hover/selected/current paint over it. */
-@media (max-width: 768px) {
-  .list-route .dt-th[data-col-key='name'],
-  .dt-td:has(> .game-name-cell) {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: var(--bg);
-    box-shadow: 8px 0 8px -8px rgba(0, 0, 0, 0.7);
+/* The pinned name (gameColumns.ts) stays put only on a phone, so each figure keeps its game. */
+@media (min-width: 769px) {
+  .dt-pinned {
+    position: static;
   }
-  /* Outranks the open game's bar (.dt-tr--current below), which sets its first cell relative. */
-  .dt-table .dt-tr.dt-tr--current > .dt-td:has(> .game-name-cell) {
-    position: sticky;
+  .dt-pinned::after {
+    display: none;
   }
 }
 .dt-tr--clickable:hover .dt-td {
@@ -223,7 +219,8 @@ html:root {
 .dt-tr.dt-tr--current > .dt-td {
   background: var(--color-background-info);
 }
-.dt-tr.dt-tr--current > .dt-td:first-child {
+/* A pinned first cell is sticky, which anchors the bar as well. */
+.dt-tr.dt-tr--current > .dt-td:first-child:not(.dt-pinned) {
   position: relative;
 }
 .dt-tr.dt-tr--current > .dt-td:first-child::before {
