@@ -71,8 +71,8 @@ export function gameSearchResultHtml(
     ? `<img class="game-search-thumb" src="${esc(r.tinyImage)}" alt="" loading="lazy">`
     : '<span class="game-search-thumb game-search-thumb--empty"></span>';
   return `
-    <button type="button" id="game-search-opt-${r.appid}" role="option" aria-selected="${active}" tabindex="-1"
-      class="game-search-result${active ? ' active' : ''}" data-appid="${r.appid}" data-name="${esc(r.name)}">
+    <button type="button" id="game-search-opt-${esc(r.appid)}" role="option" aria-selected="${active}" tabindex="-1"
+      class="game-search-result${active ? ' active' : ''}" data-appid="${esc(r.appid)}" data-name="${esc(r.name)}">
       ${thumb}
       <span class="game-search-name">${esc(r.name)}</span>
       ${ownershipMarkersHtml(ownership)}

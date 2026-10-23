@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The combined-list form fits a phone's width
 - A game's DLC no longer reorder and reload once they all arrive
 - Friends' profile links and a bundle's IsThereAnyDeal and Fanatical links open only plain web addresses
+- Game search ignores malformed results from Steam instead of showing them
 
 ### Development
 
