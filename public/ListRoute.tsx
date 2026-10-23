@@ -3416,8 +3416,13 @@ export default function ListRoute() {
     const source = tasteFitSource();
     const tasteNote = source && visible?.has(TASTE_FIT_KEY) && tasteFitNote(source);
     if (tasteNote) notes.push(tasteNote);
-    // Players says who has no profile wherever it shows.
-    if (kind === 'compare' && visible?.has(GROUP_FIT_KEY) && loadFraction() == null && !playerProfiles()) {
+    // An open Players says who has no profile; folded (a phone's default), nothing would.
+    if (
+      kind === 'compare' &&
+      visible?.has(GROUP_FIT_KEY) &&
+      loadFraction() == null &&
+      !(playerProfiles() && playersOpen())
+    ) {
       const fits = groupFits();
       const left = comparePlayers.filter((_, i) => !fits?.profiled[i]).map((p) => p.label);
       if (left.length) notes.push(`Group fit leaves out ${left.join(', ')}: too few games played here`);

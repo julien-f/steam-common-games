@@ -974,11 +974,14 @@ test('C7 edge: Suggest to starts on a player it can suggest to, not one without 
   await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
 });
 
-test('C7 edge: a player without a profile is said once, in Players, while it shows', async ({ page }) => {
+test('C7 edge: a player without a profile is said once, in Players while it is open', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=dave&u=erin');
-  await openPlayers(page);
-  await expect(page.locator('.list-players')).toContainText('too few games played here for a profile');
+  const players = await openPlayers(page);
+  await expect(players).toContainText('too few games played here for a profile');
   await expect(page.locator('.list-score-note')).toHaveCount(0);
+  // Folded (a phone's default), the status line says it again.
+  await players.locator('summary').click();
+  await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
   // Intersect has no Players section: the status line says it.
   await page.goto('/lists/compare?u=alice&u=dave&u=erin&op=intersect');
   await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
