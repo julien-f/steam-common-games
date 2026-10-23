@@ -82,9 +82,11 @@ function withStoredDisplay({ unresolved, ...account }: AccountSlot): AccountSlot
     unresolved && [getMyAccount(), getCurrentAccount(), ...readRecents()].find((a) => a?.id === account.id);
   if (!stored) return account;
   const { label, avatarUrl } = stored;
-  const keptVanities = Object.entries(stored.vanities ?? {}).filter(([id]) => unresolved.includes(id));
-  const vanities = { ...account.vanities, ...Object.fromEntries(keptVanities) };
-  return { ...account, label, avatarUrl, vanities };
+  const kept = (byMember: Record<string, string> = {}) =>
+    Object.fromEntries(Object.entries(byMember).filter(([id]) => unresolved.includes(id)));
+  const vanities = { ...account.vanities, ...kept(stored.vanities) };
+  const memberAvatars = { ...account.memberAvatars, ...kept(stored.memberAvatars) };
+  return { ...account, label, avatarUrl, vanities, ...(Object.keys(memberAvatars).length && { memberAvatars }) };
 }
 
 // ── The `?u=` override ───────────────────────────────────────────────────────────────────────
@@ -150,14 +152,19 @@ function upsertRecentAccount(account: AccountSlot): void {
   writeRecents(recents);
 }
 
-// An account's display fields (label, avatar, custom-URL names) are captured when it's picked
+// An account's display fields (label, avatars, custom-URL names) are captured when it's picked
 // and nothing else updates them — so one picked before a field existed, or renamed on Steam
 // since, kept its old face in the chip, recents and list labels. This refreshes them wherever
 // the account is stored, from a fetch that returned newer ones; nothing is written when nothing
 // changed.
 export function refreshAccountInfo(
   accountId: string,
-  info: { label?: string; avatarUrl?: string; vanities?: Record<string, string> },
+  info: {
+    label?: string;
+    avatarUrl?: string;
+    vanities?: Record<string, string>;
+    memberAvatars?: Record<string, string>;
+  },
 ): boolean {
   const fresh = Object.fromEntries(Object.entries(info).filter(([, v]) => v !== undefined && v !== ''));
   const differs = (a: AccountSlot) =>

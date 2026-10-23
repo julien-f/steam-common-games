@@ -115,16 +115,21 @@ export function accountInfoFrom(ps: SlotPlayer[]) {
   const vanities = Object.fromEntries(
     ps.flatMap((p) => (steamVanity(p.profileUrl) ? [[p.steamid, steamVanity(p.profileUrl)!]] : [])),
   );
+  // A Family's faces, per member: a single account's is avatarUrl.
+  const memberAvatars = Object.fromEntries(
+    ps.length > 1 ? ps.flatMap((p) => (p.avatarUrl && !p.placeholder ? [[p.steamid, p.avatarUrl]] : [])) : [],
+  );
   return {
     label: ps.some((p) => p.placeholder) ? undefined : ps.map((p) => p.name).join(' + '),
     avatarUrl: ps.length === 1 ? ps[0].avatarUrl : undefined,
     vanities: Object.keys(vanities).length ? vanities : undefined,
+    memberAvatars: Object.keys(memberAvatars).length ? memberAvatars : undefined,
   };
 }
 
 export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): AccountSlot {
   const members = players.map((p) => p.steamid).sort();
-  const { label, avatarUrl, vanities } = accountInfoFrom(players);
+  const { label, avatarUrl, vanities, memberAvatars } = accountInfoFrom(players);
   const unresolved = players.filter((p) => p.placeholder).map((p) => p.steamid);
   return {
     ...(unresolved.length && { unresolved }),
@@ -134,6 +139,7 @@ export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): Acc
     label,
     avatarUrl: avatarUrl || undefined,
     vanities: vanities ?? {},
+    ...(memberAvatars && { memberAvatars }),
   };
 }
 

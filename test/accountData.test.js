@@ -253,8 +253,38 @@ test('toAccountPlayer: maps a full player object onto display-ready fields', () 
 test("accountInfoFrom: no label while a player is only a placeholder, so a stored name isn't overwritten", () => {
   const alice = toAccountPlayer({ steamid: '1', personaname: 'Alice', avatarmedium: 'https://cdn/a.jpg' });
   const unknown = toAccountPlayer({ steamid: '2', personaname: '2', placeholder: true });
-  assert.deepEqual(accountInfoFrom([alice]), { label: 'Alice', avatarUrl: 'https://cdn/a.jpg', vanities: undefined });
+  assert.deepEqual(accountInfoFrom([alice]), {
+    label: 'Alice',
+    avatarUrl: 'https://cdn/a.jpg',
+    vanities: undefined,
+    memberAvatars: undefined,
+  });
   assert.equal(accountInfoFrom([alice, unknown]).label, undefined);
+});
+
+test("accountInfoFrom: a Family's faces per member, skipping a placeholder's and a missing one", () => {
+  const alice = toAccountPlayer({ steamid: '1', personaname: 'Alice', avatarmedium: 'https://cdn/a.jpg' });
+  const bob = toAccountPlayer({ steamid: '2', personaname: 'Bob' });
+  const unknown = toAccountPlayer({
+    steamid: '3',
+    personaname: '3',
+    avatarmedium: 'https://cdn/x.jpg',
+    placeholder: true,
+  });
+  const info = accountInfoFrom([alice, bob, unknown]);
+  assert.deepEqual(info.memberAvatars, { 1: 'https://cdn/a.jpg' });
+  assert.equal(info.avatarUrl, undefined);
+  assert.equal(accountInfoFrom([bob, unknown]).memberAvatars, undefined);
+});
+
+test('accountSlotFrom: a picked Family stores its faces per member', () => {
+  const alice = toAccountPlayer({ steamid: '1', personaname: 'Alice', avatarmedium: 'https://cdn/a.jpg' });
+  const bob = toAccountPlayer({ steamid: '2', personaname: 'Bob', avatarmedium: 'https://cdn/b.jpg' });
+  assert.deepEqual(accountSlotFrom([alice, bob], ['alice', 'bob']).memberAvatars, {
+    1: 'https://cdn/a.jpg',
+    2: 'https://cdn/b.jpg',
+  });
+  assert.equal('memberAvatars' in accountSlotFrom([alice], ['alice']), false);
 });
 
 test('toAccountPlayer: memberSince/countryCode/realName are empty strings when Steam did not return them (private profile)', () => {

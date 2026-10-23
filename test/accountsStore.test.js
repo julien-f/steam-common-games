@@ -126,6 +126,14 @@ test('setCurrentAccount: a Family keeps only its unresolved members’ stored na
   assert.deepEqual(getCurrentAccount(), makeAccount('a+b', { ...family, label: 'A + B', vanities: { b: 'bee' } }));
 });
 
+test("setCurrentAccount: a Family keeps only its unresolved members' stored faces", () => {
+  const { setCurrentAccount, getCurrentAccount } = store();
+  const family = { members: ['a', 'b'], rawInputs: ['a', 'b'] };
+  setCurrentAccount(makeAccount('a+b', { ...family, memberAvatars: { a: 'old-a.png', b: 'b.png' } }));
+  setCurrentAccount(makeAccount('a+b', { ...family, memberAvatars: { a: 'a.png' }, unresolved: ['b'] }));
+  assert.deepEqual(getCurrentAccount().memberAvatars, { a: 'a.png', b: 'b.png' });
+});
+
 test('setCurrentAccount: an unresolved pick finds the stored slot in myAccount too', () => {
   const { setMyAccount, setCurrentAccount, getCurrentAccount, clearRecentAccounts } = store();
   setMyAccount(makeAccount('acc1', { label: 'Alice' }));
@@ -400,6 +408,8 @@ test('refreshAccountInfo: updates the account wherever it is stored, only when s
   }
 
   assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: 'a.png' }), false, 'nothing new');
+  assert.equal(refreshAccountInfo('1', { memberAvatars: { 1: 'b.png' } }), true);
+  assert.deepEqual(getRecentAccounts()[0].memberAvatars, { 1: 'b.png' });
   assert.equal(refreshAccountInfo('1', { label: 'Alice', avatarUrl: '' }), false, 'blank never erases');
   assert.equal(refreshAccountInfo('2', { label: 'Bob' }), false, 'unknown account');
 });

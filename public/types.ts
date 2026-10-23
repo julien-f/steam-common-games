@@ -254,6 +254,7 @@ export interface AccountSlot {
   // members that set one — captured at resolve time so the
   // nicest copyable identifier needs no fetch of its own
   // (accountsStore.ts's accountIdentifiers)
+  memberAvatars?: Record<string, string>; // a Family's steam64 → avatar, same reason as avatarUrl
   unresolved?: string[]; // members whose player summaries failed; never stored (accountsStore.ts's withStoredDisplay)
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }
