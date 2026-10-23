@@ -336,3 +336,14 @@ test('suggestionsFor: nothing for a player without a profile, and never software
   );
   assert.ok(!suggested.some((s) => s.appid === 13));
 });
+
+test("commonGround: a tag in everyone's top 10 is nobody's own, even past the shared ones shown", () => {
+  const games = [
+    ...library(1, 10, (id) => ({ A: 1, B: 1, C: 1, D: 1, [`X${id}`]: 0.3 })),
+    ...library(11, 20, (id) => ({ A: 1, B: 1, C: 1, D: 0.2, [`Y${id}`]: 0.3 })),
+    ...library(21, 40, (id) => ({ [`F${id}`]: 1 })),
+  ];
+  const ground = commonGround(games, [player(tenHours(1, 10)), player(tenHours(11, 20))]);
+  assert.equal(ground.sharedCount, 4); // D, the 4th, isn't among the 3 shown
+  assert.ok(!ground.ownTags[0].includes('D'), ground.ownTags[0].join());
+});

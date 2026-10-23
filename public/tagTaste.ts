@@ -306,7 +306,7 @@ export function commonGround(games: readonly Tagged[], players: readonly Compare
     compared && shares[i]
       ? ranked(
           [...tops[i]!]
-            .filter((tag) => !sharedTags.includes(tag))
+            .filter((tag) => !inEveryTop.includes(tag))
             .map((tag) => [
               tag,
               shares[i]!.get(tag)! - Math.max(...profiled.filter((j) => j !== i).map((j) => shares[j]!.get(tag) ?? 0)),
