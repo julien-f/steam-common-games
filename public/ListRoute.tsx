@@ -1792,7 +1792,7 @@ export default function ListRoute() {
           }
           if (event.done) continue;
           if (event.limited) {
-            setDetailsLimited(event.limited);
+            if (!loadGuard.isStale(gen)) setDetailsLimited(event.limited);
             continue;
           }
           unanswered.delete(event.appid);
