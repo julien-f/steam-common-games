@@ -58,6 +58,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Phone
 
 - **U189 · minor · L1, C3, I1** — on a phone, Home's five full-width Explore cards (~400 px, repeating the nav bar and the chip's Owned/Wishlist) push **Your lists** below the fold: its heading starts at 898 px on an 844 px screen, so a returning user sees none of their lists. With no account, the Owned and Wishlist cards still read "The current account's games" and lead to "No account selected — pick one on Home". Compact the cards on a phone (two columns, no description), or put Your lists first once it has any; drop or disable the two account cards until there's an account.
+- **U202 · minor · B1** — on a phone, a bundle's table starts at 514 px of 844 (hero 189 px, two toolbar rows 89 px, sort chips 32 px, plus the "Taste fit needs Alice's Owned list opened on this device" line), so four rows fit above the fold. Fold the taste note into the Taste fit column's header or hide that column until it has data (as U193 for `?u=`), and fit search and the view buttons on one row.
 
 ## Accounts and first visit
 
