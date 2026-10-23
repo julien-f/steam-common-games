@@ -65,6 +65,7 @@ const {
   setUserPref,
   isSyncedPrefKey,
   prefFits,
+  PREFS_MAX_BYTES,
 } = require('./lib/auth');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS, TRUST_PROXY } = require('./lib/config');
 
@@ -203,12 +204,15 @@ if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 // One string per param (the last), so a repeated `?q=a&q=b` can't hand a route an array.
 app.set('query parser', (str) => Object.fromEntries(new URLSearchParams(str)));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
-app.use(express.json());
 // Express 5 leaves req.body undefined when no JSON body was parsed.
 app.use((req, _res, next) => {
   req.body ??= {};
   next();
 });
+// Ahead of the global parser: its routes parse their own body, past the 100 KB default and only once signed in.
+const prefsRouter = express.Router();
+app.use('/api/me/prefs', prefsRouter);
+app.use(express.json());
 
 // Serves the real Vite production build (`npm run build`) once one exists, and falls back to
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
@@ -1081,7 +1085,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // how many requests/minute the budget above allows.
 // detailsLimit counts a stream once whatever its size, so this caps how many one client can have
 // open at once: otherwise parallel streams of uncached games fill the shared store queue.
-const openStreams = new Map(); // req.ip -> open stream count
+const openStreams = new Map(); // client key (an IPv6 client's /56, as the limiters key it) -> open stream count
 
 app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
@@ -1102,16 +1106,17 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   }
 
   if (!rateLimitBypassed()) {
-    const open = openStreams.get(req.ip) ?? 0;
+    const client = rateLimit.ipKeyGenerator(req.ip);
+    const open = openStreams.get(client) ?? 0;
     if (open >= STREAM_MAX_PER_IP) {
       recordLimiterTrip('stream');
       return res.status(429).json({ error: 'Too many game lists loading at once. Wait for one to finish.' });
     }
-    openStreams.set(req.ip, open + 1);
+    openStreams.set(client, open + 1);
     res.once('close', () => {
-      const n = openStreams.get(req.ip) - 1;
-      if (n > 0) openStreams.set(req.ip, n);
-      else openStreams.delete(req.ip);
+      const n = openStreams.get(client) - 1;
+      if (n > 0) openStreams.set(client, n);
+      else openStreams.delete(client);
     });
   }
 
@@ -1254,7 +1259,9 @@ app.get('/api/me', (req, res) => {
 // One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so
 // two keys changing around the same time (different tabs/devices) can't clobber each other.
 // `updatedAt` (the device's own clock) is stored with the value, never checked: the write always wins.
-app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
+// The 1 KB covers the { value, updatedAt } around a value prefFits can accept.
+const prefsBody = express.json({ limit: PREFS_MAX_BYTES + 1024 });
+prefsRouter.put('/:key', authLimit, requireAuth, prefsBody, (req, res) => {
   const { value, updatedAt } = req.body;
   if (!('value' in req.body) || typeof updatedAt !== 'number') {
     return res.status(400).json({ error: 'body must be { value, updatedAt }' });

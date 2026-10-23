@@ -29,6 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Taste fit's note says when the account has too few games played, dates its taste as YYYY-MM-DD, and no longer asks a link's viewer to open the sender's Owned list
 - A comparison link with an unknown combine operation opens as the default comparison, and saving it no longer stores a list that never loads
 - Signing in on a browser whose storage is full or disabled no longer reloads the page forever
+- A shared view link with a damaged layout no longer breaks the bundles page or a list's view saving; it opens on your own view instead
+- The limit on game lists loading at once now counts an IPv6 client by its network, as the rate limits do, so rotating addresses can't get around it
+- A large synced setting, such as many lists, now saves to your account instead of being refused past 100 KB
 
 ### Development
 
