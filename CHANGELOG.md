@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Plays mostly shows how much each tag weighs, and **Why these?** lists the played games behind it.
 - On a phone, a game table keeps each game's name in view while you scroll its columns sideways
 - A bundle's summary leads with its price tiers and what it adds to your library, so a phone shows them without a swipe
+- Number columns (ratings, hours, prices, discounts, counts) align right, so their digits line up.
+- Tables show separate chips for a column both grouped and sorted, no pager when everything fits on one page, and "≥ 5.0" for an open-ended range.
 
 ### Fixed
 

@@ -134,12 +134,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: `@vates/data-table-solid` injects an unlayered `<style>`, and an unlayered rule beats any rule in a `@layer`, whatever its specificity or order.
 - **Fix**: keep every `.dt-*` override, and the `html:root { --color-* }` theme, in the unlayered `styles/vendor-data-table.css`, not in a layer.
 
-## The page freezes opening the table's Filter on a phone, under reduced motion
-
-- **Symptom**: with `prefers-reduced-motion: reduce` (the e2e default) at phone width, clicking the toolbar's Filter never returns: the main thread stays blocked (`locator.click: Timeout`, then any `page.evaluate` hangs).
-- **Cause**: a library bug ([vatesfr/data-table#43](https://github.com/vatesfr/data-table/issues/43)) triggered by any transition on a dropdown's `transform`. Its dropdown viewport clamp assumes the `translateX` it writes applies at once, and that write re-runs it through its own `MutationObserver` before a frame paints: under a transition the rect never moves, so the offset grows forever in microtasks. A near-zero `transition-duration` on every element (with the default `transition-property: all`) is enough.
-- **Fix**: transitions go to `0s` in that rule (`styles/base.css`); only animations keep a near-zero duration, for the `animationend` the lightbox waits on. Never give `.dt-dd` a transform transition until #43 is fixed.
-
 ## A tainted-canvas fallback can't be tested through `page.route`
 
 - **Symptom**: an image served by `route.fulfill` without `Access-Control-Allow-Origin` still loads with `crossOrigin = 'anonymous'` and its canvas reads fine, so the "no CORS" path never runs (seen checking the panel tint, `artTint.ts`).
