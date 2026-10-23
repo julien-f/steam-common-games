@@ -26,13 +26,13 @@ const api = supertest(app);
 function workingDetailsFetch(fetchedAppids) {
   return async (url) => {
     const appid =
-      url.match(/appids=(\d+)/)?.[1] || url.match(/appreviews\/(\d+)/)?.[1] || url.match(/appid=(\d+)/)?.[1];
+      url.match(/appids=(\d+)/)?.[1] || url.match(/%22appid%22%3A(\d+)/)?.[1] || url.match(/appid=(\d+)/)?.[1];
     if (appid) fetchedAppids.add(appid);
-    if (url.includes('appreviews')) {
+    if (url.includes('GetAppReviews')) {
       return {
         ok: true,
         json: async () => ({
-          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+          response: { query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } },
         }),
       };
     }

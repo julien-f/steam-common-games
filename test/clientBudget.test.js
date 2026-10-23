@@ -281,8 +281,10 @@ function detailsFetch(gate) {
     url = String(url);
     const appid = url.match(/appids=(\d+)/)?.[1];
     if (url === 'https://example.com/') return json({});
-    if (url.includes('appreviews'))
-      return json({ query_summary: { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' } });
+    if (url.includes('GetAppReviews'))
+      return json({
+        response: { query_summary: { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' } },
+      });
     if (url.includes('appdetails')) return json({ [appid]: { success: true, data: { name: 'Portal' } } });
     if (url.includes('IStoreBrowseService')) return json({ response: { store_items: [{ success: 1, tagids: [1] }] } });
     if (url.includes('ajaxgetstoretags')) return json({ tags: [{ tagid: 1, name: 'Action' }] });

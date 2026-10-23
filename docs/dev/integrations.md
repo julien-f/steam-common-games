@@ -4,18 +4,18 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 
 **Trust tiers.**
 
-- **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints (among them `ResolveVanityURL` and `GetOwnedGames`, `lib/steam.js`), Steam OpenID's `check_authentication` (`lib/auth.js`) and the IsThereAnyDeal API — documented.
-- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/search-results/store-browse/appdetails/appreviews/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
+- **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints (among them `ResolveVanityURL` and `GetOwnedGames`, `lib/steam.js`), its key-less `GetAppReviews`, Steam OpenID's `check_authentication` (`lib/auth.js`) and the IsThereAnyDeal API — documented.
+- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/search-results/store-browse/appdetails/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
 - **Other people use the live site** (steam.isonoe.net), so their Steam IDs and profiles pass through it: attribution and privacy are real requirements, not a local tool's.
 - **Circuit breakers** (`lib/circuitBreaker.js`) on the ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB: 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips.
-- **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB and the store browse API take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store 429 pauses every store request for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
+- **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB, the store browse API and Steam reviews take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store or reviews 429 pauses every request to that upstream for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
 
 - [HLTB — no npm package](#hltb--no-npm-package)
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
 - [Friends — documented, keyed endpoint](#friends--documented-keyed-endpoint)
 - [Tags & demo link — store browse data](#tags--demo-link--store-browse-data)
 - [Store metadata — appdetails](#store-metadata--appdetails)
-- [Reviews — store appreviews](#reviews--store-appreviews)
+- [Reviews — `GetAppReviews`](#reviews--getappreviews)
 - [ProtonDB — undocumented summary endpoint](#protondb--undocumented-summary-endpoint)
 - [Achievements — keyed `ISteamUserStats`](#achievements--keyed-isteamuserstats)
 - [News — `GetNewsForApp`](#news--getnewsforapp)
@@ -75,11 +75,14 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 - **Images load browser-direct from Steam's CDN**, never through the server. A game table loads one per row: `capsule_image` (231×87, ~12 KB), falling back to `capsule_imagev5` (184×69, ~8 KB): the larger one costs bytes (×1.5), not requests.
   - The panel reads the open game's capsule once more, in CORS mode, to tint its ground (`artTint.ts`): the CDN answers `Access-Control-Allow-Origin: *` (checked 2026-10-19), so the browser cache usually serves it; without that header the canvas would be tainted and the ground stays neutral.
 
-## Reviews — store appreviews
+## Reviews — `GetAppReviews`
 
-- `getGameRating` (`lib/steam.js`) calls the undocumented `store.steampowered.com/appreviews/{appid}?json=1&language=all&purchase_type=all&num_per_page=0` and reads only `query_summary` (`total_reviews`, `total_positive`, `review_score_desc`); `num_per_page=0` skips the review texts.
-- Store limiter and breaker, like `appdetails`.
-- No reviews (`total_reviews` 0 or absent) is cached as `null`: no data, not a failure.
+- `getGameRating` (`lib/steam.js`) calls the documented, key-less [`IUserReviewsService/GetAppReviews`](https://partner.steamgames.com/doc/webapi/IUserReviewsService) with `input_json` `{appid, languages: ['all'], purchase_type: 1, num_per_page: 1}` and reads only `response.query_summary` (`total_reviews`, `total_positive`, `review_score_desc`).
+- It replaced `store.steampowered.com/appreviews/{appid}?json=1`, which Steam switched off on 2026-10-22: it now redirects every app to the store's home page.
+- **Assumption**: `purchase_type: 1` counts every purchase (Steam and keys), like the old `purchase_type=all`. The enum's values aren't in the docs; Portal 2's totals for 1 equal 0 (Steam) plus 2 (non-Steam), and match the old endpoint's cached counts.
+- `num_per_page: 0` is ignored (20 reviews, ~16 KB); 1 keeps a response under 1 KB.
+- Key-less calls share Steam's lower rate limit and answer 429 past it; only a key tied to the app raises it, so none is sent. Own limiter, no circuit breaker (it doesn't answer 403).
+- No reviews (`total_reviews` 0 or absent — an unknown appid answers `{"response":{}}`) is cached as `null`: no data, not a failure.
 
 ## ProtonDB — undocumented summary endpoint
 

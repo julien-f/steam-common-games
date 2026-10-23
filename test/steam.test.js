@@ -39,7 +39,7 @@ function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
     ok: true,
     json: async () => ({
-      query_summary: { total_reviews: total, total_positive: positive, review_score_desc: desc },
+      response: { query_summary: { total_reviews: total, total_positive: positive, review_score_desc: desc } },
     }),
   };
 }
@@ -58,11 +58,11 @@ test('steam-store circuit breaker: trips (blockedUntil in the future) after 2 co
   const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
   await assert.rejects(
-    () => getGameRating(400),
+    () => getAppDetails(400),
     (err) => err.isUpstream === true,
   );
   await assert.rejects(
-    () => getGameRating(401),
+    () => getAppDetails(401),
     (err) => err.isUpstream === true,
   );
   assert.equal(fetchMock.mock.callCount(), 2);
@@ -72,7 +72,7 @@ test('steam-store circuit breaker: trips (blockedUntil in the future) after 2 co
 
   // Circuit is now open — a third call must reject immediately (circuit-open message) without
   // calling fetch again at all.
-  await assert.rejects(() => getGameRating(402), /circuit open/);
+  await assert.rejects(() => getAppDetails(402), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), 2);
 });
 
@@ -84,7 +84,7 @@ test('steam-store circuit breaker: requests already queued when it trips never r
 
   // storeLimit runs 2 at a time; at most one more can start between the first 403 and the
   // second, which trips the breaker. The rest were queued and must fail without a request.
-  const results = await Promise.allSettled([410, 411, 412, 413, 414, 415].map((appid) => getGameRating(appid)));
+  const results = await Promise.allSettled([410, 411, 412, 413, 414, 415].map((appid) => getAppDetails(appid)));
   assert.ok(results.every((r) => r.status === 'rejected'));
   assert.ok(fetchMock.mock.callCount() <= 3, `${fetchMock.mock.callCount()} requests`);
 });
@@ -95,10 +95,10 @@ test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers c
   t.after(_resetCircuitBreakers);
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
-  await assert.rejects(() => getGameRating(420));
-  await assert.rejects(() => getGameRating(421)); // trips it
+  await assert.rejects(() => getAppDetails(420));
+  await assert.rejects(() => getAppDetails(421)); // trips it
   await assert.rejects(
-    () => getGameRating(422),
+    () => getAppDetails(422),
     (err) => err.isCircuitOpen === true && err.isUpstream === true,
   );
 });
@@ -110,17 +110,17 @@ test('steam-store circuit breaker: logs a [circuit-breaker] warning exactly once
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
 
-  await assert.rejects(() => getGameRating(430));
+  await assert.rejects(() => getAppDetails(430));
   assert.equal(warnMock.mock.callCount(), 0, 'a single 403 must not warn — it has not tripped anything yet');
 
-  await assert.rejects(() => getGameRating(431)); // the trip itself
+  await assert.rejects(() => getAppDetails(431)); // the trip itself
   assert.equal(warnMock.mock.callCount(), 1);
   assert.match(warnMock.mock.calls[0].arguments[0], /\[circuit-breaker\]/);
 
   // Further calls while blocked are silent — they're an expected consequence of the trip
   // already logged above, not new information.
-  await assert.rejects(() => getGameRating(432));
-  await assert.rejects(() => getGameRating(433));
+  await assert.rejects(() => getAppDetails(432));
+  await assert.rejects(() => getAppDetails(433));
   assert.equal(warnMock.mock.callCount(), 1);
 });
 
@@ -131,9 +131,9 @@ test('steam-store circuit breaker: tripCount increments on trip and stays 0 unti
   assert.equal(getCircuitBreakers()['steam-store'].tripCount, 0);
 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
-  await assert.rejects(() => getGameRating(400));
+  await assert.rejects(() => getAppDetails(400));
   assert.equal(getCircuitBreakers()['steam-store'].tripCount, 0, 'a single 403 must not trip it');
-  await assert.rejects(() => getGameRating(401));
+  await assert.rejects(() => getAppDetails(401));
   assert.equal(getCircuitBreakers()['steam-store'].tripCount, 1, 'two consecutive 403s trip it once');
 });
 
@@ -150,12 +150,12 @@ test('fetchStoreApi: a 429 holds every queued store request until Retry-After ha
     calls++;
     return calls === 1
       ? { ok: false, status: 429, headers: new Headers({ 'retry-after': '2' }) }
-      : makeReviewResponse(10, 9);
+      : makeAppDetailsResponse(500);
   });
 
-  const first = getGameRating(500);
+  const first = getAppDetails(500);
   await flush();
-  const second = getGameRating(501); // queued after Steam asked us to slow down
+  const second = getAppDetails(501); // queued after Steam asked us to slow down
   await flush();
   assert.equal(calls, 1);
 
@@ -176,15 +176,15 @@ test('steam-store circuit breaker: consecutive403s exposes pre-trip state and re
   assert.equal(getCircuitBreakers()['steam-store'].consecutive403s, 0);
 
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
-  await assert.rejects(() => getGameRating(410));
+  await assert.rejects(() => getAppDetails(410));
   assert.equal(
     getCircuitBreakers()['steam-store'].consecutive403s,
     1,
     'a single 403 is visible before it trips anything',
   );
 
-  t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(10, 9));
-  await getGameRating(411);
+  t.mock.method(globalThis, 'fetch', async () => makeAppDetailsResponse(500));
+  await getAppDetails(411);
   assert.equal(getCircuitBreakers()['steam-store'].consecutive403s, 0, 'a success resets the streak');
 });
 
@@ -276,6 +276,36 @@ test('getGameRating: returns null when there are no reviews', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(0, 0));
   const result = await getGameRating(400);
   assert.equal(result, null);
+});
+
+test('getGameRating: asks GetAppReviews for every language and purchase type', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => makeReviewResponse(10, 9));
+  await getGameRating(620);
+  const url = new URL(fetchMock.mock.calls[0].arguments[0]);
+  assert.equal(url.origin + url.pathname, 'https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/');
+  assert.deepEqual(JSON.parse(url.searchParams.get('input_json')), {
+    appid: 620,
+    languages: ['all'],
+    purchase_type: 1,
+    num_per_page: 1,
+  });
+});
+
+test('getGameRating: returns null for an empty response (unknown appid)', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ response: {} }) }));
+  assert.equal(await getGameRating(999999999), null);
+});
+
+test("getGameRating: 403s don't trip the store's circuit breaker", async (t) => {
+  _reset();
+  _resetCircuitBreakers();
+  t.after(_resetCircuitBreakers);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 403 }));
+  await assert.rejects(() => getGameRating(400));
+  await assert.rejects(() => getGameRating(401));
+  assert.equal(getCircuitBreakers()['steam-store'].blockedUntil, 0);
 });
 
 test('getGameRating: returns correct shape', async (t) => {

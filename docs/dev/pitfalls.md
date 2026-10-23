@@ -2,6 +2,12 @@
 
 Surprising behaviors, misleading errors and their fixes. One entry each: symptom first (exact error text when there is one), then cause and fix. Delete entries once obsolete.
 
+## An upstream fails with `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`
+
+- **Symptom**: a `[tag]` warning in the server log with that error, for every uncached game, while cached ones still show.
+- **Cause**: the endpoint answered HTML: it was retired and redirects to a home page (Steam's `appreviews`, 2026-10-22), or it serves a block page. `fetch` follows redirects, so metrics count the final page's 200.
+- **Fix**: `curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' '<url>'`; then check the upstream's announcements for a replacement.
+
 ## Tests run slowly when started without `npm test`
 
 - **Symptom**: `node --test` on store-backed tests spends most of its time idle.

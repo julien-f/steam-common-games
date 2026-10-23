@@ -57,12 +57,12 @@ const DEMO_APPID = 999900;
 
 function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true, type } = {}) {
   return async (url) => {
-    if (url.includes('appreviews')) {
+    if (url.includes('GetAppReviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
       return {
         ok: true,
         json: async () => ({
-          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+          response: { query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } },
         }),
       };
     }
@@ -887,7 +887,7 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
   assert.deepEqual(res.body.meta?.genres, ['Action']);
   assert.equal(res.body.hltb?.main, 10);
   assert.ok(Array.isArray(res.body.tags));
-  assert.ok(!fetchedUrls.some((u) => u.includes('appreviews')), 'rating should not be re-fetched');
+  assert.ok(!fetchedUrls.some((u) => u.includes('GetAppReviews')), 'rating should not be re-fetched');
   assert.ok(
     !fetchedUrls.some((u) => u.includes('steampowered.com') && u.includes('appdetails')),
     'meta should not be re-fetched',
@@ -902,12 +902,12 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
 function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
   return async (url) => {
     if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
-    if (url.includes('appreviews')) {
+    if (url.includes('GetAppReviews')) {
       counts.rating++;
       return {
         ok: true,
         json: async () => ({
-          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+          response: { query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } },
         }),
       };
     }
@@ -1041,8 +1041,11 @@ for (const comingSoon of [true, false]) {
             777: { success: true, data: { name: 'Soon', release_date: { coming_soon: comingSoon, date: 'Q4 2027' } } },
           }),
         };
-      if (url.includes('appreviews'))
-        return { ok: true, json: async () => ({ query_summary: { total_reviews: 0, total_positive: 0 } }) };
+      if (url.includes('GetAppReviews'))
+        return {
+          ok: true,
+          json: async () => ({ response: { query_summary: { total_reviews: 0, total_positive: 0 } } }),
+        };
       if (url.includes('protondb.com')) return { ok: false, status: 404 };
       if (url.includes('search/site/init'))
         return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
@@ -1161,11 +1164,11 @@ test('GET /api/game-details/:appid: failed fetch is not cached, retried on next 
   _resetAuth();
   let hltbCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('appreviews'))
+    if (url.includes('GetAppReviews'))
       return {
         ok: true,
         json: async () => ({
-          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+          response: { query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } },
         }),
       };
     if (url.includes('appdetails')) {
@@ -1361,11 +1364,11 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
   _resetAuth();
   let hltbSearchCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('appreviews')) {
+    if (url.includes('GetAppReviews')) {
       return {
         ok: true,
         json: async () => ({
-          query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' },
+          response: { query_summary: { total_reviews: 1000, total_positive: 900, review_score_desc: 'Very Positive' } },
         }),
       };
     }
@@ -1423,21 +1426,22 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
 // fetchGameDetails' own logErr (server.js) is a second, separate consumer of the isCircuitOpen
 // flag besides routeErrorStatus (covered under GET /api/search-games below) — this closes the
 // loop on that one too, since a batch stream is exactly the "hundreds of near-identical lines"
-// scenario the flag exists to prevent (one appid's rating + meta both go through fetchStoreApi).
-test('POST /api/game-details/stream: does not log [game-details] for rating/meta blocked by an already-open circuit', async (t) => {
+// scenario the flag exists to prevent.
+test('POST /api/game-details/stream: does not log [game-details] for meta blocked by an already-open circuit', async (t) => {
   _reset();
   _resetAuth();
   _resetCircuitBreakers();
   t.after(_resetCircuitBreakers);
   const warnMock = t.mock.method(console, 'warn', () => {});
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('appreviews') || url.includes('appdetails')) return { ok: false, status: 403 };
+    // The store blocks everything, as it does when it starts answering 403.
+    if (url.includes('store.steampowered.com')) return { ok: false, status: 403 };
+    if (url.includes('GetAppReviews')) return { ok: true, json: async () => ({ response: {} }) };
     if (url.includes('IStoreBrowseService'))
       return {
         ok: true,
         json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }),
       };
-    if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
     if (url.includes('protondb.com')) return { ok: false, status: 404 }; // "no reports yet", not an error
     if (url.includes('search/site/init'))
       return { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) };
@@ -1449,17 +1453,16 @@ test('POST /api/game-details/stream: does not log [game-details] for rating/meta
   t.after(() => new Promise((r) => server.close(r)));
   await new Promise((r) => server.once('listening', r));
 
-  // First game's own rating+meta 403s trip the circuit (2 consecutive 403s) — these ARE new
-  // information and are expected to log normally.
+  // The first game's meta and tag-name 403s trip the circuit (2 consecutive 403s) — these ARE
+  // new information and are expected to log normally.
   await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 900 }] });
   assert.equal(warnMock.mock.calls.filter((c) => /\[circuit-breaker\]/.test(c.arguments[0])).length, 1);
   warnMock.mock.resetCalls();
 
-  // Second game, different appid, while the circuit is still open — its rating/meta calls are
-  // immediately isCircuitOpen errors and must not each log their own [game-details] line.
+  // Another game while the circuit is still open — its meta call is immediately an
+  // isCircuitOpen error and must not log its own [game-details] line.
   const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 901 }] });
   const gameEvent = parseSseEvents(res.body).find((e) => e.appid === 901);
-  assert.equal(gameEvent.rating, null);
   assert.equal(gameEvent.meta, null);
   assert.equal(warnMock.mock.calls.filter((c) => /\[game-details\]/.test(c.arguments[0])).length, 0);
 });
@@ -2472,7 +2475,7 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
     release = r;
   });
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (!String(url).includes('appreviews')) return { ok: true, json: async () => ({}) };
+    if (!String(url).includes('GetAppReviews')) return { ok: true, json: async () => ({}) };
     started++;
     inFlight++;
     maxInFlight = Math.max(maxInFlight, inFlight);
@@ -2481,7 +2484,7 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
     return {
       ok: true,
       json: async () => ({
-        query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 },
+        response: { query_summary: { review_score_desc: 'x', total_positive: 1, total_negative: 0, total_reviews: 1 } },
       }),
     };
   });

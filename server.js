@@ -718,7 +718,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // no signal about what actually went wrong. Skips isCircuitOpen and isBudgetExhausted errors — same reasoning
       // as routeErrorStatus's own skip: a batch load hits this once per field per appid, so
       // without the skip a single already-logged circuit trip would print potentially hundreds
-      // of near-identical lines here alone (rating + meta both go through fetchStoreApi).
+      // of near-identical lines here alone (meta goes through fetchStoreApi).
       const logErr = (label, err) => {
         if (err?.isCircuitOpen || err?.isBudgetExhausted) return;
         console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');

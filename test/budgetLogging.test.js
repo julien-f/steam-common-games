@@ -41,7 +41,7 @@ test('a route refused by an exhausted budget replies 502 without logging it agai
 });
 
 test('game details refused by exhausted budgets log no [game-details] line', async (t) => {
-  const { warn } = await exhaust(t, ['steam-store', 'steam-browse', 'protondb']);
+  const { warn } = await exhaust(t, ['steam-store', 'steam-reviews', 'steam-browse', 'protondb']);
   const res = await api.get('/api/game-details/900');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.failed, ['rating', 'hltb', 'meta', 'tags', 'protondb']);
