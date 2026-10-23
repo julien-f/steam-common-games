@@ -8,6 +8,7 @@ import Swords from 'lucide-solid/icons/swords';
 import Users from 'lucide-solid/icons/users';
 import type { Archetype, StoryGames } from './playerProfile.ts';
 import type { PlayedTag } from './tagTaste.ts';
+import { fadeInOnLoad } from './utils.ts';
 
 const ARCHETYPE_ICONS = { 'book-open': BookOpen, compass: Compass, handshake: Handshake, swords: Swords, users: Users };
 
@@ -16,6 +17,27 @@ export function ProfileBadge(props: { archetype: Archetype; small?: boolean }): 
     <span class="profile-badge" classList={{ 'profile-badge--small': props.small }} aria-hidden="true">
       <Dynamic component={ARCHETYPE_ICONS[props.archetype.icon]} />
     </span>
+  );
+}
+
+// Without a Steam avatar, the player's initial on a colour of its own, by position in the comparison.
+const AVATAR_COLOURS = ['--kind-tag', '--kind-category', '--kind-genre', '--kind-devpub'];
+export function PlayerAvatar(props: { url?: string; label: string; index: number }): JSX.Element {
+  return (
+    <Show
+      when={props.url}
+      fallback={
+        <span
+          class="player-avatar"
+          style={{ background: `var(${AVATAR_COLOURS[props.index % AVATAR_COLOURS.length]})` }}
+          aria-hidden="true"
+        >
+          {props.label.slice(0, 1).toUpperCase()}
+        </span>
+      }
+    >
+      {(url) => <img class="player-avatar" src={url()} alt="" width="36" height="36" ref={fadeInOnLoad} />}
+    </Show>
   );
 }
 

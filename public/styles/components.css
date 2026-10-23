@@ -820,35 +820,156 @@
     cursor: pointer;
     font-weight: 600;
   }
-  .list-players ul {
+  /* A comparison's players as cards, over one card of what they share (ListRoute.tsx's playersSection). */
+  .players-cards {
     display: grid;
-    gap: 6px;
-    margin: 6px 0 0;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 12px;
+    margin: 8px 0 0;
     padding: 0;
     list-style: none;
   }
-  .list-players li {
+  .players-card,
+  .players-ground {
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .players-card {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .players-card-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
+  }
+  .players-card-head > div {
+    display: grid;
+    gap: 2px;
   }
   .list-players-name {
-    min-width: 5em;
+    color: var(--text);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
-  .list-players-row {
+  .players-card-style {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .players-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .player-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    color: var(--bg);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    object-fit: cover;
+  }
+  /* Labels top-aligned in their own column; above their content on a phone. */
+  .players-ground {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 14px 16px;
+    align-items: start;
+    margin-top: 12px;
+  }
+  .players-ground > .profile-label {
+    padding-top: 4px;
+  }
+  .players-ground-body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin: 6px 0 0;
+    gap: 8px 10px;
   }
-  .list-players-suggestions {
-    margin: 6px 0 0;
-  }
-  .list-players-own {
+  .players-meter {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .players-dots {
+    display: inline-flex;
+    gap: 4px;
+  }
+  .players-dots i {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--line-strong);
+  }
+  .players-dots i.on {
+    background: var(--kind-tag);
+  }
+  .players-note {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .players-suggest-to {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .players-games {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .players-game {
+    display: grid;
+    gap: 4px;
+    width: 150px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-meta);
+    text-align: left;
+    cursor: pointer;
+  }
+  .players-game img {
+    width: 150px;
+    height: 56px;
+    border-radius: var(--radius-1);
+    background: var(--line);
+    object-fit: cover;
+  }
+  .players-game:hover .players-game-name {
+    color: var(--accent);
+  }
+  .players-game-caption {
+    color: var(--muted);
+  }
+  @media (max-width: 600px) {
+    .players-ground {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+    }
+    .players-ground > .profile-label:not(:first-child) {
+      margin-top: 8px;
+    }
+    .players-game,
+    .players-game img {
+      width: 140px;
+    }
   }
   .list-players-game {
     min-height: 24px;

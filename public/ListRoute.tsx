@@ -78,7 +78,10 @@ import {
 } from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
 import { archetypeOf, playStyle, storyGames, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
-import { OwnedProfile } from './PlayerProfile.tsx';
+import { OwnedProfile, PlayerAvatar, ProfileBadge } from './PlayerProfile.tsx';
+import Gift from 'lucide-solid/icons/gift';
+import Heart from 'lucide-solid/icons/heart';
+import Users from 'lucide-solid/icons/users';
 import {
   fmt,
   insertColumnsAfter,
@@ -111,6 +114,7 @@ import {
   hoursFromMinutes,
   oldestFetchedAt,
   scoreColor,
+  fadeInOnLoad,
   fmtLocalDate,
   smoothScroll,
   refusalMessage,
@@ -748,7 +752,13 @@ export default function ListRoute() {
 
   let tableContainer!: HTMLDivElement;
   // Each compared player's label and owned games, in `compareAccounts` order (also the panel's Owned by, see getOwners).
-  let comparePlayers: { id: string; label: string; owners: Map<number, GameOwner[]> }[] = [];
+  let comparePlayers: {
+    id: string;
+    label: string;
+    avatarUrl?: string; // a Family's: its first member's
+    family: boolean;
+    owners: Map<number, GameOwner[]>;
+  }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // The details stream's `{ limited }` message: this client spent its share, said once for the load.
@@ -2329,6 +2339,8 @@ export default function ListRoute() {
         comparePlayers = shown.map((account) => ({
           id: account.id,
           label: accountDisplayLabel(account),
+          avatarUrl: account.avatarUrl ?? Object.values(account.memberAvatars ?? {})[0],
+          family: account.members.length > 1,
           owners: ownersByAccount.get(account.id) ?? new Map(),
         }));
         notifyOwnersChanged();
@@ -3305,10 +3317,13 @@ export default function ListRoute() {
       const players = comparePlayers.map((player) => {
         const hours = playerHours(player);
         const ofRow = (g: { appid: number }) => hours(g.appid);
+        const style = playStyle(rows, ofRow);
         return {
           label: player.label,
+          avatarUrl: player.avatarUrl,
           tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
-          style: playStyle(rows, ofRow),
+          style,
+          archetype: archetypeOf(style, storyGames(rows, ofRow), { family: player.family }),
         };
       });
       const compared = comparePlayers.map((player): ComparedPlayer => ({
@@ -3354,6 +3369,23 @@ export default function ListRoute() {
     ].filter((part) => !!part);
     return parts.length ? parts.join(' · ') : null;
   }
+  // A game as its store art, name and caption, opening its panel.
+  const gameArt = (appid: number, caption: string) => (
+    <button type="button" class="players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
+      <img
+        src={rowStore.getRow(appid)?.thumb ?? rowStore.getRow(appid)?.capsule ?? undefined}
+        alt=""
+        width="150"
+        height="56"
+        loading="lazy"
+        ref={fadeInOnLoad}
+      />
+      <span class="players-game-name">{rowStore.getRow(appid)?.name}</span>
+      <span class="players-game-caption">{caption}</span>
+    </button>
+  );
+  const sharedCount = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
+    profiles.players.length === 2 ? (profiles.ground.pairs[0].shared ?? 0) : profiles.ground.sharedCount;
   // A game named in the hero, opening its panel.
   const gameButton = (appid: number) => (
     <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
@@ -3401,72 +3433,123 @@ export default function ListRoute() {
             {(profiles) => (
               <details class="list-players" open={playersOpen()} onToggle={(e) => setPlayersOpen(e.currentTarget.open)}>
                 <summary>{playersSummary(profiles())}</summary>
-                <ul>
+                <ul class="players-cards">
                   <For each={profiles().players}>
                     {(p, i) => (
-                      <li>
-                        <span class="list-players-name">{p.label}</span>
-                        <Show
-                          when={p.tags.length}
-                          fallback={<span class="list-players-none">too few games played here for a profile</span>}
-                        >
-                          {/* Once compared, what sets them apart: what they share is under In common. */}
-                          <Show when={compared(profiles())} fallback={<For each={p.tags}>{tagButton}</For>}>
-                            <For
-                              each={profiles().ground.ownTags[i()]}
-                              fallback={<span class="list-players-none">no tags of their own</span>}
+                      <li class="players-card">
+                        <div class="players-card-head">
+                          <PlayerAvatar url={p.avatarUrl} label={p.label} index={i()} />
+                          <div>
+                            <span class="list-players-name">{p.label}</span>
+                            <Show
+                              when={p.archetype}
+                              fallback={
+                                <span class="players-card-style">
+                                  {p.style
+                                    ? STYLE_SENTENCES[p.style]
+                                    : p.tags.length
+                                      ? ''
+                                      : 'too few games played here for a profile'}
+                                </span>
+                              }
                             >
-                              {tagButton}
-                            </For>
-                          </Show>
-                          <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
+                              {(archetype) => (
+                                <span class="players-card-style">
+                                  <ProfileBadge archetype={archetype()} small />
+                                  {archetype().name}
+                                </span>
+                              )}
+                            </Show>
+                          </div>
+                        </div>
+                        <Show when={p.tags.length}>
+                          <div class="players-card-tags">
+                            {/* Once compared, what sets them apart: what they share is under In common. */}
+                            <Show when={compared(profiles())} fallback={<For each={p.tags}>{tagButton}</For>}>
+                              <For
+                                each={profiles().ground.ownTags[i()]}
+                                fallback={<span class="list-players-none">no tags of their own</span>}
+                              >
+                                {tagButton}
+                              </For>
+                            </Show>
+                          </div>
                         </Show>
                       </li>
                     )}
                   </For>
                 </ul>
-                <Show when={similarityNote(profiles())}>{(note) => <p class="list-players-row">{note()}</p>}</Show>
-                <Show when={profiles().ground.sharedTags.length}>
-                  <p class="list-players-row">
-                    In common: <For each={profiles().ground.sharedTags}>{tagButton}</For>
-                  </p>
-                </Show>
-                <p class="list-players-row">
-                  Everyone's favourites:{' '}
-                  <For each={profiles().ground.favourites} fallback={<span class="list-players-none">none yet</span>}>
-                    {gameButton}
-                  </For>
-                </p>
-                <div class="list-players-row">
-                  <label>
-                    Suggest to{' '}
-                    <select value={suggestTo()} onChange={(e) => setSuggestTarget(Number(e.currentTarget.value))}>
-                      <For each={profiles().players}>{(p, i) => <option value={i()}>{p.label}</option>}</For>
-                    </select>
-                  </label>
-                  <Show when={!suggestions()?.length}>
-                    <span class="list-players-none">
-                      {suggestions()
-                        ? 'nothing the others played a lot fits yet'
-                        : 'too few games played here for a profile'}
-                    </span>
-                  </Show>
-                </div>
-                <Show when={suggestions()?.length}>
-                  <ul class="list-players-suggestions">
-                    <For each={suggestions()}>
-                      {(s) => (
-                        <li>
-                          {gameButton(s.appid)}
-                          <span class="list-players-own">
-                            {profiles().players[s.from].label} {fmtHours(s.hours)} ·{' '}
-                            {s.owns ? 'owns it' : "doesn't own it"}
-                          </span>
-                        </li>
-                      )}
+                <div class="players-ground">
+                  <span class="profile-label">
+                    <Users /> In common
+                  </span>
+                  <div class="players-ground-body">
+                    <Show
+                      when={compared(profiles())}
+                      fallback={<span class="list-players-none">needs two players with a profile</span>}
+                    >
+                      <span class="players-meter">
+                        <span class="players-dots" aria-hidden="true">
+                          <For each={Array.from({ length: TOP_TAGS }, (_, k) => k < sharedCount(profiles()))}>
+                            {(on) => <i classList={{ on }} />}
+                          </For>
+                        </span>
+                        {profiles().players.length === 2
+                          ? `${sharedCount(profiles())} of their top ${TOP_TAGS} tags`
+                          : `${sharedCount(profiles())} ${sharedCount(profiles()) === 1 ? 'tag' : 'tags'} in everyone's top ${TOP_TAGS}`}
+                      </span>
+                      <span class="players-card-tags">
+                        <For each={profiles().ground.sharedTags}>{tagButton}</For>
+                      </span>
+                    </Show>
+                    <Show when={similarityNote(profiles())}>{(note) => <p class="players-note">{note()}</p>}</Show>
+                  </div>
+                  <span class="profile-label">
+                    <Heart /> {profiles().players.length === 2 ? 'Both loved' : 'All loved'}
+                  </span>
+                  <div class="players-games">
+                    <For each={profiles().ground.favourites} fallback={<span class="list-players-none">none yet</span>}>
+                      {(appid) =>
+                        gameArt(
+                          appid,
+                          profiles()
+                            .players.map((p, k) => `${p.label} ${fmtHours(profiles().compared[k].hours(appid))}`)
+                            .join(' · '),
+                        )
+                      }
                     </For>
-                  </ul>
-                </Show>
+                  </div>
+                  <span class="profile-label">
+                    <Gift /> Suggest
+                  </span>
+                  <div class="players-ground-body">
+                    <label class="players-suggest-to">
+                      Suggest to{' '}
+                      <select value={suggestTo()} onChange={(e) => setSuggestTarget(Number(e.currentTarget.value))}>
+                        <For each={profiles().players}>{(p, k) => <option value={k()}>{p.label}</option>}</For>
+                      </select>
+                    </label>
+                    <div class="players-games list-players-suggestions">
+                      <For
+                        each={suggestions() ?? []}
+                        fallback={
+                          <span class="list-players-none">
+                            {suggestions()
+                              ? 'nothing the others played a lot fits yet'
+                              : 'too few games played here for a profile'}
+                          </span>
+                        }
+                      >
+                        {(s) =>
+                          gameArt(
+                            s.appid,
+                            `${profiles().players[s.from].label} ${fmtHours(s.hours)} · ${s.owns ? 'owns it' : "doesn't own it"}`,
+                          )
+                        }
+                      </For>
+                    </div>
+                  </div>
+                </div>
               </details>
             )}
           </Show>

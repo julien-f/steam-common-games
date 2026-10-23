@@ -279,6 +279,9 @@ test('commonGround: with three players, the closest pair and the odd one out, on
   const rogue = () => player(tenHours(1, 12));
   const ground = commonGround(games, [rogue(), rogue(), player(tenHours(13, 24))]);
   assert.deepEqual(ground.closest, { a: 0, b: 1, shared: 6 });
+  // In all three top 10s: only the T0–T3 every game carries, though In common shows 3.
+  assert.equal(ground.sharedCount, 4);
+  assert.equal(ground.sharedTags.length, 3);
   assert.equal(ground.oddOneOut, 2);
   const same = commonGround(games, [rogue(), rogue(), rogue()]);
   assert.equal(same.closest, null);

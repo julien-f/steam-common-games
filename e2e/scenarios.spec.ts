@@ -927,7 +927,7 @@ async function openPlayers(page: Page): Promise<Locator> {
 const playerLine = (players: Locator, name: string) =>
   players.getByRole('listitem').filter({ has: players.page().locator('.list-players-name', { hasText: name }) });
 
-test("C7.2: Players shows each player's top tags and play style, open on desktop, folded on a phone", async ({
+test("C7.2: Players shows each player's top tags and archetype, open on desktop, folded on a phone", async ({
   page,
 }, testInfo) => {
   await page.goto('/lists/compare?u=dave&u=erin');
@@ -938,8 +938,9 @@ test("C7.2: Players shows each player's top tags and play style, open on desktop
   if (phone) await players.locator('summary').click();
   const dave = playerLine(players, 'Dave');
   const erin = playerLine(players, 'Erin');
-  await expect(dave).toContainText('Mostly single-player games');
-  await expect(erin).toContainText('Mostly co-op games');
+  // Each card names the player's archetype.
+  await expect(dave).toContainText('Story finisher');
+  await expect(erin).toContainText('Co-op crew');
   const pvp = erin.getByRole('button', { name: 'PvP' });
   await pvp.click();
   await expect(pvp).toHaveAttribute('aria-pressed', 'true');
@@ -954,7 +955,7 @@ test('C7.3-4: Players says how many top tags each pair shares, which, and the fa
   const players = await openPlayers(page);
   await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
   await expect(playerLine(players, 'Dave').getByRole('button')).toHaveText(['Open World', 'Story Rich', 'RPG']);
-  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  const common = players.locator('.players-ground-body').first().locator('.players-card-tags');
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
   await players.getByRole('button', { name: 'Terraria' }).click();
   await expect(page.locator('#panel-title')).toHaveText('Terraria');
@@ -969,10 +970,12 @@ test('C7.5-6: Suggest to a player what another played a lot, closest to their ta
   // My account is Dave: the picker starts on Erin.
   const to = players.getByLabel('Suggest to');
   await expect(to).toHaveValue('1');
-  const first = players.locator('.list-players-suggestions li').first();
+  const first = players.locator('.list-players-suggestions .players-game').first();
   await expect(first).toHaveText(/^Deep Rock Galactic\s*Dave 120h · owns it$/);
   await to.selectOption({ label: 'Dave' });
-  await expect(players.locator('.list-players-suggestions li').first()).toContainText("Erin 90h · doesn't own it");
+  await expect(players.locator('.list-players-suggestions .players-game').first()).toContainText(
+    "Erin 90h · doesn't own it",
+  );
   await players.getByRole('button', { name: 'Valheim' }).click();
   await expect(page.locator('#panel-title')).toHaveText('Valheim');
 });
@@ -993,7 +996,7 @@ test("C7 edge: each player's line names their own tags once, those everyone shar
   const players = await openPlayers(page);
   await expect(playerLine(players, 'Erin').getByRole('button')).toHaveText(['PvP', 'Horror', 'Co-op']);
   await expect(players).not.toContainText('more than');
-  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  const common = players.locator('.players-ground-body').first().locator('.players-card-tags');
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
 });
 
@@ -1001,7 +1004,7 @@ test('C7 edge: Suggest to starts on a player it can suggest to, not one without 
   await page.goto('/lists/compare?u=alice&u=dave&u=erin');
   const players = await openPlayers(page);
   await expect(players.getByLabel('Suggest to')).toHaveValue('1'); // Dave: Alice has too few games played
-  await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
+  await expect(players.locator('.list-players-suggestions .players-game').first()).toBeVisible();
 });
 
 test('C7 edge: a player without a profile is said once, in Players while it is open', async ({ page }) => {
