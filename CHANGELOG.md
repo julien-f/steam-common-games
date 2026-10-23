@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `GET /api/health` says which version and commit the server runs, and since when
 - `GET /api/metrics` keeps 30 days of outbound status counts per day, across restarts, to date when an upstream started failing
 - Owned says whether the account mostly plays single-player, co-op or PvP games and how many story games it plays through
-- Owned's count of games with no playtime lists them, best Taste fit first, as what to play next
+- Owned's count of games played 2 h or less opens its Play next view, best Taste fit first
 - A comparison's Players section shows each player's own tags and play style, the tags and favourites they share, and what to suggest to each
 - Saved views of Owned and Wishlist, as tabs under the list's header: ready-made Recently played, Play next and Bargains, or the table as it is
 

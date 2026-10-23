@@ -678,13 +678,17 @@ test('A5.1-3: Plays mostly says what it is built from, leaving software out, and
   await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
 });
 
-test('A5.4: the no-playtime count lists those games, best Taste fit first, on a first visit', async ({ page }) => {
+test('A5.4: the barely-played count opens Play next, best Taste fit first, on a first visit', async ({ page }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const backlog = page.getByRole('button', { name: '3 games show no playtime' });
+  const backlog = page.getByRole('button', { name: '4 games played 2 h or less' }); // a preorder included
   await backlog.click();
-  await expect(rows(page)).toHaveCount(3);
+  await expect(page).toHaveURL(/view=/);
+  await expect(
+    page.getByRole('navigation', { name: 'Views' }).getByRole('link', { name: 'Play next' }),
+  ).toHaveAttribute('aria-current', 'page');
+  await expect(rows(page)).toHaveCount(4);
   await expect(backlog).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
   // Scored against the taste this visit just learned: nothing was stored before it.
@@ -693,8 +697,12 @@ test('A5.4: the no-playtime count lists those games, best Taste fit first, on a 
       .first()
       .getByRole('cell', { name: /^\d+%$/ }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Clear all' }).click();
+  await backlog.click(); // back to All games, the view kept
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  await expect(page.getByRole('navigation', { name: 'Views' }).getByRole('link')).toHaveText([
+    'All games',
+    'Play next',
+  ]);
 });
 
 test('A5 edge: Why these? names the story games that fell short of their main story, each opening its panel', async ({
@@ -713,13 +721,13 @@ test('A5 edge: Why these? names the story games that fell short of their main st
   await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
 });
 
-test("A5 edge: what to play next leaves out games that aren't out yet", async ({ page }) => {
+test('A5 edge: what to play next counts a preorder, which its Released date shows as upcoming', async ({ page }) => {
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  await page.getByRole('button', { name: '3 games show no playtime' }).click();
-  await expect(rows(page)).toHaveCount(3);
-  await expect(row(page, 'Someday Saga')).toHaveCount(0);
+  await page.getByRole('button', { name: '4 games played 2 h or less' }).click();
+  await expect(rows(page)).toHaveCount(4); // a saved view can't hold "released by today"
+  await expect(row(page, 'Someday Saga')).toHaveCount(1);
   await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
 });
 

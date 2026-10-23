@@ -96,8 +96,6 @@ import {
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
   SOURCE_NAMES,
-  endOfDay,
-  releasedBy,
 } from './gameColumns.ts';
 import {
   computeSteamdbRating,
@@ -151,7 +149,14 @@ import {
 } from './urlState.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
 import { UnsavedChangesBanner, UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
-import { getListView, saveListViewTable } from './listViews.ts';
+import {
+  PLAY_NEXT_MAX_HOURS,
+  VIEW_TEMPLATES,
+  createFromTemplate,
+  getListView,
+  saveListViewTable,
+  templateView,
+} from './listViews.ts';
 import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
 import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
@@ -340,6 +345,7 @@ function playedByColumn(
 const fmtPercent = (v: unknown) => (v == null ? '—' : `${v}%`);
 
 const TASTE_FIT_KEY = 'tasteFit';
+const PLAY_NEXT = 'play-next'; // listViews.ts's template id
 // What Taste fit is scored against; said in the list status (tasteFitNote), not only on hover.
 interface TasteSource {
   label: string | null; // null: no current account
@@ -3513,35 +3519,31 @@ export default function ListRoute() {
     const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
     return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
   });
+  // The games Play next lists (listViews.ts), counted the same way so the two agree.
   const unplayed = createMemo(() =>
     loadFraction() == null && !playtimeHidden()
-      ? tableData().filter((g) => !g.playtime && releasedBy(g, endOfDay(new Date()))).length
+      ? tableData().filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS).length
       : 0,
   );
-  const backlogShown = () => {
-    const t = filterTable();
-    return (
-      tableReady() &&
-      !!t &&
-      t.filter.ranges().playtime?.max === '0' &&
-      t.filter.ranges().releaseDate?.max === endOfDay(new Date()) &&
-      t.sort.entries()[0]?.key === TASTE_FIT_KEY
-    );
-  };
+  const backlogShown = () => activeView()?.template === PLAY_NEXT;
   // The facts line's sentences, leading into the backlog button when it follows.
   const factSentences = () => {
     const { style, story } = profileFacts();
     const sentences = [style && STYLE_SENTENCES[style], story && storySentence(story)].filter((s) => !!s);
     return sentences.join(' · ') + (sentences.length && unplayed() ? ' · ' : '');
   };
-  // What to play next: the never-launched games, closest to the account's taste first.
+  // Opens the Play next view (created the first time), or back to All games when it's open.
   function showBacklog(): void {
-    const t = filterTable();
-    if (!t) return;
-    t.filter.setRange('playtime', 'max', '0');
-    // Not yet out: nothing to play next, though it shows no playtime either.
-    t.filter.setRange('releaseDate', 'max', endOfDay(new Date()));
-    syncLeadColumn(t, TASTE_FIT_KEY, true);
+    if (backlogShown()) return navigate(viewHref(routerLocation, null));
+    let view = templateView('owned', PLAY_NEXT);
+    if (!view) {
+      view = createFromTemplate(
+        VIEW_TEMPLATES.find((t) => t.id === PLAY_NEXT)!,
+        OWNED_DEFAULT_VISIBLE,
+      );
+      showSelectionStatus(`Saved view ${view.name}`);
+    }
+    navigate(viewHref(routerLocation, view.id));
   }
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
@@ -3594,10 +3596,10 @@ export default function ListRoute() {
                 type="button"
                 class="list-profile-backlog"
                 aria-pressed={backlogShown()}
-                title="List them, best Taste fit first"
+                title="Open Play next: these games, best Taste fit first"
                 onClick={showBacklog}
               >
-                {unplayed()} {unplayed() === 1 ? 'game shows' : 'games show'} no playtime
+                {unplayed()} {unplayed() === 1 ? 'game' : 'games'} played {PLAY_NEXT_MAX_HOURS} h or less
               </button>
             </Show>
           </p>

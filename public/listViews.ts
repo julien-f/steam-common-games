@@ -59,6 +59,9 @@ export function deleteListView(kind: ViewKind, id: string): void {
   );
 }
 
+// Play next's bound, shared with Owned's profile-line count that opens it.
+export const PLAY_NEXT_MAX_HOURS = 2;
+
 // Suggested views, stamped into a SavedView at creation. `show` joins the list's default columns.
 export interface ViewTemplate {
   id: string;
@@ -85,7 +88,10 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
     id: 'play-next',
     kind: 'owned',
     name: 'Play next',
-    view: { rangeFilters: { playtime: { min: '', max: '2' } }, sorts: [{ key: 'tasteFit', dir: 'desc' }] },
+    view: {
+      rangeFilters: { playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) } },
+      sorts: [{ key: 'tasteFit', dir: 'desc' }],
+    },
     show: ['tasteFit', 'playtime', 'hltbAll'],
   },
   {
@@ -102,6 +108,11 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
 export function suggestedTemplates(kind: ViewKind, pricesShown: boolean): ViewTemplate[] {
   const created = new Set(getListViews(kind).map((v) => v.template));
   return VIEW_TEMPLATES.filter((t) => t.kind === kind && !created.has(t.id) && (pricesShown || !t.needsPrices));
+}
+
+// The view created from `templateId`, renamed or edited since or not.
+export function templateView(kind: ViewKind, templateId: string): SavedView | undefined {
+  return getListViews(kind).find((v) => v.template === templateId);
 }
 
 export function createFromTemplate(template: ViewTemplate, defaultVisible: readonly string[]): SavedView {
