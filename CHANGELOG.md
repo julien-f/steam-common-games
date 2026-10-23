@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Backlog runs log their review yield and the bugs later traced back to them, summarized for setup reviews
 - The stylesheet is split into cascade layers and icons come from lucide-solid
 - The mock API answers an unknown game instead of crashing
+- The long-comment check prints plain paths under a mnemonic-prefix git config
 
 ## [0.11.0] - 2026-10-14
 

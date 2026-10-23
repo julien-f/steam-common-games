@@ -70,7 +70,9 @@ function longComments(diff) {
 
 if (require.main === module) {
   const base = process.argv.find((a) => a.startsWith('--staged='))?.slice(9);
-  const args = base ? ['diff', '--cached', '-U0', base] : ['diff', '-U0', 'HEAD'];
+  // Explicit prefixes: a `diff.mnemonicPrefix` config would print `w/`/`i/` paths otherwise.
+  const prefixes = ['--src-prefix=a/', '--dst-prefix=b/'];
+  const args = base ? ['diff', '--cached', '-U0', ...prefixes, base] : ['diff', '-U0', ...prefixes, 'HEAD'];
   const git = (...a) => execFileSync('git', a, { encoding: 'utf8' });
   const untracked = base ? [] : git('ls-files', '--others', '--exclude-standard', '--', 'public').split('\n');
   const diff = [
