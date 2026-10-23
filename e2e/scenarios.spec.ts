@@ -868,7 +868,9 @@ test("C1 edge: a comparison's Group fit scores games for its least suited player
   const fit = row(page, 'Valheim').locator('span[title^="Alice "]');
   await expect(fit).toHaveText(/^\d+% · Alice$/);
   await expect(fit).toHaveAttribute('title', /· Bob: too few games played to tell$/);
-  await expect(page.locator('.list-score-note')).toHaveText('Group fit leaves out Bob: too few games played here');
+  // Said once, by Players (the status line says it where Players doesn't show).
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Bob')).toContainText('too few games played here for a profile');
 });
 
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
@@ -970,6 +972,16 @@ test('C7 edge: Suggest to starts on a player it can suggest to, not one without 
   const players = await openPlayers(page);
   await expect(players.getByLabel('Suggest to')).toHaveValue('1'); // Dave: Alice has too few games played
   await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
+});
+
+test('C7 edge: a player without a profile is said once, in Players, while it shows', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin');
+  await openPlayers(page);
+  await expect(page.locator('.list-players')).toContainText('too few games played here for a profile');
+  await expect(page.locator('.list-score-note')).toHaveCount(0);
+  // Intersect has no Players section: the status line says it.
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin&op=intersect');
+  await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
 });
 
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
