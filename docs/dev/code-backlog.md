@@ -2,7 +2,7 @@
 
 Code findings from `code-audit` runs, judged against CLAUDE.md's conventions and the docs each dimension names. Severity: **critical** (exploitable, or loses or corrupts data) · **major** · **minor** · **cleanup** (no behaviour change); effort S/M/L. Fix items with the `code-fix` skill; remove an item once it ships.
 
-Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-10 · perf 2026-10-10 · reliability 2026-10-10 · compliance 2026-10-10 · tests 2026-10-10 · docs 2026-10-12.
+Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-23 · perf 2026-10-10 · reliability 2026-10-10 · compliance 2026-10-10 · tests 2026-10-10 · docs 2026-10-12.
 
 - [Simplify](#simplify)
 - [Correctness](#correctness)
@@ -28,7 +28,14 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Security
 
-None open.
+- **C179 · major · M** — one anonymous IP can exhaust the shared outbound budgets (`chargeBudget`, `lib/metrics.js`) for every user: `achievementsLimit` (`server.js:410`) counts requests, but each `/api/achievements/:appid?steamids=` with fresh ids makes one uncached `GetPlayerAchievements` per id, so a few minutes at the per-IP cap use up `OUTBOUND_HOURLY_MAX`, after which every library load 502s until the window rolls; `/api/bundles/:id` with a new `country` and `/api/prices` with random gids do the same to ITAD. Charge each IP per uncached upstream call, or cap each IP's share of the budget.
+- **C180 · minor · S** — `openStreams` (`server.js:1084`) is keyed on the full `req.ip`, while express-rate-limit keys IPv6 on a /56: rotating addresses inside one /64 opens many more streams than `STREAM_MAX_PER_IP`, filling the shared store queue for everyone. Key it with express-rate-limit's ipKeyGenerator.
+- **C181 · minor · S** — no security headers: no CSP, `X-Content-Type-Options`, `frame-ancestors` or `Referrer-Policy`, and `X-Powered-By` is still sent (`server.js`), so any XSS through upstream text runs uncontained and any site can frame the app. Not checked whether the live site's proxy adds them. Set a strict CSP (`script-src 'self'`, Steam CDN images), `nosniff`, `frame-ancestors 'none'`, and disable `x-powered-by`.
+- **C182 · minor · S** — `GET /api/me` (`server.js:1249`) has no rate limit and `getSessionUser` parses the account's whole prefs (up to `PREFS_MAX_BYTES`) on every call: a signed-in client hammering it blocks the event loop. Put it behind a limiter; have auth read only the session row and load prefs only where returned.
+- **C183 · minor · S** — upstream URLs reach `href` without the http(s) check, so a `javascript:` value from Steam or ITAD would run on click: friends' `profileUrl` (`fetchAccountFriends`, `public/accountData.ts:279`, rendered at `public/AccountFriends.tsx:97`) and the bundle hero's ITAD and Fanatical links (`public/ListRoute.tsx:3385`, `public/ListRoute.tsx:3392`, `fanaticalBuyUrl`). The check exists twice already (`safeHref` in `public/panel.tsx`, `toAccountPlayer`'s `httpOnly`): move one to a shared module and use it at every site.
+- **C184 · minor · S** — the search dropdown interpolates `r.appid` unescaped into HTML set through `innerHTML` (`public/gameSearch.ts:76`), and `extractSearchResults` (`lib/steam.js`) copies Steam's `item.id` unchecked into the cache: a non-numeric id would inject markup for everyone typing that term. Keep only integer ids server-side and `esc()` it in the template.
+- **C185 · minor · S** — `compareOp` (`public/ListRoute.tsx:1251`) checks `?op=` with `in`, so `?op=constructor` passes, the comparison fails to resolve, and "Save as a list" stores (and syncs) a list that never resolves. Use `Object.hasOwn` as `public/listShare.ts:162` does, and validate `op` in `createList`.
+- **C186 · minor · S** — `takeSharedView` (`public/tableViewPrefs.ts:38`) hands any parsed `?tv=` JSON to `setViewState`: `?tv={"filters":{"name":5}}` throws, so `/bundles` fails to render and list routes lose view persistence for that visit. Check the shape and fall back to the stored view.
 
 ## Performance
 
@@ -39,6 +46,10 @@ None open.
 - **C168 · minor · S** — `pushPrefToServer` (`public/prefs.ts`) treats any response as success: a 429 (`authLimit`) or 413 (over the 2 MB cap) is neither logged nor retried until the next sign-in merge, so a pref change can silently stay local. Check `res.ok`, log with the `[prefs]` tag and re-schedule the key's push.
 - **C169 · minor · M** — `.githooks/pre-commit:10` sets aside only tracked unstaged edits; an untracked file the commit lacks (a new module) still lets the checks pass. Set untracked files aside too, per worktree (not `git stash -u`, shared across worktrees).
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
+- **C187 · major · S** — a signed-in browser whose storage can't be written reloads forever: `initAuth` (`public/authStore.ts:160`) reloads when `syncPrefsWithServer` adopted a server value, but `writeEntries` (`public/prefs.ts`) swallows the failed write and the prefs-synced flag never sticks, so every load re-adopts and reloads (storage full, see C188, or disabled). Reload only when the write stuck, or at most once per session, with an `[auth]` warning.
+- **C188 · major · M** — the Taste cache (`saveTaste`, `public/tagTaste.ts`) writes one key per account ever loaded, `?u=` visits included, and nothing prunes them; once storage is full, `writeEntries` silently drops every list and pref edit. Keep only the most recent few accounts, evict on a failed write, and surface a failed pref write. Unverified: how many libraries it takes to fill a browser's quota.
+- **C189 · minor · S** — `app.use(express.json())` (`server.js:206`) keeps the 100 KB default, so one synced key over it (a large `lists`) is refused with 413 on every push, well under the documented `PREFS_MAX_BYTES`. Give `PUT /api/me/prefs/:key` its own `express.json` limit sized to `PREFS_MAX_BYTES`.
+- **C190 · minor · M** — a shared `?f=` or compare link with many account sources fires all their `/api/common-games` calls at once (`resolveListWithSources`, `public/listResolve.ts:152`): past `SEARCH_RATE_LIMIT_MAX` they 429, the whole list fails, and the viewer's search budget is spent for a minute. Dedupe and cap sources at decode with a clear message, or resolve with bounded concurrency.
 
 ## Compliance
 
