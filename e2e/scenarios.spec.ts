@@ -953,6 +953,13 @@ test("C7 edge: each player's line names their own tags once, those everyone shar
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
 });
 
+test('C7 edge: Suggest to starts on a player it can suggest to, not one without a profile', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(players.getByLabel('Suggest to')).toHaveValue('1'); // Dave: Alice has too few games played
+  await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
+});
+
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
   await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
   await expect(rows(page)).toHaveCount(3);

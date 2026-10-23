@@ -40,7 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U211 · minor · C7** — **Suggest to** starts on a player without a profile when that's the first one ("too few games played here for a profile"), and counts the current account as "not me" when no ★ account is set, so in Alice vs. Dave vs. Erin as Alice it opens on Alice. Start on the first player with a profile who is neither my ★ nor the current account.
 - **U213 · polish · C7, C1** — **Players** is open by default on desktop and costs ~210 px every visit (the table starts at 638 of 900 px). Remember the viewer's open/closed choice (a per-viewer convenience).
 - **U214 · polish · C7** — a player without a profile is said twice: in **Players** and in the status line's "Group fit leaves out Alice". Drop the status note while Players says it.
 - **U207 · minor · C1, C5, C6** — a comparison's Players section says where tastes meet, not what everyone can run or play together. Add the group's hard constraints: worst ProtonDB tier, co-op modes, controller support.

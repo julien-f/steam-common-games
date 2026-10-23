@@ -3254,16 +3254,16 @@ export default function ListRoute() {
       return { players, ground: commonGround(rows, compared), compared };
     });
   });
-  // Defaults to the first player who isn't my account: suggesting to myself is what Taste fit does.
+  // Defaults to the first player with a profile who isn't me (my ★ or current account): suggesting
+  // to myself is what Taste fit does.
   const [suggestTarget, setSuggestTarget] = createSignal<number | null>(null);
   const suggestTo = () => {
     const chosen = suggestTarget();
     if (chosen != null) return chosen;
-    const mine = getMyAccount()?.id;
-    return Math.max(
-      0,
-      comparePlayers.findIndex((p) => p.id !== mine),
-    );
+    const me = [getMyAccount()?.id, getCurrentAccount()?.id];
+    const profiled = (i: number) => !!playerProfiles()?.players[i].tags.length;
+    const first = (ok: (i: number) => boolean) => comparePlayers.findIndex((p, i) => ok(i) && !me.includes(p.id));
+    return [first(profiled), first(() => true)].find((i) => i >= 0) ?? 0;
   };
   const suggestions = createMemo(() => {
     const profiles = playerProfiles();
