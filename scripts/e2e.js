@@ -12,17 +12,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { touchesUi } = require('./check');
+const { portOf } = require('./ports');
 
 const ROOT = path.join(__dirname, '..');
-// The main checkout serves on 28992; a worktree on its own port drawn from its path, so agents testing in
-// parallel worktrees don't collide (below Linux's ephemeral range, see playwright.config.ts). E2E_PORT overrides.
-function e2ePort(root = ROOT, env = process.env) {
-  if (env.E2E_PORT) return Number(env.E2E_PORT);
-  if (!fs.statSync(path.join(root, '.git'), { throwIfNoEntry: false })?.isFile()) return 28992;
-  return 28993 + (crypto.createHash('sha256').update(root).digest().readUInt16BE(0) % 2000);
-}
-
-const PORT = e2ePort();
+const PORT = portOf('e2e');
 const OUT_DIR = path.join(ROOT, 'node_modules/.cache/e2e-dist', String(PORT));
 const PASS_FILE = path.join(ROOT, 'node_modules/.cache/e2e-pass');
 
@@ -92,4 +85,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { isFullRun, e2ePort };
+module.exports = { isFullRun };
