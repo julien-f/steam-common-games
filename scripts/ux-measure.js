@@ -13,8 +13,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { portOf } = require('./ports');
 
-const BASE = 'http://localhost:58993'; // mock only: the real server needs demo-prefs.js first
+const BASE = `http://localhost:${portOf('mock')}`; // mock only: the real server needs demo-prefs.js first
 const SIZES = [
   [1440, 900],
   [390, 844],

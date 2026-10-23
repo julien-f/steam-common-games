@@ -1,13 +1,13 @@
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { e2ePort } from './scripts/e2e.js';
+import { portOf } from './scripts/ports.js';
 
 // End-to-end tests for docs/dev/journeys.md's journeys (`npm run test:e2e`). The app runs on
 // its own Vite server; every /api call is answered in the browser by e2e/mockApi.ts, so no
 // backend, database or upstream service is involved.
 // Below Linux's ephemeral range (32768–60999): the pre-commit hook runs this beside the unit tests,
 // whose servers and requests draw random ports from that range and could take a fixed one there.
-const PORT = e2ePort();
+const PORT = portOf('e2e');
 // A production build rather than the dev server: a page load fetches one bundle instead of every
 // module, which cuts the suite from about 30 s to 20 s.
 const OUT_DIR = path.join(__dirname, 'node_modules/.cache/e2e-dist', String(PORT));

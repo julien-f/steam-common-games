@@ -20,7 +20,7 @@
 
 ## Looking at the UI
 
-- **Mocked** (the default): `npm run dev:mock` (`:58993`) serves the app against the e2e fixtures — no backend or upstream traffic, and its own localStorage, so no demo-prefs seed/restore. The `mock` cookie switches on error and slow states (`e2e/mockApi.ts`).
+- **Mocked** (the default): `npm run dev:mock` (`:58993`; a worktree its own, `node scripts/ports.js mock`) serves the app against the e2e fixtures — no backend or upstream traffic, and its own localStorage, so no demo-prefs seed/restore. The `mock` cookie switches on error and slow states (`e2e/mockApi.ts`).
   - From an agent session, `node scripts/mock-server.js up|down` starts or reuses it in the background.
   - `node scripts/ux-measure.js [--fresh] [--state=…] /route…` writes a Playwright file measuring those routes at both widths.
 - **Real dev server**: only for real data or real loading times; `node scripts/dev-server.js up|down` runs it the same way. Its pages write the user's real prefs (every route but `/about`, `/game/:appid` included), so:
