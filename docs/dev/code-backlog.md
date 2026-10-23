@@ -30,6 +30,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C154 · minor · S** — the panel's ↻ Refresh does nothing on `/search`: `public/SearchRoute.tsx:252` registers no `refreshGame` (`public/AppShell.tsx:202` calls `routeHandlers.refreshGame?.`), so the spinner-less click is silently dropped. Register one that refetches `/api/game-details/:appid?refresh=1` and updates the shown result, sharing RankRoute's once its follow-up lands.
 - **C194 · minor · S** — a list stored or synced with an unknown combine op before `isCombineOp` existed still fails to resolve on every device: nothing checks `op` when lists are read back (`public/listsStore.ts`). Drop or repair such a list on load, with a `[lists]` warning.
 - **C195 · minor · S** — `fmtLastPlayed` (`public/utils.ts:289`) gives the UTC day while Released and the Taste fit date use `fmtLocalDate`'s local day: a game played at 20:00 in UTC-8 shows tomorrow's date. Use `fmtLocalDate`.
+- **C201 · minor · S** — the Demo column's filter list labels both values "Demo": the checklist formats the stringified raw value, and `format` (`public/gameColumns.ts:1145`) treats the truthy string `'false'` as a demo. Compare against `'true'` there, or give the column a `value` getter returning its label.
 
 ## Security
 
