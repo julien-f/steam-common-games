@@ -150,6 +150,18 @@ test('syncPrefsWithServer (first sync): marks this device as synced, so a later 
   assert.equal(global.localStorage.getItem(`steam.isonoe.net:prefs-synced:${STEAMID}`), '1');
 });
 
+test("syncPrefsWithServer (first sync): an adoption storage can't keep leaves the device unsynced, so its stale value can't later win", async (t) => {
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+  t.mock.method(console, 'warn', () => {});
+  const setItem = global.localStorage.setItem;
+  global.localStorage.setItem = (k, v) => {
+    if (k.includes('prefs-synced')) setItem(k, v);
+    else throw new Error('QuotaExceededError');
+  };
+  await auth().syncPrefsWithServer(STEAMID, { region: { value: 'GB', updatedAt: 500 } });
+  assert.equal(global.localStorage.getItem(`steam.isonoe.net:prefs-synced:${STEAMID}`), null);
+});
+
 // -- ongoing sync (this device has already synced with this account before) --
 
 test('syncPrefsWithServer (ongoing): local newer than server for the same key pushes, does not adopt', async (t) => {
