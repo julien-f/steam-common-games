@@ -185,6 +185,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 - Its compare/bucket primitives (`compareMissingLast`, `bucketNumericRange`, …) come from `@vates/data-table-core`, imported through `@vates/data-table-solid`'s re-exports — no direct `@vates/data-table-core` dependency.
 - Per-kind column objects (Tier Price/Add-on's render code, the wishlist and owned columns) stay local to `ListRoute.tsx`.
 - Most columns carry a `category` (`@vates/data-table-core` ≥ 0.13) — `Scores & Reviews`, `How Long To Beat`, `Play Time & Dates`, `Classification` (also Add-on), `Compatibility`, `Extras`, `Pricing` (`PRICE_COLUMNS` plus Tier Price) — so the Columns/Sort/Group/Filter menus collapse into per-category submenus. Identity (`capsule`/`name`) and Wishlist Rank stay uncategorized.
+- On a phone (≤ 768 px) the Name column stays pinned while the table scrolls sideways (`styles/vendor-data-table.css`, keyed on `data-col-key` and `.game-name-cell`).
 - The Image column shows `row.thumb` (the 231×87 capsule), falling back to `row.capsule` if it fails, then hiding; a row that starts from a search's tiny image keeps it until details stream in.
 - Prev/next ordering (`getGameList`) reads the table's `processedData()` accessor; nothing imports the unsupported `@vates/data-table-core/internal`.
 

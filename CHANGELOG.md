@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Home gathers your account, recent accounts, quick links and your lists, each list with one actions menu
 - Screen readers tell a game's tags, genres and categories apart, and their dots differ by shape
 - Plays mostly shows how much each tag weighs, and **Why these?** lists the played games behind it.
+- On a phone, a game table keeps each game's name in view while you scroll its columns sideways.
 
 ### Fixed
 
