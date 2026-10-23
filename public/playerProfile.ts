@@ -123,9 +123,6 @@ export const STYLE_SENTENCES: Record<PlayStyle, string> = {
   multiplayer: 'Mostly multiplayer games',
 };
 
-export const storySentence = ({ reached, fellShort }: StoryGames) =>
-  `Plays ${reached.length} of ${reached.length + fellShort.length} story games for as long as their main story`;
-
 export interface Archetype {
   name: string;
   icon: 'book-open' | 'compass' | 'handshake' | 'swords' | 'users';

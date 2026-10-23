@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { playStyleOf, playStyle, storyGames, storySentence } = require('../public/playerProfile.ts');
+const { playStyleOf, playStyle, storyGames } = require('../public/playerProfile.ts');
 
 const SOLO = ['Single-player'];
 const COOP = ['Multi-player', 'Co-op', 'Online Co-op'];
@@ -72,13 +72,6 @@ test('storyGames: endless, multiplayer, unknown-length and unplayed games are no
   ];
   const hours = hoursFrom({ 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10, 10: 10, 11: 0 });
   assert.equal(storyGames([...games, ...others], hours), null);
-});
-
-test('storySentence: says what hours can show, not that the story was finished', () => {
-  assert.equal(
-    storySentence({ reached: [1, 2, 3, 4, 5, 6, 7], fellShort: [8, 9] }),
-    'Plays 7 of 9 story games for as long as their main story',
-  );
 });
 
 test('archetypeOf: a title from the play style, story finishers among single-player profiles', () => {

@@ -603,17 +603,8 @@
     font-size: var(--fs-ui);
     font-style: italic;
   }
-  /* Owned's "Plays mostly" renders nothing until details have loaded: no empty gap meanwhile. */
   .list-hero-note:empty {
     display: none;
-  }
-  .list-plays-mostly {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--fs-label);
-    font-style: normal;
   }
   .list-plays-mostly-tag {
     position: relative;
@@ -635,10 +626,190 @@
     border-color: var(--accent);
     color: var(--accent);
   }
-  .list-profile-facts {
-    margin: 4px 0 0;
+  /* Owned's profile: the main card beside its tiles, stacked from 768 px down (PlayerProfile.tsx). */
+  .profile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .profile--tiles {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+  .profile-main,
+  .profile-tile {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+  .profile-tiles {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+  }
+  .profile-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .profile-title {
+    margin: 0;
+    color: var(--text);
+    font-size: var(--fs-title);
+    font-weight: 600;
+  }
+  .profile-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .profile-badge {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--kind-tag), color-mix(in oklch, var(--kind-tag), var(--bg) 45%));
+    color: var(--bg);
+    font-size: 22px;
+  }
+  .profile-badge--small {
+    width: 24px;
+    height: 24px;
+    font-size: var(--fs-body);
+  }
+  .profile-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
     font-size: var(--fs-label);
-    font-style: normal;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  /* Rows share their columns (subgrid), so every bar starts at the same x. */
+  .profile-bars {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 2px 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .profile-bars li {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+  .profile-bar {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    column-gap: 12px;
+    align-items: center;
+    min-height: 24px;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-1);
+    background: none;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--fs-meta);
+    text-align: left;
+    cursor: pointer;
+  }
+  .profile-bar:hover {
+    background: var(--line);
+  }
+  .profile-bar.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .profile-bar-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--line);
+  }
+  .profile-bar-track > span {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--kind-tag);
+  }
+  .profile-tile-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    color: var(--text);
+    font-size: var(--fs-meta);
+  }
+  .profile-ring {
+    flex: none;
+    width: 48px;
+    height: 48px;
+  }
+  .profile-ring circle {
+    fill: none;
+    stroke-width: 5;
+  }
+  .profile-ring-track {
+    stroke: var(--line-strong);
+  }
+  .profile-ring-arc {
+    stroke: var(--good);
+    stroke-linecap: round;
+  }
+  .profile-ring text {
+    fill: var(--text);
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+  .profile-figure {
+    color: var(--text);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  @media (max-width: 768px) {
+    .profile--tiles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    /* Phone: each tile one line, its label left to the ring and caption; the archetype says the style. */
+    .profile-tiles {
+      gap: 8px;
+    }
+    .profile-tile {
+      padding: 6px 10px;
+    }
+    .profile-tile > .profile-label,
+    .profile-label--bars,
+    .profile-style {
+      display: none;
+    }
+    .profile-tile-body {
+      flex-wrap: nowrap;
+    }
+    .profile-tile-body .btn {
+      margin-left: auto;
+    }
+    .profile-ring {
+      width: 36px;
+      height: 36px;
+    }
+    .profile-figure {
+      font-size: 22px;
+    }
+    /* 4 tags are enough to read on a phone; the rest is in Why these? */
+    .profile-bars li:nth-child(n + 5) {
+      display: none;
+    }
   }
   .list-players {
     margin-top: 8px;
@@ -695,23 +866,6 @@
   .list-players-switch {
     margin: 8px 0 0;
     font-size: var(--fs-label);
-  }
-  .list-profile-backlog {
-    min-height: 24px;
-    padding: 2px 4px;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  .list-profile-backlog[aria-pressed='true'] {
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .list-plays-mostly-count {
-    color: var(--muted);
   }
   .list-plays-mostly-why {
     min-height: 24px;

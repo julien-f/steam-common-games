@@ -638,11 +638,10 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   });
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
-  const note = page.locator('.list-plays-mostly');
-  const tags = note.locator('.list-plays-mostly-tag');
+  const note = page.locator('.profile');
   // Singleplayer: on fewer games, so rarer here than Action and Co-op.
-  await expect(tags).toHaveText(['Singleplayer', 'Action', 'Co-op']);
-  await expect(tags.first()).toHaveAttribute('title', /· the top tag$/);
+  await expect(note.locator('.profile-bar-name')).toHaveText(['Singleplayer', 'Action', 'Co-op']);
+  await expect(note.locator('.profile-bar').first()).toHaveAttribute('title', /· the top tag$/);
 
   const why = note.getByRole('button', { name: 'Why these?' });
   const breakdown = page.locator('#plays-mostly-breakdown');
@@ -653,11 +652,28 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await why.click();
   await expect(breakdown).toBeHidden();
 
-  const coop = note.getByRole('button', { name: 'Co-op' });
+  const coop = note.getByRole('button', { name: /^Co-op \d+%$/ });
   await coop.click();
   await expect(rows(page)).toHaveCount(4);
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
   await expect(coop).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('A5 edge: a profile too thin for an archetype or tiles shows neither, and no empty box', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on all 6 of Alice's games: enough for Plays mostly, not for a play style or story games.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/owned');
+  const profile = page.locator('.profile');
+  await expect(profile.getByRole('heading')).toHaveText('Plays mostly');
+  await expect(profile.locator('.profile-tile')).toHaveCount(0);
+  await expect(profile).not.toHaveClass(/profile--tiles/);
 });
 
 test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
@@ -666,14 +682,15 @@ test('A5.1-3: Plays mostly says what it is built from, leaving software out, and
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const note = page.locator('.list-plays-mostly');
+  const note = page.locator('.profile');
   // 15 played, minus Wallpaper Engine's 3000 h.
   await expect(note).toContainText('from 14 played games');
-  await expect(note.locator('.list-plays-mostly-tag')).not.toContainText(['Utilities']);
+  await expect(note.locator('.profile-bar-name')).not.toContainText(['Utilities']);
+  await expect(note.getByRole('heading')).toHaveText('Story finisher');
   // Sekiro and Hogwarts Legacy fell short; Dead Cells and Slay the Spire are endless.
-  await expect(page.locator('.list-profile-facts')).toContainText(
-    'Mostly single-player games · Plays 7 of 9 story games for as long as their main story · ',
-  );
+  await expect(
+    note.getByRole('img', { name: "7 of 9 story games played for their main story's length" }),
+  ).toBeVisible();
   await note.getByRole('button', { name: 'Why these?' }).click();
   await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
 });
@@ -682,7 +699,7 @@ test('A5.4: the barely-played count opens Play next, best Taste fit first, on a 
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const backlog = page.getByRole('button', { name: '4 games played 2 h or less' }); // a preorder included
+  const backlog = page.getByRole('button', { name: 'Play next: 4 games played 2 h or less' }); // a preorder included
   await backlog.click();
   await expect(page).toHaveURL(/view=/);
   await expect(
@@ -725,7 +742,7 @@ test('A5 edge: what to play next counts a preorder, which its Released date show
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  await page.getByRole('button', { name: '4 games played 2 h or less' }).click();
+  await page.getByRole('button', { name: 'Play next: 4 games played 2 h or less' }).click();
   await expect(rows(page)).toHaveCount(4); // a saved view can't hold "released by today"
   await expect(row(page, 'Someday Saga')).toHaveCount(1);
   await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
@@ -735,9 +752,10 @@ test('A5 edge: an account with no playtime at all says why it has no profile', a
   await asPlayer(page, BOB);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(BOB.owned.length);
-  await expect(page.locator('.list-plays-mostly')).toHaveText(
+  await expect(page.locator('.list-hero-note')).toHaveText(
     "No playtime to profile: it's private, or nothing was played yet.",
   );
+  await expect(page.locator('.profile')).toHaveCount(0);
 });
 
 test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {
@@ -756,7 +774,7 @@ test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned 
   await expect(note).toHaveText("Taste fit needs Alice's Owned list opened on this device");
 
   await page.goto('/lists/owned');
-  await expect(page.locator('.list-plays-mostly')).toBeVisible();
+  await expect(page.locator('.profile')).toBeVisible();
   await page.goto('/lists/wishlist');
   await expect(note).toHaveText(/^Taste fit: Alice's taste as of \d{4}-\d{2}-\d{2}$/);
   await expect(

@@ -77,7 +77,8 @@ import {
   type Taste,
 } from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
-import { playStyle, storyGames, storySentence, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
+import { archetypeOf, playStyle, storyGames, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
+import { OwnedProfile } from './PlayerProfile.tsx';
 import {
   fmt,
   insertColumnsAfter,
@@ -3252,7 +3253,8 @@ export default function ListRoute() {
       return `The last ${MAX_RECENT_GAMES} games you looked up in this browser — local search history, never sent anywhere.`;
     const list = combineList();
     if (list?.kind === 'dynamic' || list?.kind === 'ranked') return formulaNote(list);
-    if (kind === 'owned') return playsMostlyNote();
+    if (kind === 'owned')
+      return playtimeHidden() ? "No playtime to profile: it's private, or nothing was played yet." : undefined;
     if (kind === 'creator') return creatorNote();
     return undefined;
   }
@@ -3526,12 +3528,6 @@ export default function ListRoute() {
       : 0,
   );
   const backlogShown = () => activeView()?.template === PLAY_NEXT;
-  // The facts line's sentences, leading into the backlog button when it follows.
-  const factSentences = () => {
-    const { style, story } = profileFacts();
-    const sentences = [style && STYLE_SENTENCES[style], story && storySentence(story)].filter((s) => !!s);
-    return sentences.join(' · ') + (sentences.length && unplayed() ? ' · ' : '');
-  };
   // Opens the Play next view (created the first time), or back to All games when it's open.
   function showBacklog(): void {
     if (backlogShown()) return navigate(viewHref(routerLocation, null));
@@ -3547,63 +3543,31 @@ export default function ListRoute() {
   }
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
-  function playsMostlyNote(): JSX.Element {
+  // A Family's profile mixes its members: no archetype titles it.
+  const archetype = createMemo(() =>
+    archetypeOf(profileFacts().style, profileFacts().story, {
+      family: (untrack(getEffectiveCurrentAccount)?.members.length ?? 0) > 1,
+    }),
+  );
+  function ownedProfileSection(): JSX.Element {
     const pct = (weight: number) => `${Math.round(weight * 100)}%`;
     return (
       <>
-        <Show
-          when={playsMostly().length}
-          fallback={
-            <Show when={playtimeHidden()}>
-              <div class="list-plays-mostly">No playtime to profile: it's private, or nothing was played yet.</div>
-            </Show>
-          }
-        >
-          <div class="list-plays-mostly">
-            Plays mostly:{' '}
-            <For each={playsMostly()}>
-              {({ tag, weight }, i) => (
-                <button
-                  type="button"
-                  class="list-plays-mostly-tag"
-                  classList={{ active: tableReady() && isTagActive('tags', tag) }}
-                  aria-pressed={tableReady() && isTagActive('tags', tag)}
-                  title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
-                  onClick={() => onTagClick('tags', tag)}
-                >
-                  {tag}
-                  <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
-                </button>
-              )}
-            </For>
-            <span class="list-plays-mostly-count">from {playsMostlyProfile().played} played games</span>
-            <button
-              type="button"
-              class="list-plays-mostly-why"
-              aria-expanded={playsMostlyWhy()}
-              aria-controls="plays-mostly-breakdown"
-              onClick={() => setPlaysMostlyWhy((open) => !open)}
-            >
-              Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
-            </button>
-          </div>
-        </Show>
-        <Show when={profileFacts().style || profileFacts().story || unplayed()}>
-          <p class="list-profile-facts">
-            {factSentences()}
-            <Show when={unplayed()}>
-              <button
-                type="button"
-                class="list-profile-backlog"
-                aria-pressed={backlogShown()}
-                title="Open Play next: these games, best Taste fit first"
-                onClick={showBacklog}
-              >
-                {unplayed()} {unplayed() === 1 ? 'game' : 'games'} played {PLAY_NEXT_MAX_HOURS} h or less
-              </button>
-            </Show>
-          </p>
-        </Show>
+        <OwnedProfile
+          archetype={archetype()}
+          tags={playsMostly()}
+          played={playsMostlyProfile().played}
+          styleSentence={profileFacts().style ? STYLE_SENTENCES[profileFacts().style!] : null}
+          story={profileFacts().story}
+          unplayed={unplayed()}
+          playNextHours={PLAY_NEXT_MAX_HOURS}
+          backlogShown={backlogShown()}
+          whyOpen={playsMostlyWhy()}
+          isTagActive={(tag) => tableReady() && isTagActive('tags', tag)}
+          onTag={(tag) => onTagClick('tags', tag)}
+          onBacklog={showBacklog}
+          onWhy={() => setPlaysMostlyWhy((open) => !open)}
+        />
         <Show when={playsMostly().length}>
           <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
             <p>
@@ -4065,7 +4029,7 @@ export default function ListRoute() {
           actions={heroActions}
           tiles={heroTiles()}
           note={heroNote()}
-          section={playersSection()}
+          section={kind === 'owned' ? ownedProfileSection() : playersSection()}
         />
       </Show>
       <Show when={viewKind}>{(k) => <ViewTabs kind={k()} activeId={activeView()?.id ?? null} />}</Show>

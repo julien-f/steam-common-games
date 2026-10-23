@@ -78,7 +78,7 @@ Tests map to journeys by title: `A1: â€¦` covers A1's built steps, `A1.1,3-4: â€
   3. read the profile line: solo, co-op or PvP; whether story games are played through
   4. click the count of games played 2 h or less: it opens Owned's **Play next** view (L5), best Taste fit first
 - **Done when**: every figure says what it's counted from, and stays silent rather than guessing below its threshold; software (Wallpaper Engine) counts toward none of it.
-- **Edges**: private playtime (no profile, and it says so); fewer than 5 played games; a Family, whose profile mixes its members.
+- **Edges**: private playtime (no profile, and it says so); fewer than 5 played games; a profile too thin for an archetype or tiles (no empty box); a Family, whose profile mixes its members (no archetype).
 
 ## Comparing libraries
 
