@@ -2080,6 +2080,24 @@ test('B1 edge: stepping onto the last bundle keeps focus on › Next bundle, mar
   await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
 });
 
+test("B1 edge: a failed ‹/› step doesn't pull focus back to it on a later load", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route(`**/api/bundles/${PICK_BUNDLE.id}*`, (route) =>
+    route.fulfill({ status: 502, json: { error: 'ITAD is down' } }),
+  );
+  await page.goto('/bundles');
+  await page.getByRole('cell', { name: BUNDLE.title }).click();
+  const hero = page.getByRole('heading', { level: 1, name: BUNDLE.title });
+  await expect(hero).toBeVisible();
+  const next = page.getByRole('button', { name: 'Next bundle' });
+  await next.focus();
+  await next.press('Enter');
+  await expect(page.getByRole('main')).toContainText('ITAD is down');
+  await page.goBack();
+  await expect(hero).toBeVisible();
+  await expect(next).not.toBeFocused();
+});
+
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
   await mockApi(page, { states: ['untiered'] });
   await asPlayer(page, ALICE);

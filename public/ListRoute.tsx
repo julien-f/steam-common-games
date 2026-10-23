@@ -2030,7 +2030,21 @@ export default function ListRoute() {
     );
   }
 
-  async function load({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
+  // Disarms the ‹/› focus hand-back for a load stepBundle didn't start, and for one ending with no
+  // title, else a later load (Back) would pull focus to the button.
+  async function load(opts: { refresh?: boolean } = {}): Promise<void> {
+    if (opts.refresh || bundleStepFocus?.id !== Number(params.bundleId)) bundleStepFocus = undefined;
+    const step = bundleStepFocus;
+    const run = loadList(opts);
+    const gen = loadGuard.current(); // loadList takes its generation before its first await
+    try {
+      await run;
+    } finally {
+      if (bundleStepFocus === step && !heroTitle() && !loadGuard.isStale(gen)) bundleStepFocus = undefined;
+    }
+  }
+
+  async function loadList({ refresh = false }: { refresh?: boolean } = {}): Promise<void> {
     if (kind === 'recent' && hasLoadedOnce) {
       // Guarded by "is this appid already the open panel's game" — openGame() above navigates
       // here too (to keep the address bar in sync with a row click/prev-next/random pick made
@@ -3242,23 +3256,24 @@ export default function ListRoute() {
     );
   }
 
-  // Built once per mount, not per render: `kind` never changes under a mounted route, and every
-  // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
-  // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
-  // ListHero renders no action row for them instead of an empty one.
   // A step reloads the hero (load() clears heroTitle), so the pressed ‹/› gets focus back once it's
   // back on screen, unless focus went elsewhere in the meantime.
-  let bundleStepFocus: HTMLElement | undefined;
+  let bundleStepFocus: { btn: HTMLElement; id: number } | undefined;
   function stepBundle(id: number | null, btn: HTMLElement): void {
     if (id == null) return;
-    bundleStepFocus = btn;
+    bundleStepFocus = { btn, id };
     navigate(withAccountParam(`/lists/bundle/${id}`));
   }
   createEffect(() => {
     if (!heroTitle() || !bundleStepFocus) return;
-    if (document.activeElement === document.body) bundleStepFocus.focus();
+    if (document.activeElement === document.body) bundleStepFocus.btn.focus();
     bundleStepFocus = undefined;
   });
+
+  // Built once per mount, not per render: `kind` never changes under a mounted route, and every
+  // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
+  // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
+  // ListHero renders no action row for them instead of an empty one.
   const heroLead: JSX.Element | undefined =
     kind !== 'bundle' ? undefined : (
       <div class="list-hero-nav">
