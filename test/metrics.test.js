@@ -1,5 +1,6 @@
 'use strict';
 
+process.env.DB_FILE = ''; // _reset() empties metrics_daily: never the real db.sqlite
 const { test } = require('node:test');
 process.env.OUTBOUND_HOURLY_MAX = '5';
 process.env.OUTBOUND_DAILY_MAX = '50';
@@ -12,6 +13,7 @@ const {
   getMetrics,
   _reset,
 } = require('../lib/metrics');
+const { db } = require('../lib/db');
 
 test.beforeEach(() => _reset());
 
@@ -374,4 +376,38 @@ test('trackedFetch: refuses calls past the daily budget until the day rolls over
   t.mock.timers.setTime(24 * 60 * 60 * 1000);
   await createTrackedFetch('grp')('label', 'u');
   assert.equal(getMetrics().budgets.grp.dayUsed, 1);
+});
+
+test('getMetrics: daily counts each status, and network failures, per UTC day, group and label', async (t) => {
+  let fail = false;
+  t.mock.method(globalThis, 'fetch', async () => {
+    if (fail) throw new TypeError('fetch failed');
+    return { ok: true, status: 200 };
+  });
+  const call = createTrackedFetch('grp');
+  await call('getA', 'https://example.com/');
+  await call('getA', 'https://example.com/');
+  fail = true;
+  await assert.rejects(() => call('getA', 'https://example.com/'));
+  const day = new Date().toISOString().slice(0, 10);
+  assert.deepEqual(
+    getMetrics().daily.map((r) => ({ ...r })),
+    [
+      { day, group: 'grp', label: 'getA', status: '200', count: 2 },
+      { day, group: 'grp', label: 'getA', status: 'network', count: 1 },
+    ],
+  );
+});
+
+test('getMetrics: daily drops days older than 30 at the first call of a day', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, status: 200 }));
+  const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const insert = db.prepare("INSERT INTO metrics_daily VALUES (?, 'grp', 'getA', '302', 1)");
+  insert.run(daysAgo(31));
+  insert.run(daysAgo(29));
+  await createTrackedFetch('grp')('getA', 'https://example.com/');
+  assert.deepEqual(
+    getMetrics().daily.map((r) => r.day),
+    [daysAgo(29), daysAgo(0)],
+  );
 });

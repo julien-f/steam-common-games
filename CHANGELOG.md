@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game's panel links to its developers' and publishers' games on Steam, each opening as a list
 - A developer's or publisher's list shows which of its games you don't own, and can be saved as a list
 - `GET /api/health` says which version and commit the server runs, and since when
+- `GET /api/metrics` keeps 30 days of outbound status counts per day, across restarts, to date when an upstream started failing
 
 ### Changed
 

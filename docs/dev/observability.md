@@ -4,7 +4,7 @@ Outbound-request metrics, budgets, and the warnings the app logs on its own. Cac
 
 ## GET /api/metrics
 
-No auth, same trust level as `GET /api/health`. In memory, reset on restart (except `cacheEntries`); no history beyond the trailing hour.
+No auth, same trust level as `GET /api/health`. In memory, reset on restart, except `cacheEntries` and `daily`, the only history beyond the trailing hour.
 
 ```
 { since,
@@ -16,10 +16,11 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
   budgets:         { [group]: { hourUsed, hourMax, hourTopClient, dayUsed, dayMax, dayTopClient } },
   circuitBreakers: { 'steam-store' | hltb | protondb: { blockedUntil, tripCount, consecutive403s } },
   semaphores:      { store | tag | proton | reviews | hltb | 'itad-info': { active, queued, maxQueueSeen, rejected } },
-  cacheEntries:    { [group]: count } }
+  cacheEntries:    { [group]: count },
+  daily:           [{ day, group, label, status, count }] }
 ```
 
-- **Windows**: every windowed signal nests under `sinceRestart`/`lastHour`, always the outermost keys; nothing nests a window of its own. Live snapshots (`budgets`, `circuitBreakers`, `semaphores`, `cacheEntries`) sit outside both. A name with no events yet is absent rather than zeroed.
+- **Windows**: every windowed signal nests under `sinceRestart`/`lastHour`, always the outermost keys; nothing nests a window of its own. Live snapshots (`budgets`, `circuitBreakers`, `semaphores`, `cacheEntries`) and the persisted `daily` sit outside both. A name with no events yet is absent rather than zeroed.
 
 ### Outbound — `groups`
 
@@ -39,6 +40,12 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart (exc
 - `dedupHits`: concurrent calls `createDedup(name)` (`lib/dedup.js`) coalesced into one in flight — `steam`, `itad`, `fanatical`. A burst points at a retry loop or a polling client.
 - `cacheHits`: `getCached()` outcomes per `lib/cache.js` `GROUPS` label (`library`, `resolve`, `rating`, `meta`, `search`, `news`, `bundles`, `itad-ids`). `forced` (a user's ↻) is kept apart from `misses`. A rate limiter's cache check doesn't record, so each request counts once. Tells "traffic grew" apart from "the cache stopped working" when outbound counts jump.
 - `cacheEntries`: row count per group, read from `db.sqlite` (survives restarts, lists every group). With `cacheHits`: few entries plus many misses means a TTL too short; many entries plus many misses, a key space the cache can't help.
+
+### Daily — `daily`
+
+- Outbound status counts per UTC day, group and label, kept in `db.sqlite` (`metrics_daily`) for 30 days: dates when an upstream's answers changed (a 200 turning into 302s or 429s), across restarts. `status` is the HTTP status as text, or `network` for a `networkErrors` call.
+- Written on every outbound call, as part of `trackedFetch`; a failed write warns `[metrics]` and never fails the call. Days past 30 are deleted on the first call of each day.
+- Labels are published and kept for a month, so they stay function names, never built from a request.
 
 ### Live snapshots
 
@@ -74,5 +81,5 @@ All are `console.warn`: degraded but recoverable. An error marked `isCircuitOpen
 Deliberately not done:
 
 - Log warnings for cache hit-rate collapse or latency trends: no single event to hang them on; read `GET /api/metrics` instead.
-- Several time windows (5 min, day, week): one hour answers "is it happening now", `sinceRestart` the rest.
+- More in-memory windows (5 min, week): one hour answers "is it happening now", `sinceRestart` and `daily` the rest.
 - A per-group total under `groups`: sum the labels client-side.
