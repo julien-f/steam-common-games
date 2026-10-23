@@ -2726,6 +2726,22 @@ test("PUT /api/me/prefs/:key: 413 once the account's prefs would pass PREFS_MAX_
     .expect(200);
 });
 
+test('PUT /api/me/prefs/:key: PREFS_MAX_BYTES counts UTF-8 bytes, not characters', async (t) => {
+  const steamid = '76561198000000214';
+  const agent = await loginAs(t, steamid);
+  // 3 bytes a character: the cap in bytes, a third of it in characters.
+  setUserPref(steamid, 'lists', '€'.repeat(PREFS_MAX_BYTES / 3), 1000);
+  await agent
+    .put('/api/me/prefs/region')
+    .send({ value: 'x'.repeat(1000), updatedAt: 1000 })
+    .expect(413);
+  // A multibyte value within the cap in bytes still fits on its own.
+  await agent
+    .put('/api/me/prefs/lists')
+    .send({ value: '€'.repeat((PREFS_MAX_BYTES - 100) / 3), updatedAt: 2000 })
+    .expect(200);
+});
+
 test('PUT /api/me/prefs/:key: accepts one key larger than the default JSON body limit, up to PREFS_MAX_BYTES', async (t) => {
   const steamid = '76561198000000213';
   const agent = await loginAs(t, steamid);
