@@ -3675,6 +3675,18 @@ test("F2 edge: /search, About and the 404 page title themselves with the list ro
   }
 });
 
+test('F2 edge: on /search, ↓ moves from the box into the results, and an opened result keeps its row focused', async ({
+  page,
+}) => {
+  await page.goto('/search?q=hades');
+  await expect(rows(page)).toHaveCount(1);
+  await page.getByPlaceholder('Search for a game…').press('ArrowDown');
+  await expect(rows(page).first()).toBeFocused();
+  await rows(page).first().press('Enter');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(rows(page).first()).toBeFocused();
+});
+
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
   await page.route('**/api/search-games?q=portal*', (route) =>
     route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
