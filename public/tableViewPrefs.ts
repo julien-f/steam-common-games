@@ -47,7 +47,7 @@ function takeSharedView(): TableViewState | null {
   } catch {
     return null; // malformed — fall back to the stored default
   }
-  return isTableViewState(view) ? view : null; // setViewState throws on a wrong shape
+  return isTableViewState(view) ? view : null; // setViewState throws on a wrong shape: https://github.com/vatesfr/data-table/issues/44
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
