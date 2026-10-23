@@ -197,6 +197,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     key: 'games',
     label: 'Games',
     type: 'number',
+    align: 'end',
     groupable: true,
     format: fmt.num,
     defaultSortDir: 'desc',
@@ -212,6 +213,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     key: 'price',
     label: 'Cheapest Tier',
     type: 'number',
+    align: 'end',
     groupable: true,
     // Sorted, filtered and bucketed in the region's currency (currency.ts's approximate rates):
     // some shops only price in USD, and "$6 < €10" is not an order. Shown in the shop's own.
@@ -228,7 +230,7 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
     compare: compareNumMissingLast,
     ...priceTierGroup(() => regionCurrency(), 'Varies'),
   },
-  { key: 'tierCount', label: 'Tiers', type: 'number', groupable: true, format: fmt.num },
+  { key: 'tierCount', label: 'Tiers', type: 'number', align: 'end', groupable: true, format: fmt.num },
   // Published before Ends — a bundle's own life order, and the default sort's column sits next to
   // the ones it's read against rather than at the far end of the row.
   {

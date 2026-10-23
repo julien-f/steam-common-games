@@ -2022,6 +2022,15 @@ test("B1 edge: on a phone, every game's name stays in view while the table scrol
   }
 });
 
+test('B1 edge: figures line up: number columns align to the end, text to the start', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/bundle/90002');
+  await expect(rows(page)).toHaveCount(5);
+  for (const key of ['tierPrice', 'bestDealCut', 'steamdbRating'])
+    await expect(page.locator(`.dt-td[data-col-key="${key}"]`).first()).toHaveCSS('text-align', 'end');
+  await expect(page.locator('.dt-td[data-col-key="name"]').first()).not.toHaveCSS('text-align', 'end');
+});
+
 test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/bundles');
