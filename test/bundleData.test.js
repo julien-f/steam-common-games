@@ -134,6 +134,18 @@ test('fetchBundleById: no country param when omitted', async (t) => {
   assert.equal(seenUrl, '/api/bundles/1');
 });
 
+test("fetchBundleById: a non-http(s) ITAD link becomes null, so the hero can't render it as an href", async (t) => {
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({
+      bundle: { id: 1, url: 'javascript:alert(1)', details: 'https://isthereanydeal.com/bundles/1/' },
+    }),
+  }));
+  const { bundle } = await fetchBundleById(1);
+  assert.equal(bundle.url, null);
+  assert.equal(bundle.details, 'https://isthereanydeal.com/bundles/1/');
+});
+
 test('fetchBundleById: throws with the server error message on a non-2xx response', async (t) => {
   withFetch(t, async () => ({ ok: false, json: async () => ({ error: 'not found' }) }));
   await assert.rejects(() => fetchBundleById(999), /not found/);

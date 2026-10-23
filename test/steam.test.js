@@ -1553,6 +1553,21 @@ test('searchStoreGames: returns empty array when items field is missing', async 
   assert.deepEqual(await searchStoreGames('xyz'), []);
 });
 
+test('searchStoreGames: drops an item whose id is not a positive integer, so it never reaches the cache', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({
+      items: [
+        { id: '"><img src=x onerror=alert(1)>', name: 'Bad' },
+        { id: null, name: 'Null' },
+        { id: 400, name: 'Portal' },
+      ],
+    }),
+  }));
+  assert.deepEqual(await searchStoreGames('portal'), [{ appid: 400, name: 'Portal', tinyImage: null }]);
+});
+
 test('searchStoreGames: tinyImage is null when absent', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async () => ({

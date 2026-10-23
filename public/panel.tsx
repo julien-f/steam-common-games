@@ -13,6 +13,7 @@ import {
   PROTON_TIER_UNKNOWN,
   focusGameRow,
   fadeInOnLoad,
+  safeHref,
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
@@ -190,16 +191,6 @@ function panelShuffle(arr: { appid: number }[]) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
-}
-
-// Rejects anything but a plain http(s) URL — the same guard the now-deleted accountsBar.ts/
-// app.tsx used to apply to profile URLs. JSX text/attribute interpolation escapes on its own, so this guard is the
-// one XSS-relevant check still needed: a developer-supplied `meta.website` or a news item's
-// `url` (both flow through unfiltered from Steam's own APIs — see lib/steam.js) could
-// otherwise be a `javascript:`/`data:` URI that runs script when clicked instead of
-// navigating away. Returns '' for anything unsafe.
-function safeHref(url: string | null | undefined) {
-  return /^https?:\/\//i.test(url || '') ? url : '';
 }
 
 const randomQueues = new Map<string, { appid: number }[]>(); // queueKey → remaining shuffled games

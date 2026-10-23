@@ -52,6 +52,12 @@ test('gameSearchResultHtml: escapes the name and marks the active result', () =>
   assert.ok(html.includes('aria-selected="true"'));
 });
 
+test('gameSearchResultHtml: escapes the appid too (a cached result from upstream, typed only by convention)', () => {
+  const html = gameSearchResultHtml({ appid: '"><img src=x>', name: 'X' }, false);
+  assert.ok(!html.includes('<img'));
+  assert.ok(html.includes('data-appid="&quot;&gt;&lt;img src=x&gt;"'));
+});
+
 test('gameSearchResultHtml: renders a placeholder thumb when tinyImage is absent', () => {
   const html = gameSearchResultHtml({ appid: 620, name: 'Portal 2' }, false);
   assert.ok(html.includes('game-search-thumb--empty'));
