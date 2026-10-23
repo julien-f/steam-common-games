@@ -217,9 +217,8 @@ app.use((req, _res, next) => {
 const prefsRouter = express.Router();
 app.use('/api/me/prefs', prefsRouter);
 app.use(express.json());
-// Charges each request's outbound calls to its client's share (lib/metrics.js's chargeBudget); the prefs routes above make none.
-// After the body parser, so the context never depends on which async resource its stream callbacks
-// run in. Skipped with the limiters, so the suite's requests, all from one address, share no share.
+// Charges a request's outbound calls to its client's share (chargeBudget); after the body parser, whose stream
+// callbacks needn't keep the context. The prefs routes above make none; tests bypassing the limiters skip it.
 app.use((req, _res, next) => (rateLimitBypassed() ? next() : runAsClient(clientKey(req), next)));
 
 // Serves the real Vite production build (`npm run build`) once one exists, and falls back to
