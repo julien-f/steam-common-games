@@ -640,6 +640,20 @@
     font-size: var(--fs-label);
     font-style: normal;
   }
+  .list-profile-backlog {
+    min-height: 24px;
+    padding: 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .list-profile-backlog[aria-pressed='true'] {
+    text-decoration: none;
+    font-weight: 600;
+  }
   .list-plays-mostly-count {
     color: var(--muted);
   }

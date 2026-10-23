@@ -3259,6 +3259,26 @@ export default function ListRoute() {
     const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
     return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
   });
+  const unplayed = createMemo(() =>
+    loadFraction() == null && !playtimeHidden() ? tableData().filter((g) => !g.playtime).length : 0,
+  );
+  const backlogShown = () => {
+    const t = filterTable();
+    return tableReady() && !!t && t.filter.ranges().playtime?.max === '0' && t.sort.entries()[0]?.key === TASTE_FIT_KEY;
+  };
+  // The facts line's sentences, leading into the backlog button when it follows.
+  const factSentences = () => {
+    const { style, story } = profileFacts();
+    const sentences = [style && STYLE_SENTENCES[style], story && storySentence(story)].filter((s) => !!s);
+    return sentences.join(' · ') + (sentences.length && unplayed() ? ' · ' : '');
+  };
+  // What to play next: the never-launched games, closest to the account's taste first.
+  function showBacklog(): void {
+    const t = filterTable();
+    if (!t) return;
+    t.filter.setRange('playtime', 'max', '0');
+    syncLeadColumn(t, TASTE_FIT_KEY, true);
+  }
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
@@ -3303,14 +3323,20 @@ export default function ListRoute() {
             </button>
           </div>
         </Show>
-        <Show when={profileFacts().style || profileFacts().story}>
+        <Show when={profileFacts().style || profileFacts().story || unplayed()}>
           <p class="list-profile-facts">
-            {[
-              profileFacts().style && STYLE_SENTENCES[profileFacts().style!],
-              profileFacts().story && storySentence(profileFacts().story!),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            {factSentences()}
+            <Show when={unplayed()}>
+              <button
+                type="button"
+                class="list-profile-backlog"
+                aria-pressed={backlogShown()}
+                title="List them, best Taste fit first"
+                onClick={showBacklog}
+              >
+                {unplayed()} {unplayed() === 1 ? 'game shows' : 'games show'} no playtime
+              </button>
+            </Show>
           </p>
         </Show>
         <Show when={playsMostly().length}>

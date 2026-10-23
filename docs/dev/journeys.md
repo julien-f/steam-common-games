@@ -76,7 +76,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. Owned (mine, or a friend's via A2 or a `?u=` link)
   2. read Plays mostly and how many played games it's built from
   3. read the profile line: solo, co-op or PvP; whether story games are played through
-  4. click the backlog count to list the paid games with no playtime, best Taste fit first ◇
+  4. click the no-playtime count to list those games, best Taste fit first
 - **Done when**: every figure says what it's counted from, and stays silent rather than guessing below its threshold; software (Wallpaper Engine) counts toward none of it.
 - **Edges**: private playtime (no profile, and it says so); fewer than 5 played games; a Family, whose profile mixes its members.
 

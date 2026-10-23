@@ -36,7 +36,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 ## Taste profile
 
 - **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
-- **U206 · minor · F3** — "what should I play next" from Owned takes a filter and a sort by hand. A **Play next** preset: never played, sorted by Taste fit.
 
 ## Comparing
 
