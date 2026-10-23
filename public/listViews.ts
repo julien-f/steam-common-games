@@ -62,8 +62,8 @@ export function deleteListView(kind: ViewKind, id: string): void {
 // Play next's bound, shared with Owned's profile-line count that opens it.
 export const PLAY_NEXT_MAX_HOURS = 2;
 
-// Suggested views, stamped into a SavedView at creation. `cols` are its visible columns in display order:
-// no price column without `needsPrices`, and never the list's default set (either reads back as unsaved Columns).
+// Suggested views, stamped into a SavedView at creation; `cols` are its visible columns in display order. No price
+// column without `needsPrices`, nor a sort or column set equal to the list's default: either reads back as unsaved.
 export interface ViewTemplate {
   id: string;
   kind: ViewKind;
@@ -94,6 +94,20 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
       sorts: [{ key: 'tasteFit', dir: 'desc' }],
     },
     cols: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres'],
+  },
+  {
+    id: 'short-games',
+    kind: 'owned',
+    name: 'Short games',
+    view: {
+      rangeFilters: {
+        playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) },
+        // The range filter reads a missing length as 0: the lower bound keeps out games with no HLTB entry.
+        hltbMain: { min: '0.1', max: '5' },
+      },
+      // No sort: Owned's default, best rated first.
+    },
+    cols: ['capsule', 'name', 'hltbMain', 'steamdbRating', 'tasteFit', 'playtime', 'genres'],
   },
   {
     id: 'bargains',

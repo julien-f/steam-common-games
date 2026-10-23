@@ -93,10 +93,10 @@ test('Bargains filters on the 1-year and all-time record tiers', () => {
 test('suggestedTemplates: per kind, minus created ones (even renamed), priced ones only with prices', () => {
   const { suggestedTemplates, createFromTemplate, renameListView } = views();
   const ids = (kind, priced) => suggestedTemplates(kind, priced).map((t) => t.id);
-  assert.deepEqual(ids('owned', true), ['recently-played', 'play-next']);
+  assert.deepEqual(ids('owned', true), ['recently-played', 'play-next', 'short-games']);
   assert.deepEqual(ids('wishlist', true), ['bargains']);
   assert.deepEqual(ids('wishlist', false), []);
   const v = createFromTemplate(suggestedTemplates('owned', true)[0]);
   renameListView('owned', v.id, 'Lately');
-  assert.deepEqual(ids('owned', true), ['play-next']);
+  assert.deepEqual(ids('owned', true), ['play-next', 'short-games']);
 });
