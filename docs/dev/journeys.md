@@ -40,11 +40,11 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: I want to peek at a friend's wishlist, then return to mine.
 - **Steps**:
   1. nav chip
-  2. pick a recent account (or resolve a new one on Home)
+  2. pick a known account (or resolve a new one on Home)
   3. **Wishlist**
   4. switch back to my account from the chip
-- **Done when**: my ★ account is unchanged; the friend lands in Recent accounts; open lists re-load in place on switch.
-- **Edges**: removing a recent account that a dynamic list still uses (soft-remove, list keeps working).
+- **Done when**: my ★ account is unchanged; the friend lands in Home's Accounts; open lists re-load in place on switch.
+- **Edges**: removing an account that a dynamic list still uses (soft-remove, list keeps working); many accounts (filter by name); removing on touch (Edit/Done).
 
 ### A3 Treat a Steam Family as one account
 
@@ -65,7 +65,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. friends list
   3. explore one
   4. back on Home, their friends list marks mutual friends
-- **Done when**: the friend becomes the current account and joins Recent accounts, so Compare's player boxes offer them next.
+- **Done when**: the friend becomes the current account and joins Home's Accounts, so Compare's player boxes offer them next.
 - **Or**: 5. select several friends 6. **Compare with me** ◇ 7. lands on C1's result with me plus them, my current account unchanged
 - **Edges**: private friends list; a Family's merged friends list; the list's refresh after adding a friend on Steam.
 

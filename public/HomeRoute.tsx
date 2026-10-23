@@ -27,9 +27,6 @@ import {
   getMyAccount,
   setMyAccount,
   getEffectiveCurrentAccount,
-  getRecentAccounts,
-  removeRecentAccount,
-  clearRecentAccounts,
   getAccountOverride,
   accountDisplayLabel,
   refreshAccountInfo,
@@ -41,6 +38,7 @@ import type { AccountPlayer } from './accountData.ts';
 import { normalizeInput, steamVanity, fmtAge, countryFlag } from './utils.ts';
 import { CopyButton } from './CopyButton.tsx';
 import { AccountFriends } from './AccountFriends.tsx';
+import { AccountTiles } from './AccountTiles.tsx';
 import {
   getFolders,
   getLists,
@@ -100,7 +98,6 @@ export default function HomeRoute() {
   // ★ starring) still deals in stored accounts.
   const currentAccount = getEffectiveCurrentAccount;
   const overrideState = getAccountOverrideState;
-  const recents = () => getRecentAccounts();
   const [resolveInputs, setResolveInputs] = createSignal<string[]>(['']);
   const [resolveError, setResolveError] = createSignal('');
   const [resolving, setResolving] = createSignal(false);
@@ -256,28 +253,11 @@ export default function HomeRoute() {
     return myAccount()?.id === account.id ? `Unstar ${label}` : `Star ${label} as mine`;
   }
 
-  function toggleMyAccount(account: AccountSlot, e: MouseEvent): void {
-    e.stopPropagation();
+  function toggleMyAccount(account: AccountSlot): void {
     setMyAccount(myAccount()?.id === account.id ? null : account);
   }
 
   let lookupField!: HTMLInputElement;
-  // The removed pill's Remove goes with it: focus the next one's, else the previous one's, else the lookup field.
-  function handleRemoveRecent(id: string, e: MouseEvent): void {
-    e.stopPropagation();
-    const pill = (e.currentTarget as HTMLElement).closest('li');
-    const neighbour = (pill?.nextElementSibling ?? pill?.previousElementSibling) as HTMLElement | null;
-    const neighbourId = neighbour?.dataset.accountId;
-    removeRecentAccount(id);
-    (
-      (neighbourId && document.querySelector<HTMLElement>(`[data-account-id="${neighbourId}"] .recent-remove`)) ||
-      lookupField
-    ).focus();
-  }
-  function handleClearRecents(): void {
-    clearRecentAccounts();
-    lookupField.focus();
-  }
 
   // The fixed list links have to carry a `?u=` override along (`withAccountParam`) or clicking
   // "Owned" while exploring a shared link would quietly show the *stored* account's library
@@ -652,6 +632,19 @@ export default function HomeRoute() {
                       />
                     )}
                   </Show>
+                  {/* Not while exploring a `?u=` link: that state has its own "Set as my current account". */}
+                  <Show when={overrideState().state === 'none'}>
+                    <button
+                      type="button"
+                      class="account-star-btn"
+                      classList={{ 'is-mine': myAccount()?.id === account().id }}
+                      title={starLabel(account())}
+                      aria-label={starLabel(account())}
+                      onClick={() => toggleMyAccount(account())}
+                    >
+                      <Star />
+                    </button>
+                  </Show>
                   <Show when={solePlayer()?.isPrivate}>
                     <span
                       class="account-private"
@@ -794,44 +787,12 @@ export default function HomeRoute() {
           </ul>
         </Show>
 
-        <div class="home-recents">
-          <h3>Recent accounts</h3>
-          <Show when={recents().length > 0} fallback={<p>No recent accounts yet.</p>}>
-            <ul class="recent-accounts">
-              <For each={recents()}>
-                {(account) => (
-                  <li data-account-id={account.id}>
-                    <button
-                      type="button"
-                      class="recent-icon-btn recent-star"
-                      classList={{ 'recent-star--mine': myAccount()?.id === account.id }}
-                      title={starLabel(account)}
-                      aria-label={starLabel(account)}
-                      onClick={[toggleMyAccount, account]}
-                    >
-                      <Star />
-                    </button>
-                    <button type="button" class="recent-name" onClick={() => pickAccount(account)}>
-                      {accountDisplayLabel(account)}
-                    </button>
-                    <button
-                      type="button"
-                      class="recent-icon-btn recent-remove"
-                      title="Remove"
-                      aria-label={`Remove ${accountDisplayLabel(account)}`}
-                      onClick={[handleRemoveRecent, account.id]}
-                    >
-                      <X />
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-            <button type="button" class="recents-clear" onClick={handleClearRecents}>
-              Clear all
-            </button>
-          </Show>
-        </div>
+        <AccountTiles
+          myAccountId={myAccount()?.id ?? null}
+          currentAccountId={currentAccount()?.id ?? null}
+          onPick={pickAccount}
+          emptyFocus={() => lookupField}
+        />
 
         <Show when={currentAccount()}>
           {(account) => (

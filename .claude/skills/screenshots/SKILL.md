@@ -9,7 +9,7 @@ Committed screenshots live in `docs/images/`, kebab-case, referenced from `READM
 
 ## Never shoot a real account
 
-Only the demo account may appear: <https://steamcommunity.com/profiles/76561198070571772/>. Real profiles reach the screenshots through the account card, "Recent accounts", the nav-bar chip and the panel's "Owned by" — including any extra account the user allowed for UX reviews.
+Only the demo account may appear: <https://steamcommunity.com/profiles/76561198070571772/>. Real profiles reach the screenshots through the account card, its "Accounts" tiles, the nav-bar chip and the panel's "Owned by" — including any extra account the user allowed for UX reviews.
 
 `scripts/demo-prefs.js` holds the demo state (account with its name and avatar, example lists and folders) and the backup/restore around it: seed before opening any app page and restore after, as in [testing.md](../../../docs/dev/testing.md#looking-at-the-ui).
 

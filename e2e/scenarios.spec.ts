@@ -193,14 +193,63 @@ test('A2 edge: the nav chip reads as an account, not as a second selected route'
   expect(await chip.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe('rgba(0, 0, 0, 0)');
 });
 
-test("A2 edge: a recent account's star names, and says on hover, what clicking it does", async ({ page }) => {
+test("A2 edge: the account card's star names, and says on hover, what clicking it does", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toHaveAttribute('title', 'Unstar Alice');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toHaveAttribute('title', 'Unstar Alice');
   await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toHaveAttribute('title', 'Star Bob as mine');
+});
+
+test('A2 edge: accounts list mine first, then by name; starring moves one first', async ({ page }) => {
+  await asPlayer(page, BOB, { otherAccounts: ['dave', 'Carol'] });
+  await page.goto('/');
+  const tiles = page.locator('.account-tiles .account-tile');
+  await expect(tiles).toHaveText([/Bob.*\(yours\)/, /Carol/, /dave/]);
+  await expect(tiles.first()).toHaveAttribute('aria-current', 'true');
+
+  await tiles.filter({ hasText: 'dave' }).click();
+  await page.getByRole('button', { name: 'Star dave as mine' }).click();
+  await expect(tiles).toHaveText([/dave.*\(yours\)/, /Bob/, /Carol/]);
+  await expect(tiles.first()).toHaveAttribute('aria-current', 'true');
+});
+
+test('A2 edge: many accounts can be filtered by name, and Esc clears the filter', async ({ page }) => {
+  const others = ['Bea', 'Cid', 'Dee', 'Eve', 'Fay', 'Gus', 'Hal', 'Ida'];
+  await asPlayer(page, ALICE, { otherAccounts: others });
+  await page.goto('/');
+  const tiles = page.locator('.account-tiles li');
+  await expect(tiles).toHaveCount(9);
+  const filter = page.getByRole('searchbox', { name: 'Filter accounts' });
+  await filter.fill('e');
+  await expect(tiles).toHaveText([/Alice/, /Bea/, /Dee/, /Eve/]);
+  await filter.fill('zz');
+  await expect(page.locator('.home-recents')).toContainText('No account matches “zz”.');
+  await page.getByRole('button', { name: 'Clear filter' }).click();
+  await expect(tiles).toHaveCount(9);
+  await expect(filter).toBeFocused();
+  await filter.fill('e');
+  await page.keyboard.press('Escape');
+  await expect(tiles).toHaveCount(9);
+});
+
+test('A2 edge: Edit shows every Remove and Clear all; Esc and Done leave it', async ({ page }) => {
+  await asPlayer(page, ALICE, { otherAccounts: ['Bea'] });
+  await page.goto('/');
+  const remove = page.getByRole('button', { name: 'Remove Bea' });
+  await expect(remove).toHaveCSS('opacity', '0');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(remove).toHaveCSS('opacity', '1');
+  await expect(page.getByRole('button', { name: 'Clear all' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Clear all' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(page.locator('.home-recents')).toContainText('No accounts yet');
+  await expect(page.getByRole('button', { name: /^(Edit|Done)$/ })).toHaveCount(0);
 });
 
 test('A2 edge: removing a recent account moves focus to the next one, the last to the lookup field', async ({
@@ -210,13 +259,14 @@ test('A2 edge: removing a recent account moves focus to the next one, the last t
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
-  const first = (await page.locator('.recent-accounts li').first().innerText()).trim();
-  const second = first === 'Bob' ? 'Alice' : 'Bob';
-  await page.getByRole('button', { name: `Remove ${first}` }).click();
-  await expect(page.getByRole('button', { name: `Remove ${second}` })).toBeFocused();
+  await expect(page.locator('.account-tiles li')).toHaveCount(2);
+  // Hidden until hovered or focused: keyboard focus reveals it.
+  await page.getByRole('button', { name: 'Remove Alice' }).focus();
+  await expect(page.getByRole('button', { name: 'Remove Alice' })).toHaveCSS('opacity', '1');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.recent-accounts li')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove Bob' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.account-tiles li')).toHaveCount(0);
   await expect(page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…')).toBeFocused();
 });
 
@@ -892,7 +942,7 @@ test('C1 edge: Enter in an empty player box adds the suggestion pointed at, not 
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(2); // Bob is now a known account
+  await expect(page.locator('.account-tiles li')).toHaveCount(2); // Bob is now a known account
   await page.goto('/lists/compare');
   const boxes = page.locator('.compare-form').getByRole('combobox');
   await boxes.nth(1).fill('carol');
@@ -911,7 +961,7 @@ test('C1 edge: an empty player box highlights no suggestion until one is pointed
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(2); // Bob is now a known account
+  await expect(page.locator('.account-tiles li')).toHaveCount(2); // Bob is now a known account
   await page.goto('/lists/compare');
   const box = page.locator('.compare-form').getByRole('combobox').nth(1);
   await box.focus();
@@ -935,7 +985,7 @@ test('C1 edge: ArrowDown steps through every player suggestion', async ({ page }
     await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill(name);
     await page.getByRole('button', { name: 'Look up', exact: true }).click();
   }
-  await expect(page.locator('.recent-accounts li')).toHaveCount(3);
+  await expect(page.locator('.account-tiles li')).toHaveCount(3);
   await page.goto('/lists/compare');
   const box = page.locator('.compare-form').getByRole('combobox').nth(1);
   await box.focus();
@@ -1582,7 +1632,7 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 });
 
-test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and each recent account on one row", async ({
+test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and the account tiles inside the card", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
@@ -1590,7 +1640,7 @@ test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and each recen
   await page.goto('/');
   await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
   await page.getByRole('button', { name: 'Look up', exact: true }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(2);
+  await expect(page.locator('.account-tiles li')).toHaveCount(2);
 
   const viewport = page.viewportSize()!;
   expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(16);
@@ -1599,16 +1649,16 @@ test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and each recen
   expect(card.x + card.width).toBe(viewport.width - 16);
   expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(29);
 
-  for (const li of await page.locator('.recent-accounts li').all()) {
-    const tops = await li.locator(':scope > *').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
+  for (const li of await page.locator('.account-tiles li').all()) {
     const box = (await li.boundingBox())!;
-    expect(box.height).toBeLessThan(48);
-    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(12);
+    expect(box.x).toBeGreaterThanOrEqual(card.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
   }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
   await expect(page.getByRole('button', { name: 'Star Bob as mine' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Unstar Alice' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('button', { name: 'Remove Bob' }).click();
-  await expect(page.locator('.recent-accounts li')).toHaveCount(1);
+  await expect(page.locator('.account-tiles li')).toHaveCount(1);
 });
 
 test("I1 edge: on a phone with no account yet, the nav's search, account and preferences share one row", async ({
@@ -4092,6 +4142,8 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   const friends = page.locator('.account-friends summary');
   expect(await takes24pxTap(friends)).toBe(true);
   expect(await takes24pxTap(page.getByRole('button', { name: 'Unstar Alice' }))).toBe(true);
+  expect(await takes24pxTap(page.getByRole('button', { name: 'Edit', exact: true }))).toBe(true);
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   expect(await takes24pxTap(page.getByRole('button', { name: 'Remove Alice' }))).toBe(true);
   await friends.click();
   expect(await takes24pxTap(page.locator('.account-friends-refresh'))).toBe(true);
