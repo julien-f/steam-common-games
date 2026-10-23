@@ -199,7 +199,7 @@ test('saveTableViewToServer: strips page/searchQuery before pushing and before s
 
 test('revertTableViewToServer: live-patches the table and adopts the baseline locally, without re-pushing it', async () => {
   await withLocation('', async () => {
-    const { getPref, setSignedInSteamid, _resetSignedInSteamid } = require('../public/prefs.ts');
+    const { getPref, setSignedInSteamid, _resetPrefsState } = require('../public/prefs.ts');
     const table = fakeTable({ pageSize: 25 });
     setBaseline('libraryView', { value: { pageSize: 10 }, updatedAt: 42 });
     setSignedInSteamid('76561198000000001');
@@ -214,7 +214,7 @@ test('revertTableViewToServer: live-patches the table and adopts the baseline lo
       revertTableViewToServer(table, 'libraryView');
     } finally {
       globalThis.fetch = restore;
-      _resetSignedInSteamid();
+      _resetPrefsState();
     }
 
     assert.deepEqual(table.getViewState(), { pageSize: 10 });

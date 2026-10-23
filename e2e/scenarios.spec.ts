@@ -1195,6 +1195,41 @@ test("L1 edge: a row's ⋯ menu works from the keyboard and hands focus back", a
   await expect(page.getByRole('heading', { name: 'Your lists' })).toBeFocused();
 });
 
+test("L1 edge: a list edit the browser can't store says so", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // Refuses the prefs blob once the test sets the flag, as a full storage would.
+  await page.addInitScript(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if ((window as { storageFull?: boolean }).storageFull && key === 'steam.isonoe.net:prefs')
+        throw new DOMException('full', 'QuotaExceededError');
+      setItem.call(this, key, value);
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New list' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
+  await page.keyboard.press('Enter');
+  const alert = page.getByRole('alert').filter({ hasText: 'storage is full' });
+  await expect(alert).toHaveCount(0);
+
+  await page.evaluate(() => ((window as { storageFull?: boolean }).storageFull = true));
+  await rowMenu(page, 'Shortlist').click();
+  await page.getByRole('button', { name: 'Rename Shortlist' }).click();
+  await page.getByRole('textbox', { name: 'List name' }).fill('Picks');
+  await page.keyboard.press('Enter');
+  await expect(alert).toHaveText(
+    "This browser's storage is full: your last change wasn't saved on this device.Dismiss",
+  );
+
+  // Dismiss hands focus back to where it was.
+  const focused = await page.evaluateHandle(() => document.activeElement);
+  expect(await focused.evaluate((el) => el !== document.body)).toBe(true);
+  await alert.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(alert).toHaveCount(0);
+  expect(await focused.evaluate((el) => el === document.activeElement)).toBe(true);
+});
+
 test("L1 edge: clearing a ranking's name hands it back its default label", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist');

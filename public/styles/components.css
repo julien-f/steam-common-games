@@ -386,6 +386,24 @@
     }
   }
 
+  /* A failed pref write (StorageFullBanner.tsx): along the bottom, left of the ↑ button, over the panel. */
+  .storage-full-banner {
+    position: fixed;
+    right: calc(2 * var(--gutter) + var(--control-h));
+    bottom: var(--gutter);
+    left: var(--gutter);
+    z-index: 101;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--warn);
+    border-radius: var(--radius-3);
+    background: var(--surface);
+    font-size: var(--fs-ui);
+  }
+
   /* ── A route's hero (ListHero.tsx): a flat section, not a card. Title, chips and actions, then
      the list's facts as label-over-value pairs. ── */
   .list-hero {

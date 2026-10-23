@@ -115,7 +115,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `viewTransition.ts` / `artTint.ts` — the shared-element morphs into the panel and the lightbox; the panel ground's tint from the game's art.
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
-- `prefs.ts` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the Preferences panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
+- `prefs.ts` / `StorageFullBanner.tsx` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the banner when storage refuses a write of it; the Preferences panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
 - `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — restore/persist/share/reset a table view; the table-view pref keys; the signed-in Save/Revert baseline; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).
@@ -296,6 +296,7 @@ The "look up any game" box is one nav-bar search in the shell, not one per route
 Above 768px the shell is locked to the viewport and **`.app-scroll` is the page's scroller**, avoiding two scrollbars side by side. Nav and footer sit inside it, so they still scroll away; `.app-content` takes `flex: 1` to keep the footer down on a short page.
 
 - **`AppShell` owns the page's scroll position** (`pageScrollTop`/`scrollPageToTop` — `.app-scroll` on desktop, the document on mobile, so both are read and written). It scrolls to the top on each path change, and shows the floating **Back to top** button (an up arrow) past `TO_TOP_AFTER_PX`. The button's `position: fixed` ignores the shell's gutter, so `.panel-open` offsets it by `--panel-w`; its z-index is below the panel's.
+- **A pref write storage refuses** (`prefs.ts`'s `prefsWriteFailed`) shows `StorageFullBanner` (`role="alert"`), fixed along the bottom left of the Back to top button and over the panel. Dismiss hides it until a write succeeds again, handing focus back to where it was before the banner (else `<main>`); the next failure brings it back. The failed edit isn't kept in memory: it snaps back.
 - **Below 769px the lock is off** and the document scrolls: the panel is an overlay there, and a document that never scrolls is a URL bar that never collapses.
 
 **Focus and history.**

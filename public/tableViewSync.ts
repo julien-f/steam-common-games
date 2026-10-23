@@ -81,7 +81,7 @@ export function isUnsaved(key: string, currentValue: unknown): boolean {
 // Clears every baseline — called from authStore.ts's signOut() so a lingering baseline from the
 // previous account can't leak into the next (either a different signed-in account, or back to
 // signed-out, where there's no account to diff against at all). Also the test-only reset (see
-// test/tableViewSync.test.js), same module-level-signal reset need _resetSignedInSteamid
+// test/tableViewSync.test.js), same module-level-signal reset need _resetPrefsState
 // documents in prefs.ts.
 export function resetBaselines(): void {
   setBaselines({});

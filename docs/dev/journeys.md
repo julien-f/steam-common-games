@@ -141,7 +141,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. put it in a folder
   5. or, while reading one game's panel, **Add to list** there ◇
 - **Done when**: the list appears in Home's tree; adding/removing games persists across reloads.
-- **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders; a row's ⋯ menu from the keyboard (Esc, Rename, Move and Delete each leave focus on a row's ⋯, or the heading once the tree is empty).
+- **Edges**: delete then restore (soft-delete — no restore UI yet, frontend.md's Known gaps); a folder's "Move to…" never offers its own subfolders; a row's ⋯ menu from the keyboard (Esc, Rename, Move and Delete each leave focus on a row's ⋯, or the heading once the tree is empty); an edit the browser can't store (storage full) says so instead of silently snapping back.
 
 ### L2 Wishlisted but already owned in the family
 

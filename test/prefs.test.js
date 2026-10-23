@@ -17,9 +17,9 @@ function makeMemoryLocalStorage() {
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
   delete require.cache[require.resolve('../public/prefs.ts')];
-  // require.cache deletion above doesn't reach signedInSteamid (a module-level `let`) — see
-  // _resetSignedInSteamid's own comment in prefs.ts.
-  require('../public/prefs.ts')._resetSignedInSteamid();
+  // require.cache deletion above doesn't reach prefs.ts's module-level state — see
+  // _resetPrefsState's own comment there.
+  require('../public/prefs.ts')._resetPrefsState();
 });
 
 test('getPref: returns the fallback when the key was never set', () => {
@@ -344,4 +344,51 @@ test('getPref is reactive per key: an effect reruns on its own key only', async 
   adoptPrefEntry('region', 'DE', 1); // silent: see adoptPrefEntry
   dispose();
   assert.deepEqual(seen, [null, 'GB']);
+});
+
+// ── failed writes ───────────────────────────────────────────────────────────────────────────────
+
+function refuseWrites() {
+  global.localStorage.setItem = () => {
+    throw new DOMException('full', 'QuotaExceededError');
+  };
+}
+
+test('setPref: a write storage refuses is counted and warned until one succeeds', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const { setPref, prefsWriteFailures } = require('../public/prefs.ts');
+  const { setItem } = global.localStorage;
+  refuseWrites();
+  setPref('region', 'DE');
+  setPref('region', 'GB');
+  assert.equal(prefsWriteFailures(), 2);
+  assert.match(warn.mock.calls[0].arguments[0], /^\[prefs\]/);
+  global.localStorage.setItem = setItem;
+  setPref('region', 'US');
+  assert.equal(prefsWriteFailures(), 0);
+});
+
+test('dismissPrefsWriteFailure: hides failures until a write succeeds, then the next one shows', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { setPref, prefsWriteFailed, dismissPrefsWriteFailure } = require('../public/prefs.ts');
+  const { setItem } = global.localStorage;
+  refuseWrites();
+  setPref('region', 'DE');
+  assert.equal(prefsWriteFailed(), true);
+  dismissPrefsWriteFailure();
+  assert.equal(prefsWriteFailed(), false);
+  setPref('region', 'GB');
+  assert.equal(prefsWriteFailed(), false);
+  global.localStorage.setItem = setItem;
+  setPref('region', 'US');
+  refuseWrites();
+  setPref('region', 'FR');
+  assert.equal(prefsWriteFailed(), true);
+});
+
+test('adoptPrefEntry: a refused write is not counted (authStore.ts warns)', () => {
+  const { adoptPrefEntry, prefsWriteFailures } = require('../public/prefs.ts');
+  refuseWrites();
+  assert.equal(adoptPrefEntry('region', 'DE', 1), false);
+  assert.equal(prefsWriteFailures(), 0);
 });

@@ -72,6 +72,16 @@ function version(key: string): { track: () => void; notify: () => void } {
   return v;
 }
 
+// setPref writes storage refused since the last one it kept; AppShell.tsx's banner says so.
+const [prefsWriteFailures, setPrefsWriteFailures] = createSignal(0);
+const [dismissed, setDismissed] = createSignal(false);
+export { prefsWriteFailures };
+export const prefsWriteFailed = (): boolean => prefsWriteFailures() > 0 && !dismissed();
+// Until a write succeeds again: the next edits would most likely fail too.
+export function dismissPrefsWriteFailure(): void {
+  setDismissed(true);
+}
+
 // Returns `fallback` when the key was never set, storage is unavailable (private browsing,
 // cleared site data), or the stored blob itself is corrupted — never throws.
 export function getPref<T = unknown>(key: string): T | undefined;
@@ -86,7 +96,13 @@ export function setPref(key: string, value: unknown): void {
   const entries = readEntries();
   const updatedAt = Date.now();
   entries[key] = { value, updatedAt };
-  writeEntries(entries);
+  if (writeEntries(entries)) {
+    setPrefsWriteFailures(0);
+    setDismissed(false);
+  } else {
+    console.warn(`[prefs] storage refused "${key}": the change isn't saved on this device`);
+    setPrefsWriteFailures((n) => n + 1);
+  }
   version(key).notify();
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
@@ -146,10 +162,12 @@ export function setSignedInSteamid(steamid: string | null): void {
 // Test-only (see test/prefs.test.js) — this repo's usual "delete require.cache between tests"
 // reset doesn't reach a module-level `let` in a TS-stripped ESM file (confirmed live; same
 // caveat myOwnership.ts/accountOverride.ts document for their own module state), and unlike
-// those this one variable didn't seem worth a whole factory-function rewrite for. Same `_reset`
+// those this little state didn't seem worth a whole factory-function rewrite for. Same `_reset`
 // naming convention as lib/cache.js/lib/metrics.js's own test-only resets.
-export function _resetSignedInSteamid(): void {
+export function _resetPrefsState(): void {
   signedInSteamid = null;
+  setPrefsWriteFailures(0);
+  setDismissed(false);
 }
 
 // Fire-and-forget — a failed sync leaves the change on this device only, in localStorage, exactly
