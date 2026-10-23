@@ -3242,7 +3242,7 @@ export default function ListRoute() {
         <div class="list-plays-mostly">
           Plays mostly:{' '}
           <For each={playsMostly()}>
-            {(tag) => (
+            {({ tag }) => (
               <button
                 type="button"
                 class="list-plays-mostly-tag"
