@@ -77,6 +77,31 @@ test('getPref/setPref: never throw when localStorage is unavailable', () => {
   assert.equal(getPref('region', 'fallback'), 'fallback');
 });
 
+test('setPref: on a full storage, evicts cached tastes to make room and persists', () => {
+  // Full while any taste is stored.
+  const store = new Map([
+    ['steam.isonoe.net:taste:a', '{"at":1}'],
+    ['steam.isonoe.net:taste:b', '{"at":2}'],
+  ]);
+  global.localStorage = {
+    get length() {
+      return store.size;
+    },
+    key: (i) => [...store.keys()][i] ?? null,
+    getItem: (k) => store.get(k) ?? null,
+    setItem(k, v) {
+      if ([...store.keys()].some((key) => key.startsWith('steam.isonoe.net:taste:')))
+        throw new DOMException('full', 'QuotaExceededError');
+      store.set(k, v);
+    },
+    removeItem: (k) => store.delete(k),
+  };
+  const { setPref } = require('../public/prefs.ts');
+  setPref('region', 'DE');
+  assert.deepEqual([...store.keys()], ['steam.isonoe.net:prefs']);
+  assert.equal(JSON.parse(store.get('steam.isonoe.net:prefs')).region.value, 'DE');
+});
+
 // ── v1 → v2 storage migration (raw value per key → {value, updatedAt} per key) ─────────────────
 
 test('getPref: reads a pre-migration (v1) blob with no schemaVersion at all', () => {

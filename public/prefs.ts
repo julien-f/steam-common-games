@@ -11,6 +11,7 @@
 // setPref below).
 import { createSignal } from 'solid-js';
 import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
+import { setItemMakingRoom } from './tasteCache.ts';
 
 export const PREFS_STORAGE_KEY = 'steam.isonoe.net:prefs';
 
@@ -54,14 +55,9 @@ function readEntries(): Record<string, PrefEntry> {
   return entries;
 }
 
-// False when not persisted: private browsing, quota, storage unavailable.
+// False when not persisted: private browsing, storage unavailable, or full even without the cached tastes.
 function writeEntries(entries: Record<string, PrefEntry>): boolean {
-  try {
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
-    return true;
-  } catch {
-    return false;
-  }
+  return setItemMakingRoom(PREFS_STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...entries }));
 }
 
 // Per key, not one for the blob: table views and rankings are written on every edit, and would rerun every reader.
