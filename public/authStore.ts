@@ -69,7 +69,8 @@ function markSyncedBefore(steamid: string): void {
 //
 // Equal timestamps are left alone — indistinguishable from "already in sync".
 //
-// Returns whether anything was adopted from the server — the caller reloads in that case, since
+// Returns whether anything was adopted from the server and every adoption was kept — the caller
+// reloads in that case (a partial one would reload into another first sync, forever), since
 // every store (accountsStore, listsStore, ...) seeds its in-memory state from localStorage once
 // at load; live-patching each of them to notice an external write isn't worth it for something
 // that, once merged, won't differ again until the next real edit on either side. A table-view key
@@ -109,7 +110,9 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
       if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted = true;
       else {
         unkept = true;
-        console.warn(`[auth] couldn't store the account's "${key}" pref locally; this device keeps its own`);
+        console.warn(
+          `[auth] couldn't store the account's "${key}" pref locally; this device won't use the account's value`,
+        );
       }
     } else if (local && (!server || local.updatedAt > server.updatedAt)) {
       pushes.push(pushPrefToServer(key, local.value, local.updatedAt));
@@ -119,7 +122,7 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
   await Promise.all(pushes);
   // Still unsynced while a server value isn't kept, or a later sync would let the stale local one win.
   if (!unkept) markSyncedBefore(steamid);
-  return adopted;
+  return adopted && !unkept;
 }
 
 // A verified Steam login already IS a resolved identity — nobody should have to retype their own
