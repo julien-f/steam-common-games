@@ -165,13 +165,6 @@ html:root {
   }
 }
 
-/* SearchRoute.tsx focuses the open result's row from code, which the library's :focus-visible ring
-   often skips after a click: plain :focus there, offset inward for a table row. */
-.search-table .dt-tr:focus {
-  outline: 2px solid var(--text);
-  outline-offset: -2px;
-}
-
 /* An expired bundle's row (BundlesBrowseRoute.tsx's rowClass), only shown with "Include expired" on. */
 .bundle-row--expired {
   opacity: 0.45;
