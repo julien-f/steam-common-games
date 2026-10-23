@@ -291,9 +291,10 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
+export const pad2 = (n: number) => String(n).padStart(2, '0');
+
 // YYYY-MM-DD on the viewer's calendar.
 export function fmtLocalDate(d: Date): string {
-  const pad2 = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 

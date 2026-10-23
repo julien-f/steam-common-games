@@ -7,7 +7,7 @@
 // operates on a plain scalar (`row.shop`, not `row.page?.name`), which is also what the table's
 // own filter checklists/group keys are built from.
 
-import { compareByOrder, formatMoney, fmtLocalDate } from './utils.ts';
+import { compareByOrder, formatMoney, fmtLocalDate, pad2 } from './utils.ts';
 import type { PriceAmount } from './types.ts';
 
 // ITAD-hosted artwork for one game, as the bundle list itself returns it — `boxart` (300×450
@@ -201,7 +201,6 @@ export function cheapestTierPrice(bundle: BundleListItem): PriceAmount | null {
 // hour to shorten it was considered and rejected — two bundles published at 21:21 and 21:16 on the
 // same day (real, live data) would both read "21h", putting back exactly the unexplained ordering
 // showing the time was meant to fix.
-const pad2 = (n: number) => String(n).padStart(2, '0');
 
 function parseBundleDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
