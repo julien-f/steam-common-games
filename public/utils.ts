@@ -6,6 +6,12 @@ export function steamVanity(profileUrl: string | null | undefined): string | nul
   return m ? m[1] : null;
 }
 
+// '' for anything but a plain http(s) URL: an upstream-supplied `javascript:`/`data:` href would
+// run script on click (JSX escapes text, not URL schemes).
+export function safeHref(url: string | null | undefined): string {
+  return url && /^https?:\/\//i.test(url) ? url : '';
+}
+
 // Extract username/ID from a pasted Steam profile URL
 export function normalizeInput(raw: string): string {
   const vanity = steamVanity(raw);

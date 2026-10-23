@@ -353,6 +353,14 @@ test('fetchAccountFriends: a friend Steam returned no name/location for gets emp
   });
 });
 
+test('fetchAccountFriends: a non-http(s) profile URL is dropped, so the friend renders without a link', async (t) => {
+  withFetch(t, async () => ({
+    ok: true,
+    json: async () => ({ friends: [{ steamid: '2', profileurl: 'javascript:alert(1)' }], unavailable: [] }),
+  }));
+  assert.equal((await fetchAccountFriends(['1'])).friends[0].profileUrl, '');
+});
+
 test("fetchAccountOverview: returns the account's library and its member accounts from one call", async (t) => {
   let calls = 0;
   withFetch(t, async () => {

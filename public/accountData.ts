@@ -5,7 +5,7 @@
 // functions (row-building, table wiring, URL/history updates, accounts-bar rendering) — none of
 // that belongs here; ListRoute.tsx owns the equivalent orchestration generically, for any list
 // kind, not just account-scoped ones.
-import { steamVanity, fmtLastPlayed, postJson } from './utils.ts';
+import { steamVanity, fmtLastPlayed, postJson, safeHref } from './utils.ts';
 import { accountIdFor } from './accountsStore.ts';
 import type { AccountSlot } from './types.ts';
 
@@ -90,12 +90,11 @@ export interface AccountPlayer {
 // its data is instead, with a ↻ to refresh it — an honest, actionable fact where presence was a
 // dishonest one.
 export function toAccountPlayer(p: RawAccountPlayer): AccountPlayer {
-  const httpOnly = (url: string | undefined): string => (/^https?:\/\//i.test(url || '') ? url! : '');
   return {
     steamid: p.steamid,
     name: p.personaname || p.steamid,
-    profileUrl: httpOnly(p.profileurl),
-    avatarUrl: httpOnly(p.avatarmedium),
+    profileUrl: safeHref(p.profileurl),
+    avatarUrl: safeHref(p.avatarmedium),
     isPrivate: p.communityvisibilitystate !== undefined && p.communityvisibilitystate !== 3,
     gameCount: typeof p.gameCount === 'number' ? p.gameCount : null,
     memberSince: fmtLastPlayed(p.timecreated),
@@ -276,7 +275,7 @@ export async function fetchAccountFriends(
       steamid: f.steamid,
       name: f.personaname || f.steamid,
       avatarUrl: f.avatar || '',
-      profileUrl: f.profileurl || '',
+      profileUrl: safeHref(f.profileurl),
       memberSince: fmtLastPlayed(f.timecreated),
       countryCode: f.loccountrycode || '',
       realName: f.realname || '',

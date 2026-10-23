@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   normalizeInput,
   steamVanity,
+  safeHref,
   scoreColor,
   fmtH,
   fmtTime,
@@ -60,6 +61,17 @@ test('steamVanity: a /profiles/<steam64> URL means no custom name was ever set',
 test('steamVanity: no profile URL at all (a profile Steam knew nothing about) is null', () => {
   assert.equal(steamVanity(''), null);
   assert.equal(steamVanity(undefined), null);
+});
+
+// ── safeHref ──────────────────────────────────────────────────────────────────
+
+test('safeHref: keeps an http(s) URL, turns anything else (javascript:, data:, missing) into ""', () => {
+  assert.equal(safeHref('https://store.steampowered.com/'), 'https://store.steampowered.com/');
+  assert.equal(safeHref('HTTP://x/'), 'HTTP://x/');
+  assert.equal(safeHref('javascript:alert(1)'), '');
+  assert.equal(safeHref('data:text/html,x'), '');
+  assert.equal(safeHref(null), '');
+  assert.equal(safeHref(undefined), '');
 });
 
 // ── scoreColor ────────────────────────────────────────────────────────────────

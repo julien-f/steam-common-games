@@ -6,7 +6,7 @@
 
 import type { BundleListItem } from './bundleRows.ts';
 import type { PriceAmount } from './types.ts';
-import { ApiError, fetchJson, postJson } from './utils.ts';
+import { ApiError, fetchJson, postJson, safeHref } from './utils.ts';
 
 export interface FlatGame {
   gid: string;
@@ -154,7 +154,11 @@ export async function fetchBundleById(
       undefined,
       'Bundle lookup failed',
     );
-    return { bundle: data.bundle, fetchedAt: data.fetchedAt ?? null };
+    const { bundle } = data;
+    return {
+      bundle: { ...bundle, url: safeHref(bundle.url) || null, details: safeHref(bundle.details) || null },
+      fetchedAt: data.fetchedAt ?? null,
+    };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) throw new BundleNotFoundError(err.message);
     if (err instanceof ApiError && err.status === 503) throw new UnavailableError(err.message);
