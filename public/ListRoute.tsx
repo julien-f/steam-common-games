@@ -3445,11 +3445,17 @@ export default function ListRoute() {
     return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
   });
   const unplayed = createMemo(() =>
-    loadFraction() == null && !playtimeHidden() ? tableData().filter((g) => !g.playtime).length : 0,
+    loadFraction() == null && !playtimeHidden() ? tableData().filter((g) => !g.playtime && !g.comingSoon).length : 0,
   );
   const backlogShown = () => {
     const t = filterTable();
-    return tableReady() && !!t && t.filter.ranges().playtime?.max === '0' && t.sort.entries()[0]?.key === TASTE_FIT_KEY;
+    return (
+      tableReady() &&
+      !!t &&
+      t.filter.ranges().playtime?.max === '0' &&
+      !!t.filter.ranges().releaseDate?.max &&
+      t.sort.entries()[0]?.key === TASTE_FIT_KEY
+    );
   };
   // The facts line's sentences, leading into the backlog button when it follows.
   const factSentences = () => {
@@ -3462,6 +3468,8 @@ export default function ListRoute() {
     const t = filterTable();
     if (!t) return;
     t.filter.setRange('playtime', 'max', '0');
+    // Not yet out: nothing to play next, though it shows no playtime either.
+    t.filter.setRange('releaseDate', 'max', fmtLocalDate(new Date()));
     syncLeadColumn(t, TASTE_FIT_KEY, true);
   }
   // Out here: the hero note re-renders, which would close the breakdown.

@@ -35,7 +35,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Taste profile
 
-- **U208 · minor · A5, F3** — the no-playtime button's "what to play next" list counts and ranks unreleased and free-to-play games with the rest: on Dave's Owned, Someday Saga (coming soon) and Counter-Strike 2 (free) top it, above the two games actually waiting to be played. Leave coming-soon games out (and say free ones apart), in both the count and the filter.
 - **U212 · polish · A5** — "Plays 7 of 9 story games for as long as their main story" doesn't say which; the two that fell short are the actionable part ("pick Sekiro back up?"). **Why these?** lists the story games reached and fell short, each opening its panel.
 - **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
 

@@ -682,9 +682,9 @@ test('A5.4: the no-playtime count lists those games, best Taste fit first, on a 
   await asPlayer(page, DAVE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
-  const backlog = page.getByRole('button', { name: '4 games show no playtime' });
+  const backlog = page.getByRole('button', { name: '3 games show no playtime' });
   await backlog.click();
-  await expect(rows(page)).toHaveCount(4);
+  await expect(rows(page)).toHaveCount(3);
   await expect(backlog).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
   // Scored against the taste this visit just learned: nothing was stored before it.
@@ -695,6 +695,16 @@ test('A5.4: the no-playtime count lists those games, best Taste fit first, on a 
   ).toBeVisible();
   await page.getByRole('button', { name: 'Clear all' }).click();
   await expect(rows(page)).toHaveCount(DAVE.owned.length);
+});
+
+test("A5 edge: what to play next leaves out games that aren't out yet", async ({ page }) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  await page.getByRole('button', { name: '3 games show no playtime' }).click();
+  await expect(rows(page)).toHaveCount(3);
+  await expect(row(page, 'Someday Saga')).toHaveCount(0);
+  await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
 });
 
 test('A5 edge: an account with no playtime at all says why it has no profile', async ({ page }) => {
