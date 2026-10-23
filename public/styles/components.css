@@ -3495,7 +3495,7 @@
   .explore-card:hover {
     border-color: var(--line-control);
   }
-  .explore-card:has(a:focus-visible) {
+  .explore-card:has(h3 a:focus-visible) {
     outline: 2px solid var(--text);
     outline-offset: 2px;
   }
@@ -3514,19 +3514,37 @@
   .explore-card a {
     text-decoration: none;
   }
-  .explore-card a::after {
+  .explore-card h3 a::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
   }
-  .explore-card a:focus-visible {
+  .explore-card h3 a:focus-visible {
     outline: none;
   }
   .explore-card p {
     color: var(--muted);
     font-size: var(--fs-meta);
     line-height: 1.4;
+  }
+  /* Above the card's own stretched link. */
+  .explore-views {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-meta);
+  }
+  .explore-card .explore-views a {
+    display: inline-block;
+    min-height: 24px;
+    line-height: 24px;
+    text-decoration: underline;
   }
   /* Phone: one card per row, the icon beside the text. */
   @media (max-width: 600px) {
@@ -3544,6 +3562,9 @@
     .explore-icon {
       grid-row: span 2;
       margin-bottom: 0;
+    }
+    .explore-views {
+      grid-column: 2;
     }
   }
 

@@ -1642,6 +1642,22 @@ test('L5 edge: no tabs until the list has a view', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'Views' })).toHaveCount(0);
 });
 
+test('L5.5: Home opens a view from its list card, for the account being explored', async ({ page }) => {
+  await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW] } });
+  await page.goto('/?u=bob');
+  await expect(page.getByRole('list', { name: 'Owned views' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Wishlist views' })).toHaveCount(0); // no views, no links
+  await page.getByRole('list', { name: 'Owned views' }).getByRole('link', { name: 'Short' }).click();
+  await expect(page).toHaveURL(/\/lists\/owned\?.*view=short/);
+  await expect(page).toHaveURL(/u=bob/);
+  await expect(page.getByRole('heading', { name: "Bob's Library" })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Views' }).getByRole('link', { name: 'Short' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(rows(page)).toHaveCount(4); // Bob never played his: every game is under 2 h
+});
+
 test('L5 edge: a link to a deleted view shows the whole list, and says so', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?view=gone');
