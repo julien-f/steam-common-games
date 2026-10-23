@@ -933,6 +933,15 @@ test('C7.5-6: Suggest to a player what another played a lot, closest to their ta
   await expect(page.locator('#panel-title')).toHaveText('Valheim');
 });
 
+test("C7 edge: a player's tag filters a table that comes into view, even under an open Players on a phone", async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await playerLine(players, 'Erin').getByRole('button', { name: 'PvP' }).click();
+  await expect(row(page, 'Dead by Daylight')).toBeInViewport();
+});
+
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
   await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
   await expect(rows(page)).toHaveCount(3);

@@ -40,7 +40,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U209 · minor · C7, I1** — on a phone, opening **Players** moves the table from 572 to 825 px of 844, so tapping a player's tag filters a table that's off-screen: nothing visible changes. Bring the table into view after a tag tap from Players (or fold the section), as the status line would.
 - **U210 · minor · C7** — each player's "more than the others" tags mostly repeat their top 3 shown just before (Dave's are identical: Open World, Story Rich, RPG), while the shared count in the summary and **In common** say the same thing twice. Once two players have a profile, show each player's own tags in place of their top tags, and fold In common into the summary ("share 2 of their top 10 tags: Action, FPS").
 - **U211 · minor · C7** — **Suggest to** starts on a player without a profile when that's the first one ("too few games played here for a profile"), and counts the current account as "not me" when no ★ account is set, so in Alice vs. Dave vs. Erin as Alice it opens on Alice. Start on the first player with a profile who is neither my ★ nor the current account.
 - **U213 · polish · C7, C1** — **Players** is open by default on desktop and costs ~210 px every visit (the table starts at 638 of 900 px). Remember the viewer's open/closed choice (a per-viewer convenience).

@@ -111,6 +111,7 @@ import {
   oldestFetchedAt,
   scoreColor,
   fmtLocalDate,
+  smoothScroll,
   refusalMessage,
 } from './utils.ts';
 import {
@@ -3292,7 +3293,13 @@ export default function ListRoute() {
       class="list-plays-mostly-tag"
       aria-pressed={tableReady() && isTagActive('tags', tag)}
       title={`Filter by ${tag}`}
-      onClick={() => onTagClick('tags', tag)}
+      onClick={() => {
+        onTagClick('tags', tag);
+        // An open Players can push the table off a phone's screen: show what the tag did.
+        const toolbar = document.querySelector('.dt-toolbar');
+        if (toolbar && toolbar.getBoundingClientRect().top > innerHeight / 2)
+          toolbar.scrollIntoView({ block: 'start', behavior: smoothScroll() });
+      }}
     >
       {tag}
     </button>
