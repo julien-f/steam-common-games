@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The combined-list form fits a phone's width
 - A game's DLC no longer reorder and reload once they all arrive
 - A comparison link with an unknown combine operation opens as the default comparison, and saving it no longer stores a list that never loads
+- Signing in on a browser whose storage is full or disabled no longer reloads the page forever
 
 ### Development
 

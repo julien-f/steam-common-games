@@ -120,7 +120,7 @@ Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without 
 - **Every sign-in check merges** (`authStore.ts`'s `syncPrefsWithServer`, from `initAuth` on every page load):
   - **First sync of a device with an account** (no `steam.isonoe.net:prefs-synced:<steamid>` localStorage flag — its own key, never synced, so an adopted blob can't carry it): server wins for every key both sides have, whatever the timestamps (a new device's local state may be leftover anonymous browsing); keys only local are pushed.
   - **Every later sync**: per-key last-write-wins both ways; a key on one side propagates; a tie is left alone.
-  - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load.
+  - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load. An adoption storage refuses (full, disabled) is skipped with an `[auth]` warning instead, or every load would re-adopt and reload.
 - **Signing in fills `myAccount`/`currentAccount` when unset** (`autoPopulateAccountFromLogin`), via the same `resolveAccountSlot` as Home's picker; an existing pick is never overwritten, and a failed resolve retries on the next load.
 - **Table-view keys are never auto-synced** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `bundlesBrowseView`). Editing a table stays local until the user saves it:
   - `public/tableViewSync.ts` keeps an in-memory `baseline` per key — the server's value as of the last `syncPrefsWithServer`.

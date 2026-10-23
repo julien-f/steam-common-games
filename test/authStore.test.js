@@ -354,6 +354,20 @@ test('initAuth (signed in): adopting server prefs reloads the page, and leaves t
   assert.ok(!calls.some((c) => c.url === '/api/common-games'), 'no account resolve before the reload');
 });
 
+test("initAuth (signed in): an adoption storage can't keep doesn't reload, so a full storage can't reload forever", async (t) => {
+  const seen = withBrowser(t);
+  global.localStorage.setItem = () => {
+    throw new Error('QuotaExceededError');
+  };
+  const warn = t.mock.method(console, 'warn', () => {});
+  mockMeFetch(t, { steamid: STEAMID, prefs: { region: { value: 'GB', updatedAt: 500 } } });
+
+  await auth().initAuth();
+
+  assert.equal(seen.reloads, 0);
+  assert.ok(warn.mock.calls.some((c) => String(c.arguments[0]).startsWith('[auth]')));
+});
+
 test('initAuth (signed in): with nothing to adopt, fills in the account from the login and syncs later edits', async (t) => {
   const seen = withBrowser(t);
   const calls = mockMeFetch(t, { steamid: STEAMID, prefs: null });
