@@ -332,6 +332,15 @@ test('S3 edge: a first game link in a fresh browser lists that game under Recent
   await expect(page.getByText('No games in this list.')).toHaveCount(0);
 });
 
+test('S3 edge: a shared layout with a wrongly typed field still applies the rest of it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // An older or hand-edited link: `filters.name` should be a list of values.
+  const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }], filters: { name: 5 } });
+  await page.goto(`/lists/owned?tv=${encodeURIComponent(tv)}`);
+  await expect(rows(page)).toHaveCount(6);
+  await expect(rows(page).first()).toContainText('Valheim');
+});
+
 test("S3 edge: editing a shared layout warns it's lost on reload unless kept", async ({ page }) => {
   const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
   await page.goto(`/lists/compare?u=alice&u=bob&tv=${encodeURIComponent(tv)}`);

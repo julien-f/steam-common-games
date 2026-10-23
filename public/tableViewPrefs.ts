@@ -47,38 +47,11 @@ function takeSharedView(): TableViewState | null {
   } catch {
     return null; // malformed — fall back to the stored default
   }
-  return isTableViewState(view) ? view : null; // setViewState throws on a wrong shape: https://github.com/vatesfr/data-table/issues/44
+  // A wrongly typed field inside is data-table's to ignore; the rest of the view still applies.
+  return isRecord(view) ? (view as TableViewState) : null;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isStrings = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
-const isPositiveInteger = (v: unknown): boolean => Number.isInteger(v) && (v as number) >= 1;
-const isMapOf = (v: unknown, isValue: (value: unknown) => boolean): boolean =>
-  isRecord(v) && Object.values(v).every(isValue);
-
-const VIEW_FIELD_CHECKS: Record<keyof TableViewState, (v: unknown) => boolean> = {
-  visibleCols: isStrings,
-  columnOrder: isStrings,
-  groupBy: isStrings,
-  collapsedGroups: isStrings,
-  sorts: (v) =>
-    Array.isArray(v) &&
-    v.every((s) => isRecord(s) && typeof s.key === 'string' && (s.dir === 'asc' || s.dir === 'desc')),
-  filters: (v) => isMapOf(v, isStrings),
-  excludeFilters: (v) => isMapOf(v, isStrings),
-  filterModes: (v) => isMapOf(v, (m) => m === 'and' || m === 'or'),
-  rangeFilters: (v) => isMapOf(v, (r) => isRecord(r) && typeof r.min === 'string' && typeof r.max === 'string'),
-  page: isPositiveInteger,
-  pageSize: isPositiveInteger,
-  searchQuery: (v) => typeof v === 'string',
-};
-
-function isTableViewState(v: unknown): v is TableViewState {
-  return (
-    isRecord(v) && Object.entries(VIEW_FIELD_CHECKS).every(([key, check]) => v[key] === undefined || check(v[key]))
-  );
-}
-
 // Saves every future view change — the only ongoing side effect table interaction has; the URL
 // stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
 // signal it touches), in its own root since a route can bind it from an async load. `paused`:

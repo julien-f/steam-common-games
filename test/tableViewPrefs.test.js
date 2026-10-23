@@ -86,21 +86,8 @@ test('restoreTableView: a malformed param falls through to the stored default', 
   });
 });
 
-test('restoreTableView: valid JSON of the wrong shape falls through to the stored default', () => {
-  const bad = [
-    '{"filters":{"name":5}}',
-    '[]',
-    '5',
-    'null',
-    '{"sorts":[{"key":"name","dir":"up"}]}',
-    '{"rangeFilters":{"price":{"min":1}}}',
-    '{"filterModes":{"tags":"xor"}}',
-    '{"pageSize":"25"}',
-    '{"pageSize":0}',
-    '{"page":-3}',
-    '{"page":1.5}',
-    '{"visibleCols":"name"}',
-  ];
+test('restoreTableView: valid JSON that is no view object falls through to the stored default', () => {
+  const bad = ['[]', '5', 'null', '"view"'];
   for (const raw of bad) {
     withLocation(`?tv=${encodeURIComponent(raw)}`, () => {
       const { setPref } = require('../public/prefs.ts');
