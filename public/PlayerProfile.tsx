@@ -143,10 +143,11 @@ function StoryList(props: {
                         {g().name}
                       </span>
                       <span class="profile-story-track" classList={{ reached: group.reached }}>
-                        <span style={{ width: `${Math.min(100, (100 * g().hours) / (g().main || g().hours))}%` }} />
+                        {/* No main story left (details refreshed since): an empty bar, not NaN%. */}
+                        <span style={{ width: `${g().main ? Math.min(100, (100 * g().hours) / g().main!) : 0}%` }} />
                       </span>
                       <span class="profile-story-hours">
-                        {roundHours(g().hours)} / {roundHours(g().main ?? 0)} h
+                        {g().main ? `${roundHours(g().hours)} / ${roundHours(g().main!)} h` : fmtHours(g().hours)}
                       </span>
                     </button>
                   )}
