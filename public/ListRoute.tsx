@@ -2336,7 +2336,7 @@ export default function ListRoute() {
         comparePlayers = shown.map((account) => ({
           id: account.id,
           label: accountDisplayLabel(account),
-          avatarUrl: account.avatarUrl ?? Object.values(account.memberAvatars ?? {})[0],
+          avatarUrl: account.avatarUrl ?? account.members.map((id) => account.memberAvatars?.[id]).find(Boolean),
           family: account.members.length > 1,
           owners: ownersByAccount.get(account.id) ?? new Map(),
         }));

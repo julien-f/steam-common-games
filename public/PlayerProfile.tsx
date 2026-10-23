@@ -32,7 +32,7 @@ export function PlayerAvatar(props: { url?: string; label: string; index: number
           style={{ background: `var(${AVATAR_COLOURS[props.index % AVATAR_COLOURS.length]})` }}
           aria-hidden="true"
         >
-          {props.label.slice(0, 1).toUpperCase()}
+          {Array.from(props.label)[0]?.toUpperCase()}
         </span>
       }
     >
