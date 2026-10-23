@@ -65,6 +65,7 @@ const {
   setUserPref,
   isSyncedPrefKey,
   prefFits,
+  PREFS_MAX_BYTES,
 } = require('./lib/auth');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS, TRUST_PROXY } = require('./lib/config');
 
@@ -203,7 +204,10 @@ if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 // One string per param (the last), so a repeated `?q=a&q=b` can't hand a route an array.
 app.set('query parser', (str) => Object.fromEntries(new URLSearchParams(str)));
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
-app.use(express.json());
+const PREFS_PATH = /^\/api\/me\/prefs\//;
+const jsonBody = express.json();
+// The prefs route parses its own body, past the default 100 KB limit and only once signed in.
+app.use((req, res, next) => (PREFS_PATH.test(req.path) ? next() : jsonBody(req, res, next)));
 // Express 5 leaves req.body undefined when no JSON body was parsed.
 app.use((req, _res, next) => {
   req.body ??= {};
@@ -1255,7 +1259,9 @@ app.get('/api/me', (req, res) => {
 // One key per request, never a whole-blob PUT — matches prefs.ts's own per-key setPref, so
 // two keys changing around the same time (different tabs/devices) can't clobber each other.
 // `updatedAt` (the device's own clock) is stored with the value, never checked: the write always wins.
-app.put('/api/me/prefs/:key', authLimit, requireAuth, (req, res) => {
+// prefFits counts UTF-16 units, which UTF-8 encodes in up to 3 bytes each.
+const prefsBody = express.json({ limit: 3 * PREFS_MAX_BYTES });
+app.put('/api/me/prefs/:key', authLimit, requireAuth, prefsBody, (req, res) => {
   const { value, updatedAt } = req.body;
   if (!('value' in req.body) || typeof updatedAt !== 'number') {
     return res.status(400).json({ error: 'body must be { value, updatedAt }' });
