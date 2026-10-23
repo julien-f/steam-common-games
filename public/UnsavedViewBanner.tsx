@@ -2,7 +2,7 @@ import { Show, createSignal, onCleanup, type JSX } from 'solid-js';
 import Link from 'lucide-solid/icons/link';
 import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import { getAuthUser } from './authStore.ts';
-import { isUnsaved, summarizeViewDiff } from './tableViewSync.ts';
+import { summarizeViewDiff } from './tableViewSync.ts';
 import type { ViewStateApi } from '@vates/data-table-solid';
 import { revertTableViewToServer, saveTableViewToServer } from './tableViewPrefs.ts';
 
@@ -10,18 +10,34 @@ import { revertTableViewToServer, saveTableViewToServer } from './tableViewPrefs
 // table-view pref is never auto-pushed, see prefs.ts's setPref).
 export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string }): JSX.Element {
   return (
-    <Show when={getAuthUser() && isUnsaved(props.prefKey, props.table.getViewState())}>
+    <Show when={getAuthUser()}>
+      <UnsavedChangesBanner
+        name="this view"
+        changes={summarizeViewDiff(props.prefKey, props.table.getViewState())}
+        note="differs from what's saved to your account."
+        onSave={() => saveTableViewToServer(props.prefKey, props.table.getViewState())}
+        onRevert={() => revertTableViewToServer(props.table, props.prefKey)}
+      />
+    </Show>
+  );
+}
+
+// Hidden while `changes` is empty.
+export function UnsavedChangesBanner(props: {
+  name: string;
+  changes: string[];
+  note: string;
+  onSave: () => void;
+  onRevert: () => void;
+}): JSX.Element {
+  return (
+    <Show when={props.changes.length}>
       <div class="pref-unsaved-banner">
-        Unsaved changes to this view ({summarizeViewDiff(props.prefKey, props.table.getViewState()).join(', ')}) —
-        differs from what's saved to your account.
-        <button
-          type="button"
-          class="btn"
-          onClick={() => saveTableViewToServer(props.prefKey, props.table.getViewState())}
-        >
+        Unsaved changes to {props.name} ({props.changes.join(', ')}) — {props.note}
+        <button type="button" class="btn" onClick={() => props.onSave()}>
           Save
         </button>
-        <button type="button" class="btn" onClick={() => revertTableViewToServer(props.table, props.prefKey)}>
+        <button type="button" class="btn" onClick={() => props.onRevert()}>
           Revert
         </button>
       </div>
@@ -37,6 +53,7 @@ export function ViewActions(props: {
   onReset: () => void;
   shareDisabledReason?: string | null;
   hideShare?: boolean;
+  hideReset?: boolean;
 }): JSX.Element {
   const [reasonShown, setReasonShown] = createSignal(false);
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -64,16 +81,18 @@ export function ViewActions(props: {
           <span class="btn-label"> Share view</span>
         </button>
       </Show>
-      <button
-        type="button"
-        class="btn"
-        aria-label="Default view"
-        title="Back to the default columns, sort and filters"
-        onClick={() => props.onReset()}
-      >
-        <RotateCcw class="btn-icon" />
-        <span class="btn-label">Default view</span>
-      </button>
+      <Show when={!props.hideReset}>
+        <button
+          type="button"
+          class="btn"
+          aria-label="Default view"
+          title="Back to the default columns, sort and filters"
+          onClick={() => props.onReset()}
+        >
+          <RotateCcw class="btn-icon" />
+          <span class="btn-label">Default view</span>
+        </button>
+      </Show>
       <Show when={props.shareDisabledReason}>
         {(reason) => (
           <>

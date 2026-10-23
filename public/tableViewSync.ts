@@ -15,7 +15,7 @@ const [baselines, setBaselines] = createSignal<Record<string, PrefEntry | undefi
 
 // The server's currently-known entry for `key`, or undefined when the server has never saved it
 // (a brand-new account, or a view never Saved yet) — treated the same as an empty view by
-// isUnsaved/summarizeViewDiff below, so a first-time local customization shows as unsaved too.
+// summarizeViewDiff below, so a first-time local customization shows as unsaved too.
 export function getBaseline(key: string): PrefEntry | undefined {
   return baselines()[key];
 }
@@ -63,19 +63,20 @@ const FIELD_LABELS: readonly (readonly [keyof TableViewState, string])[] = [
 // `key`'s baseline — what the unsaved-changes banner names, e.g. "Sort, Columns". Empty when
 // there's nothing to save.
 export function summarizeViewDiff(key: string, currentValue: unknown): string[] {
-  const baseline = stripTransientViewFields(baselines()[key]?.value);
+  return diffViewLabels(baselines()[key]?.value, currentValue);
+}
+
+// The same, against any saved view (a listViews.ts view's own definition).
+export function diffViewLabels(savedValue: unknown, currentValue: unknown): string[] {
+  const saved = stripTransientViewFields(savedValue);
   const current = stripTransientViewFields(currentValue);
   const labels: string[] = [];
   for (const [field, label] of FIELD_LABELS) {
-    if (JSON.stringify(current[field]) !== JSON.stringify(baseline[field]) && !labels.includes(label)) {
+    if (JSON.stringify(current[field]) !== JSON.stringify(saved[field]) && !labels.includes(label)) {
       labels.push(label);
     }
   }
   return labels;
-}
-
-export function isUnsaved(key: string, currentValue: unknown): boolean {
-  return summarizeViewDiff(key, currentValue).length > 0;
 }
 
 // Clears every baseline — called from authStore.ts's signOut() so a lingering baseline from the

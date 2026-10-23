@@ -11,6 +11,7 @@ export const SYNCED_PREF_KEYS: readonly string[] = [
   'region',
   'lists',
   'folders',
+  'listViews',
   ...TABLE_VIEW_PREF_KEYS,
 ];
 const RANKING_KEY_RE = /^ranking:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

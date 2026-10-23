@@ -54,6 +54,7 @@ import {
   isDescendantFolder,
   getRanking,
 } from './listsStore.ts';
+import { getListViews, type ViewKind } from './listViews.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { useBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, formatFormula, listDisplayName } from './listLabels.ts';
@@ -267,6 +268,11 @@ export default function HomeRoute() {
     return withAccountParam(path, location.search);
   }
 
+  // A list's saved views (listViews.ts), straight from its card.
+  function viewLinks(kind: ViewKind): { name: string; href: string }[] {
+    return getListViews(kind).map((v) => ({ name: v.name, href: accountLink(`/lists/${kind}?view=${v.id}`) }));
+  }
+
   // Home's ways into the lists that aren't the user's own; `name` is each link's accessible name.
   const exploreCards = () => [
     {
@@ -274,12 +280,14 @@ export default function HomeRoute() {
       href: accountLink('/lists/owned'),
       icon: LibraryBig,
       description: "The current account's games",
+      views: viewLinks('owned'),
     },
     {
       name: 'Wishlist',
       href: accountLink('/lists/wishlist'),
       icon: Heart,
       description: "The current account's wishlist",
+      views: viewLinks('wishlist'),
     },
     // No `?u=`: a comparison names its own players in the URL, and carrying an unrelated
     // account override alongside them would be two different claims about whose games are on screen.
@@ -814,6 +822,17 @@ export default function HomeRoute() {
                   <A href={card.href}>{card.name}</A>
                 </h3>
                 <p>{card.description}</p>
+                <Show when={card.views?.length}>
+                  <ul class="explore-views" aria-label={`${card.name} views`}>
+                    <For each={card.views}>
+                      {(view) => (
+                        <li>
+                          <A href={view.href}>{view.name}</A>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
               </li>
             )}
           </For>

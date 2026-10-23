@@ -307,3 +307,11 @@ export interface GameList {
   deletedAt?: number; // soft-deleted — hidden from the tree/pickers, kept for dynamic-list
   // resolution + restore as long as something still references it
 }
+
+// A named table view of Owned or Wishlist (listViews.ts), for whichever account is current.
+export interface SavedView {
+  id: string;
+  name: string;
+  tableView: object; // tableViewPrefs.ts's shape, minus page/searchQuery
+  template?: string; // the listViews.ts template it was created from
+}

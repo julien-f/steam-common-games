@@ -981,6 +981,78 @@
     font-size: var(--fs-ui);
   }
 
+  /* Scrolls inside itself on a phone rather than wrapping: one row, the table starts higher. */
+  .view-tabs {
+    position: relative; /* offsetLeft, for ViewTabs.tsx's scroll */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--fs-ui);
+  }
+  .view-tab {
+    flex: none;
+    padding: 8px 10px;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .view-tab:hover {
+    color: var(--text);
+  }
+  .view-tab[aria-current='page'] {
+    border-bottom-color: var(--accent);
+    color: var(--text);
+  }
+  .view-tab-more {
+    display: inline-flex;
+    flex: none;
+    justify-content: center;
+    align-items: center;
+    min-width: 28px;
+    min-height: 28px;
+    border: 0;
+    border-radius: var(--radius-2);
+    background: none;
+    color: var(--muted);
+  }
+  .view-tab-more:hover {
+    background: var(--line);
+    color: var(--text);
+  }
+  /* Phone: icon only, so it fits beside the title with Rank this list. */
+  @media (max-width: 768px) {
+    .new-view-label {
+      display: none;
+    }
+  }
+  .view-menu-panel {
+    width: 260px;
+  }
+  .view-menu-panel:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .view-menu-form {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .view-menu-label {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+
+  .list-note {
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: var(--fs-ui);
+  }
+
   /* Share view / Default view, in the table toolbar's end slot. */
   .list-view-actions {
     position: relative;
@@ -3508,7 +3580,7 @@
   .explore-card:hover {
     border-color: var(--line-control);
   }
-  .explore-card:has(a:focus-visible) {
+  .explore-card:has(h3 a:focus-visible) {
     outline: 2px solid var(--text);
     outline-offset: 2px;
   }
@@ -3527,19 +3599,37 @@
   .explore-card a {
     text-decoration: none;
   }
-  .explore-card a::after {
+  .explore-card h3 a::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
   }
-  .explore-card a:focus-visible {
+  .explore-card h3 a:focus-visible {
     outline: none;
   }
   .explore-card p {
     color: var(--muted);
     font-size: var(--fs-meta);
     line-height: 1.4;
+  }
+  /* Above the card's own stretched link. */
+  .explore-views {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-meta);
+  }
+  .explore-card .explore-views a {
+    display: inline-block;
+    min-height: 24px;
+    line-height: 24px;
+    text-decoration: underline;
   }
   /* Phone: one card per row, the icon beside the text. */
   @media (max-width: 600px) {
@@ -3557,6 +3647,9 @@
     .explore-icon {
       grid-row: span 2;
       margin-bottom: 0;
+    }
+    .explore-views {
+      grid-column: 2;
     }
   }
 

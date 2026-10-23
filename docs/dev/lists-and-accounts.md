@@ -120,6 +120,7 @@ Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without 
 - **Every sign-in check merges** (`authStore.ts`'s `syncPrefsWithServer`, from `initAuth` on every page load):
   - **First sync of a device with an account** (no `steam.isonoe.net:prefs-synced:<steamid>` localStorage flag — its own key, never synced, so an adopted blob can't carry it): server wins for every key both sides have, whatever the timestamps (a new device's local state may be leftover anonymous browsing); keys only local are pushed.
   - **Every later sync**: per-key last-write-wins both ways; a key on one side propagates; a tie is left alone.
+  - One key is one value: concurrent edits to it on two devices keep the newest whole, `lists` and `listViews` alike (two views added at once on two devices: one is lost).
   - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load. An adoption storage refuses (full, disabled) is skipped with an `[auth]` warning instead, or every load would re-adopt and reload.
 - **Signing in fills `myAccount`/`currentAccount` when unset** (`autoPopulateAccountFromLogin`), via the same `resolveAccountSlot` as Home's picker; an existing pick is never overwritten, and a failed resolve retries on the next load.
 - **Table-view keys are never auto-synced** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `bundlesBrowseView`). Editing a table stays local until the user saves it:
@@ -150,7 +151,7 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
              accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId? · name?
 ```
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `listViews` (`{ owned?, wishlist? }`: `SavedView[]` each — `id` · `name` · `tableView` · `template?` — for whichever account is current, never a list or combine source), `recentGames`, `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
 
 Outside the blob: `steam.isonoe.net:taste:<accountId>` (`tagTaste.ts`'s `Taste`: play profile, the library's tag rarities and each owned game's top 10 tags — ~325 KB for 1,000 games), rewritten each time that account's Owned list finishes loading and read by every list's Taste fit and the panel's similar owned games. A device-local cache (`tasteCache.ts`): never synced, and kept out of the blob that every pref read parses.
 

@@ -51,7 +51,7 @@ function markSyncedBefore(steamid: string): void {
 // instead, this just refreshes tableViewSync.ts's `baseline` (this session's best-known copy of
 // the server's value) for the owning route to diff the live table against, showing an explicit
 // Save/Revert "unsaved changes" banner when they differ. A key the server has never saved clears
-// its baseline instead, which isUnsaved/summarizeViewDiff (tableViewSync.ts) treat the same as an
+// its baseline instead, which summarizeViewDiff (tableViewSync.ts) treat the same as an
 // empty view.
 //
 // Every other pref (region, ...) keeps the original rule — a device's *first ever* sync with a

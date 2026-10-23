@@ -150,7 +150,10 @@ import {
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
-import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { UnsavedChangesBanner, UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { getListView, saveListViewTable } from './listViews.ts';
+import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
+import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import {
@@ -1964,10 +1967,58 @@ export default function ListRoute() {
     if (kind === 'creator') return 'creatorListView';
     return 'ownedListView';
   }
+  // Owned/Wishlist's saved view (listViews.ts) in `?view=`, for whichever account is current.
+  const viewKind = kind === 'owned' || kind === 'wishlist' ? kind : null;
+  const viewId = createMemo(() => (viewKind ? new URLSearchParams(routerLocation.search).get('view') : null));
+  const activeView = createMemo(() => {
+    const id = viewId();
+    return viewKind && id ? (getListView(viewKind, id) ?? null) : null;
+  });
+  // A saved view's edits until Save, kept across table rebuilds; dropped on leaving the view.
+  const viewDrafts = new Map<string, TableViewState>();
+  function savedViewStore(id: string): ViewStore {
+    return {
+      load: () => viewDrafts.get(id) ?? ((untrack(activeView)?.tableView ?? {}) as TableViewState),
+      save: (view) => viewDrafts.set(id, view),
+    };
+  }
   // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
   function viewStore(): ViewStore {
+    const saved = untrack(activeView);
+    if (saved) return savedViewStore(saved.id);
     const id = userList()?.id;
     return id ? userListViewStore(id) : prefViewStore(viewPrefKey());
+  }
+  // Another tab of the same list: no reload, only its view (and where it's kept) changes.
+  createEffect(
+    on(
+      viewId,
+      () => {
+        viewDrafts.clear();
+        if (!table) return;
+        unsyncView?.();
+        setViewingShared(false);
+        const store = viewStore();
+        applyView(store.load());
+        unsyncView = bindViewPersistence(table, store, viewingShared, setSharedViewEdited);
+      },
+      { defer: true },
+    ),
+  );
+  // A view filtering on prices (Bargains) matches nothing until they arrive: say so, not "no match".
+  const viewAwaitsPrices = createMemo(() => {
+    if (!tableReady() || !activeView() || itadOff()) return false;
+    const view = viewTable.getViewState();
+    const keys = [...Object.keys(view.filters ?? {}), ...Object.keys(view.rangeFilters ?? {})];
+    return keys.some((k) => PRICE_KEYS.has(k)) && tableData().some((row) => row.bestDealPrice === undefined);
+  });
+  function saveActiveView(): void {
+    const saved = activeView();
+    if (saved && viewKind) saveListViewTable(viewKind, saved.id, viewTable.getViewState());
+  }
+  function revertActiveView(): void {
+    const saved = activeView();
+    if (saved) applyView(saved.tableView);
   }
   // tableView drops page/searchQuery, so a rebuild (e.g. after a removal) keeps them from here.
   let lastUserListView: { id: string; view: TableViewState } | null = null;
@@ -2029,7 +2080,7 @@ export default function ListRoute() {
     // Owned/Wishlist are whoever is current — without `u=` the recipient would get their own.
     const account = kind === 'owned' || kind === 'wishlist' ? getEffectiveCurrentAccount() : null;
     const u = account && accountIdentifiers(account).map((m) => m.identifier);
-    shareTableView(table, btn, u ? { u: u.join(',') } : {});
+    shareTableView(table, btn, u ? { u: u.join(',') } : {}, ['view']);
   }
   function handleResetView(): void {
     if (table) resetTableView(viewTable, viewStore());
@@ -2052,6 +2103,7 @@ export default function ListRoute() {
           onReset={handleResetView}
           shareDisabledReason={shareViewFailure()}
           hideShare={isDynamicList()}
+          hideReset={!!activeView()}
         />
       </>
     );
@@ -3705,6 +3757,20 @@ export default function ListRoute() {
             {editingRankedSource() ? 'Cancel' : 'Change source'}
           </button>
         </Show>
+        <Show when={viewKind}>
+          {(k) => (
+            <NewViewMenu
+              kind={k()}
+              defaultVisible={k() === 'owned' ? OWNED_DEFAULT_VISIBLE : WISHLIST_DEFAULT_VISIBLE}
+              pricesShown={!itadOff()}
+              currentView={viewTable.getViewState}
+              onCreated={(view) => {
+                navigate(viewHref(routerLocation, view.id));
+                showSelectionStatus(`Saved view ${view.name}`);
+              }}
+            />
+          )}
+        </Show>
         <Show when={rankSourceRef()}>
           <Show
             when={tableReady() && existingRankings().length > 0}
@@ -4000,6 +4066,7 @@ export default function ListRoute() {
           section={playersSection()}
         />
       </Show>
+      <Show when={viewKind}>{(k) => <ViewTabs kind={k()} activeId={activeView()?.id ?? null} />}</Show>
       {/* The players form is this route's empty state (fewer than two players in the URL) and its
           edit affordance (the hero's "Edit players"), never a third thing — see
           ComparePlayersForm.tsx on why it lives here rather than on Home. Keyed on the URL's own
@@ -4112,8 +4179,27 @@ export default function ListRoute() {
         <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
       </div>
       {/* Never a user list's own view: it syncs within `lists` on every change (listsStore.ts), with nothing to Save. */}
-      <Show when={tableReady() && !userList()}>
+      <Show when={tableReady() && !userList() && !activeView()}>
         <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
+      </Show>
+      <Show when={tableReady() && activeView()}>
+        {(saved) => (
+          <UnsavedChangesBanner
+            name={saved().name}
+            changes={diffViewLabels(saved().tableView, viewTable.getViewState())}
+            note="lost if you leave this view."
+            onSave={saveActiveView}
+            onRevert={revertActiveView}
+          />
+        )}
+      </Show>
+      <Show when={viewAwaitsPrices()}>
+        <p class="list-note" role="status">
+          Prices are still loading: this view filters on them.
+        </p>
+      </Show>
+      <Show when={viewId() && !activeView()}>
+        <p class="list-note">This view no longer exists; showing the whole list.</p>
       </Show>
       <Show when={tableReady() && viewingShared()}>
         <SharedViewBanner

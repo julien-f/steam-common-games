@@ -197,6 +197,18 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. add to a manual list
 - **Done when**: the manual list keeps them after Recently Looked Up moves on.
 
+### L5 Switch between views of my library
+
+- **Who / goal**: keep "Recently played" and "Play next" on Owned, or "Bargains" on Wishlist, and switch between them without filtering again.
+- **Steps**:
+  1. Owned
+  2. **New view**: a suggested view, or **Save as view** for the table as it is
+  3. switch views from the tabs under the header
+  4. change a view's sort or filters, then **Save** or **Revert**
+  5. Home: open a view from the Owned card
+- **Done when**: each view keeps its own layout; a friend's Owned opens through the same views; leaving a view drops its unsaved edits; Share view sends the layout, not the view.
+- **Edges**: a link to a deleted view; Bargains while prices load; the tabs on a phone.
+
 ## Ranking
 
 ### R1 Rank my played games
@@ -251,6 +263,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. Wishlist
   2. sort by discount or filter record-low badges (🔥 ★ ☆)
   3. Preferences (gear icon) to set region
+- **Or**: step 2 as Wishlist's **Bargains** view (L5).
 - **Done when**: prices state their region and age; the refresh on the Prices figure refreshes them only.
 
 ### B3 What does this bundle add for the whole household?
@@ -305,6 +318,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. filter to never played
   4. sort by HLTB (shortest first) or rating
   5. **Pick a random game** (or **R**) for a random pick, or browse with ↑/↓
+- **Or**: steps 2–4 as Owned's **Play next** view (L5).
 - **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?); Plays mostly's **Why these?** on a phone (the games wrap under each bar, and their hours don't read as a sort order).
 

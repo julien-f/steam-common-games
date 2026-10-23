@@ -34,6 +34,10 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 ## Lists
 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, follow their source — nothing to maintain. Their "Updated" figure says how old they are (see [How fresh is this?](#how-fresh-is-this)).
+- **Views** of Owned and Wishlist keep several named layouts of one list (columns, sort, grouping, filters), opened as tabs under its header: **All games**, then each view.
+  - **New view** (beside Rank this list) offers ready-made ones, **Recently played** and **Play next** (played 2 h or less, best Taste fit first) on Owned, **Bargains** (at a 1-year or all-time low, biggest discount first) on Wishlist, or saves the table as it is now.
+  - Changing a view's table doesn't save it: **Save** or **Revert** in the banner above it; leaving the view drops the changes. Its **⋯** renames or deletes it.
+  - A view follows the account you're exploring, like Owned and Wishlist themselves; Home's Owned and Wishlist cards link each one.
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
 - Lists live in a **folder tree** you can rename, nest and organize. Each row shows its kind's icon and what it holds ("List · 12 games", "Ranking · 30 ranked"); its **⋯** menu moves it elsewhere in the tree (**Move to…**), renames or deletes it.
@@ -141,7 +145,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 - Links pasted in a chat (WhatsApp, Slack, Discord, iMessage…) show a preview card; a `/game/…` link's card names the game and shows its header image once the app has looked that game up, other links get the site's card.
 - Add `?u=` to any list link to share the account you're exploring. It never changes the recipient's own default account, and a game link deliberately doesn't carry it.
 - A comparison's link names its players the same way, one `?u=` each — including links made by older versions of this app, which still work.
-- **Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Your own saved lists' link only opens in your browser, so a combined list has **Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
+- **Share view** copies a link with your current table layout — columns, sort, grouping, filters — baked in. On Owned and Wishlist it also carries the account (`?u=`), so the recipient sees your games, not their own. The recipient sees it for that visit only, with **Keep as my layout** to make it theirs or **Use my own** to go back; once they change that layout, the banner warns it's lost on reload unless kept. Nothing of their own setup changes otherwise. Shared from a view, the link carries its layout, not the view. Your own saved lists' link only opens in your browser, so a combined list has **Share list** instead of Share view, and on manual and ranked lists Share view is dimmed: they can't be shared yet.
 
 ## Sync
 
