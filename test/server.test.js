@@ -2732,6 +2732,9 @@ test('PUT /api/me/prefs/:key: accepts one key larger than the default JSON body 
   const big = 'x'.repeat(PREFS_MAX_BYTES - 100);
   await agent.put('/api/me/prefs/region').send({ value: big, updatedAt: 1000 }).expect(200);
   assert.equal(getUserPrefs(steamid).region.value.length, big.length);
+  // Express matches routes case-insensitively, so the size limit must follow the route, not a path copy.
+  await agent.put('/API/me/prefs/region').send({ value: big, updatedAt: 2000 }).expect(200);
+  await agent.put('/api/me/prefs/region').expect(400);
 });
 
 test('POST /auth/logout: session stops working afterwards', async (t) => {
