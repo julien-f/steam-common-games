@@ -113,8 +113,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## A phone e2e layout test fails in CI only, by a few pixels
 
 - **Symptom**: a position check like I1's `expect(top).toBeLessThan(520)` gets `Received: 524.5` in CI, yet passes locally and in the `mcr.microsoft.com/playwright` image.
-- **Cause**: the GitHub runner's fonts run wider, so a row at its 390 px limit (340.4 px of buttons in 340 px) wraps there only.
-- **Fix**: reproduce locally by widening the text (`page.addStyleTag` with `letter-spacing: 1px`), as I1's test does; to see CI's layout, log `getBoundingClientRect()`s from the test on a branch run.
+- **Cause**: the GitHub runner's system font is DejaVu Sans, wider than Fedora's and with a shorter `normal` line height, so a row at its 390 px limit wraps, a column sized in px overflows, or a control drops under a 24px tap there only.
+- **Fix**: reproduce exactly with DejaVu Sans's `.ttf` files in a directory and a `fonts.conf` that includes `/etc/fonts/fonts.conf`, adds that `<dir>` and puts DejaVu Sans first for `system-ui`, `sans-serif` (and DejaVu Sans Mono for `monospace`) with `<alias binding="strong">`; then `FONTCONFIG_FILE=<that file> npx playwright test …`. Fix the CSS (size to content, set a line height), not the threshold: Debian and Ubuntu users get the same font.
 - **Also**: to find the change that broke it, diff against the last green run's commit (`gh run view <id> --json headSha`), not just the newest commit: one push can carry many.
 
 ## A closed `[popover]` panel shows anyway

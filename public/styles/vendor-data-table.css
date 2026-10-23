@@ -157,6 +157,10 @@ html:root {
   .list-route .dt-toolbar-divider {
     display: none;
   }
+  /* Room for wider system fonts (DejaVu Sans) before Share view drops off Columns/Group/Sort's line. */
+  .dt-btn {
+    padding: 0 8px;
+  }
   /* Down from the library's 160px, so the search still fits beside the view actions at 320px. */
   .dt-search-wrap {
     min-width: 120px;

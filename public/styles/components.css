@@ -2882,24 +2882,31 @@
     background: var(--line);
     color: var(--text);
   }
+  /* One grid down to each row (subgrid): the keys column fits the widest keys in any font, and every
+     description starts at the same x, across sections too. */
   .shortcuts-body {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 18px 10px;
     padding: 14px 16px 16px;
     overflow-y: auto;
   }
+  .shortcuts-section,
+  .shortcuts-section > dl,
+  .shortcuts-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    row-gap: 0;
+  }
   .shortcuts-section-title {
+    grid-column: 1 / -1;
     margin-bottom: 8px;
     color: var(--muted);
     font-size: var(--fs-meta);
   }
   .shortcuts-row {
-    display: grid;
-    /* Fixed, not max-content: every row's description then starts at the same x, across sections too. */
-    grid-template-columns: 96px 1fr;
     align-items: center;
-    gap: 10px;
     color: var(--text-body);
     font-size: var(--fs-ui);
   }
@@ -3368,6 +3375,8 @@
   .tree-name {
     flex: 0 1 auto;
     padding-block: 4px;
+    /* Not `normal`: some system fonts' is short enough to leave the link under a 24px tap. */
+    line-height: 1.4;
     text-decoration: none;
   }
   a.tree-name:hover {
@@ -3571,7 +3580,8 @@
     text-decoration: line-through var(--bad);
   }
   .compare-token-remove {
-    width: 24px;
+    /* Over 24px: its x follows the label's fractional width, and hit-testing snaps edges to whole pixels. */
+    width: 26px;
     height: 24px;
     padding: 0;
     border: 0;
