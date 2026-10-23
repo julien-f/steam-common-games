@@ -71,10 +71,13 @@ export function similarGames<T extends Tagged>(target: T, games: readonly T[], l
 // Below this many played games, a profile says more about chance than taste.
 const MIN_PLAYED_FOR_PROFILE = 5;
 
-function playedOf<T extends Omit<Tagged, 'appid'> & { playtime?: number }>(weighted: readonly T[]) {
+type Hours<T> = (g: T) => number | undefined;
+const ownPlaytime = (g: { playtime?: number }) => g.playtime;
+
+function playedOf<T extends Omit<Tagged, 'appid'>>(weighted: readonly T[], hours: Hours<T>) {
   return weighted
-    .filter((g) => g.playtime && !isSoftware(g))
-    .map((game) => ({ game, hours: game.playtime!, weights: featuresOf(game) }));
+    .filter((g) => hours(g) && !isSoftware(g))
+    .map((game) => ({ game, hours: hours(game)!, weights: featuresOf(game) }));
 }
 
 // Tag weights × log playtime (one 2000 h game can't drown the rest) × rarity; null if too few played.
@@ -94,14 +97,15 @@ export interface PlayedTag {
 
 const GAMES_PER_TAG = 3;
 
-// `played`: how many games the profile is built from.
-export function topPlayedTags(
-  games: readonly (Omit<Tagged, 'appid'> & { name: string; playtime?: number })[],
+// `played`: how many games the profile is built from. `hours`: a comparison player's, not the row's own.
+export function topPlayedTags<T extends Omit<Tagged, 'appid'> & { name: string; playtime?: number }>(
+  games: readonly T[],
   limit: number,
+  hours: Hours<T> = ownPlaytime,
 ): { tags: PlayedTag[]; played: number } {
   const weighted = games.filter((g) => g.details?.tagWeights);
   const idf = inverseFrequency(weighted.map(featuresOf));
-  const played = playedOf(weighted);
+  const played = playedOf(weighted, hours);
   const top = [...(playProfile(played, idf) ?? [])]
     .filter(([tag, score]) => score > 0 && !tag.startsWith(TIER_PREFIX))
     .sort((a, b) => b[1] - a[1])
@@ -185,7 +189,7 @@ export function tasteOf(games: readonly (Tagged & { name: string; playtime?: num
   if (!weighted.length) return null;
   const corpus = weighted.map(featuresOf);
   const idf = inverseFrequency(corpus);
-  const profile = playProfile(playedOf(weighted), idf);
+  const profile = playProfile(playedOf(weighted, ownPlaytime), idf);
   const tags = new Set(corpus.flatMap(Object.keys));
   return {
     at,

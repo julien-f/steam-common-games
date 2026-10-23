@@ -862,6 +862,49 @@ test('C6 edge: a comparison has a Played column per player', async ({ page }) =>
   await expect(portal.nth(col('Played (h) · Bob'))).toHaveText('—');
 });
 
+// A comparison's Players section, opened: it starts folded on a phone.
+async function openPlayers(page: Page): Promise<Locator> {
+  const players = page.locator('.list-players');
+  await expect(players.locator('summary')).toBeVisible();
+  if (!(await players.evaluate((d: HTMLDetailsElement) => d.open))) await players.locator('summary').click();
+  return players;
+}
+
+test("C7.2: Players shows each player's top tags and play style, open on desktop, folded on a phone", async ({
+  page,
+}, testInfo) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = page.locator('.list-players');
+  await expect(players.locator('summary')).toHaveText('Players (2)');
+  const phone = testInfo.project.name === 'phone';
+  await expect(players).toHaveJSProperty('open', !phone);
+  if (phone) await players.locator('summary').click();
+  const dave = players.getByRole('listitem').filter({ hasText: 'Dave' });
+  const erin = players.getByRole('listitem').filter({ hasText: 'Erin' });
+  await expect(dave).toContainText('Mostly single-player games');
+  await expect(erin).toContainText('Mostly co-op games');
+  const pvp = erin.getByRole('button', { name: 'PvP' });
+  await pvp.click();
+  await expect(pvp).toHaveAttribute('aria-pressed', 'true');
+  await expect(row(page, 'Dead by Daylight')).toBeVisible();
+  await expect(row(page, 'The Witcher 3: Wild Hunt')).toHaveCount(0);
+});
+
+test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
+  await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
+  await expect(rows(page)).toHaveCount(3);
+  await page.getByRole('button', { name: 'Switch to Grouped by membership' }).click();
+  await expect(page.locator('.list-players summary')).toHaveText('Players (2)');
+});
+
+test('C7 edge: a player with too few games played says so', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave');
+  const players = await openPlayers(page);
+  await expect(players.getByRole('listitem').filter({ hasText: 'Alice' })).toContainText(
+    'too few games played here for a profile',
+  );
+});
+
 test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=bob&u=carol');
   await expect(groupRows(page)).toHaveCount(6);

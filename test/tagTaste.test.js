@@ -100,6 +100,14 @@ test('topPlayedTags: no profile from fewer than 5 played games', () => {
   assert.deepEqual(topPlayedTags([...games, owned(5, 0, { B: 1 })], 5), { tags: [], played: 4 });
 });
 
+test("topPlayedTags: a comparison player's hours instead of the row's own playtime", () => {
+  const games = [1, 2, 3, 4, 5].map((id) => owned(id, 0, { Roguelike: 1, [`T${id}`]: 0.5 }));
+  assert.deepEqual(topPlayedTags(games, 3), { tags: [], played: 0 });
+  const { tags, played } = topPlayedTags(games, 3, () => 10);
+  assert.equal(played, 5);
+  assert.equal(tags.length, 3);
+});
+
 const software = (g) => ({ ...g, genres: ['Casual', 'Utilities'] });
 
 test('isSoftware: by Steam genre, since software comes back as type "game"', () => {

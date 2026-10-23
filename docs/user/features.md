@@ -87,6 +87,7 @@ The result is a link. Copy the address and whoever opens it sees the same compar
 
 - Each player gets a **Played (h)** column; its "never played" filter preset (on every Played column) finds what a player owns but never launched.
 - **Group fit** scores each game for the player it suits least, by each player's taste (the Steam tags of what they play, weighted by playtime); the cell names that player, and hovering it shows everyone's score. A player with fewer than 5 played games here has no taste profile and is left out, as the line under the list header says. Profiles come from the games in the comparison, so on **Intersect** only from the shared ones.
+- **Players**, under the header (folded on a phone): each player's top 3 Steam tags (each filters the list) and whether they mostly play single-player, co-op or PvP games, as on [Owned](#lists). It needs every player's whole library, so on **Intersect** or **Subtract** it offers to switch back to Grouped instead.
 - The mode menu switches between the four [combine operations](#combining-lists) — e.g. **Intersect** for a single flat table of what everyone owns.
 - **Save as a list** keeps it in your own list tree, where it re-resolves every time you open it.
 

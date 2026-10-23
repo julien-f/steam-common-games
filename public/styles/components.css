@@ -640,6 +640,39 @@
     font-size: var(--fs-label);
     font-style: normal;
   }
+  .list-players {
+    margin-top: 8px;
+    font-size: var(--fs-label);
+  }
+  .list-players summary {
+    min-height: 24px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .list-players ul {
+    display: grid;
+    gap: 6px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .list-players li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .list-players-name {
+    min-width: 5em;
+    font-weight: 600;
+  }
+  .list-players-none {
+    color: var(--muted);
+  }
+  .list-players-switch {
+    margin: 8px 0 0;
+    font-size: var(--fs-label);
+  }
   .list-profile-backlog {
     min-height: 24px;
     padding: 2px 4px;

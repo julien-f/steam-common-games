@@ -637,6 +637,7 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
+const PLAYER_TAGS_SHOWN = 3;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -3206,18 +3207,92 @@ export default function ListRoute() {
     );
   }
 
+  // A comparison player's hours on a game, summed over a Family's members.
+  const playerHours = (player: (typeof comparePlayers)[number]) => (appid: number) => {
+    const minutes = player.owners.get(appid)?.reduce((sum, o) => sum + o.minutes, 0);
+    return minutes ? minutes / 60 : 0;
+  };
   // Once every row's details are in, like Plays mostly.
   const groupFits = createMemo(() =>
-    kind === 'compare' && loadFraction() == null
-      ? playerFits(
-          tableData(),
-          comparePlayers.map((player) => (appid) => {
-            const minutes = player.owners.get(appid)?.reduce((sum, o) => sum + o.minutes, 0);
-            return minutes && minutes / 60;
-          }),
-        )
-      : null,
+    kind === 'compare' && loadFraction() == null ? playerFits(tableData(), comparePlayers.map(playerHours)) : null,
   );
+  // Profiles need every player's whole library among the rows: Intersect and Subtract drop some.
+  const profilesShown = () => compareOp() === 'group-by-membership' || compareOp() === 'union';
+  // Untracked rows: price loading and ownership stamping after the details mustn't recompute it.
+  const playerProfiles = createMemo(() => {
+    if (kind !== 'compare' || loadFraction() != null || !profilesShown()) return null;
+    return untrack(() => {
+      const rows = tableData();
+      return comparePlayers.map((player) => {
+        const hours = playerHours(player);
+        const ofRow = (g: { appid: number }) => hours(g.appid);
+        return {
+          label: player.label,
+          tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
+          style: playStyle(rows, ofRow),
+        };
+      });
+    });
+  });
+  const [playersOpen, setPlayersOpen] = createSignal(window.matchMedia('(min-width: 768px)').matches);
+  function playersSection(): JSX.Element | undefined {
+    if (kind !== 'compare') return undefined;
+    return (
+      <Show when={compareList()}>
+        <Show
+          when={profilesShown()}
+          fallback={
+            <p class="list-players-switch">
+              Comparing the players' tastes needs their whole libraries.{' '}
+              <button
+                type="button"
+                class="btn"
+                onClick={() => navigate(compareUrl(compareSlots(), DEFAULT_COMPARE_OP))}
+              >
+                Switch to {OP_LABELS[DEFAULT_COMPARE_OP]}
+              </button>
+            </p>
+          }
+        >
+          <Show when={playerProfiles()}>
+            {(profiles) => (
+              <details class="list-players" open={playersOpen()} onToggle={(e) => setPlayersOpen(e.currentTarget.open)}>
+                <summary>Players ({profiles().length})</summary>
+                <ul>
+                  <For each={profiles()}>
+                    {(p) => (
+                      <li>
+                        <span class="list-players-name">{p.label}</span>
+                        <Show
+                          when={p.tags.length}
+                          fallback={<span class="list-players-none">too few games played here for a profile</span>}
+                        >
+                          <For each={p.tags}>
+                            {(tag) => (
+                              <button
+                                type="button"
+                                class="list-plays-mostly-tag"
+                                aria-pressed={tableReady() && isTagActive('tags', tag)}
+                                title={`Filter by ${tag}`}
+                                onClick={() => onTagClick('tags', tag)}
+                              >
+                                {tag}
+                              </button>
+                            )}
+                          </For>
+                          <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </details>
+            )}
+          </Show>
+        </Show>
+      </Show>
+    );
+  }
   // The table's score columns explained in the status line, since a cell's title is hover-only.
   const [tasteFitSource, setTasteFitSource] = createSignal<TasteSource | null>(null);
   const scoreNotes = createMemo(() => {
@@ -3765,6 +3840,7 @@ export default function ListRoute() {
           actions={heroActions}
           tiles={heroTiles()}
           note={heroNote()}
+          section={playersSection()}
         />
       </Show>
       {/* The players form is this route's empty state (fewer than two players in the URL) and its

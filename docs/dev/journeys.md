@@ -145,7 +145,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Who / goal**: two or more friends want to see where their tastes meet and differ, and what one could pass on to another.
 - **Steps**:
   1. C1
-  2. open **Players** ◇
+  2. open **Players**
   3. read each player's top tags and play style, and how alike the pairs are ◇
   4. read the shared favourites and the tags in common ◇
   5. **Suggest to** a player: games another played a lot that they never have ◇
