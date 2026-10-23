@@ -902,6 +902,27 @@ test('C1 edge: an empty player box highlights no suggestion until one is pointed
   await expect(chips.filter({ hasText: 'Bob' })).toHaveCount(1);
 });
 
+test('C1 edge: ArrowDown steps through every player suggestion', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  for (const name of ['bob', 'carol']) {
+    await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill(name);
+    await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  }
+  await expect(page.locator('.recent-accounts li')).toHaveCount(3);
+  await page.goto('/lists/compare');
+  const box = page.locator('.compare-form').getByRole('combobox').nth(1);
+  await box.focus();
+  const options = page.getByRole('option');
+  await expect(options).toHaveCount(2);
+  await box.press('ArrowDown');
+  await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await box.press('ArrowDown');
+  await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await box.press('ArrowDown');
+  await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true'); // wraps
+});
+
 test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);

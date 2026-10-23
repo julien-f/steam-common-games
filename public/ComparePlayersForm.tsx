@@ -154,7 +154,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        openDropdown(slotIdx);
+        if (openSlot() !== slotIdx) openDropdown(slotIdx);
         setHighlight((h) => (list.length === 0 || activeIdx() == null ? 0 : (h + 1) % list.length));
         setPointed(true);
         break;

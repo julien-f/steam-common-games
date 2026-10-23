@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a phone, Compare's players form no longer shows a More actions button with nothing behind it
 - Enter in an empty player field on Compare adds the suggestion you pointed at, or else starts the comparison once two players are in
 - Keyboard focus stays in place after Look up, Add to list and stepping onto the last bundle
+- ArrowDown in a Compare player box steps through every suggestion instead of sticking on one
 
 ### Development
 
