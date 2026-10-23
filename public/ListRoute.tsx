@@ -1247,6 +1247,8 @@ export default function ListRoute() {
   // The comparison currently in the URL. Read reactively (not captured), so editing the players
   // re-runs the load effect below without a remount.
   const compareSlots = (): string[][] => normalizeSlots(parseUrlState(routerLocation.search).slots);
+  // Gates the hero's Edit players, and with it whether a comparison has anything for its ⋯ to fold.
+  const canEditPlayers = (): boolean => compareSlots().length >= 2;
   function compareOp(): CombineOp {
     const raw = new URLSearchParams(routerLocation.search).get('op');
     return raw && raw in OP_LABELS ? (raw as CombineOp) : (DEFAULT_COMPARE_OP as CombineOp);
@@ -3362,7 +3364,7 @@ export default function ListRoute() {
           <>
             {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
               a private or misspelled profile is exactly when editing them has to be reachable. */}
-            <Show when={compareSlots().length >= 2}>
+            <Show when={canEditPlayers()}>
               <button type="button" class="btn hero-secondary" onClick={() => setEditingPlayers((v) => !v)}>
                 {editingPlayers() ? 'Cancel' : 'Edit players'}
               </button>
@@ -3544,8 +3546,8 @@ export default function ListRoute() {
         <ListHero
           title={heroTitle()}
           lead={heroLead}
-          // A comparison's folded actions (Edit players, Save) need its players.
-          secondaryActions={kind === 'bundle' || (kind === 'compare' && compareSlots().length >= 2)}
+          // Save only shows with a result, which needs the players Edit players is gated on.
+          secondaryActions={kind === 'bundle' || (kind === 'compare' && canEditPlayers())}
           chips={
             <>
               {kind === 'bundle' && (
