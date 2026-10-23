@@ -30,6 +30,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C154 · minor · S** — the panel's ↻ Refresh does nothing on `/search`: `public/SearchRoute.tsx:252` registers no `refreshGame` (`public/AppShell.tsx:202` calls `routeHandlers.refreshGame?.`), so the spinner-less click is silently dropped. Register one that refetches `/api/game-details/:appid?refresh=1` and updates the shown result, sharing RankRoute's once its follow-up lands.
 - **C194 · minor · S** — a list stored or synced with an unknown combine op before `isCombineOp` existed still fails to resolve on every device: nothing checks `op` when lists are read back (`public/listsStore.ts`). Drop or repair such a list on load, with a `[lists]` warning.
 - **C195 · minor · S** — `fmtLastPlayed` (`public/utils.ts:289`) gives the UTC day while Released and the Taste fit date use `fmtLocalDate`'s local day: a game played at 20:00 in UTC-8 shows tomorrow's date. Use `fmtLocalDate`.
+- **C199 · minor · S** — `isTableViewState` (`public/tableViewPrefs.ts`) requires a positive `pageSize`, but the table library treats `pageSize: 0` as "no paging", so a valid `?tv=` view with paging off is dropped for the stored one. Accept a non-negative integer.
 
 ## Security
 
@@ -47,6 +48,7 @@ None open.
 - **C1 · minor · M** — dependency updates wait on a manual `dependency-audit` run. Dependabot or Renovate could open them, since CI (`.github/workflows/ci.yml`) runs `check` and the e2e suite on PRs, but their PRs lack the `CHANGELOG.md` entry the pre-commit hook requires (CI doesn't check it) and skip `npm run build`, so each still needs a local pass through dependency-audit's Applying.
 - **C190 · minor · M** — a shared `?f=` or compare link with many account sources fires all their `/api/common-games` calls at once (`resolveListWithSources`, `public/listResolve.ts:152`): past `SEARCH_RATE_LIMIT_MAX` they 429, the whole list fails, and the viewer's search budget is spent for a minute. Dedupe and cap sources at decode with a clear message, or resolve with bounded concurrency.
 - **C196 · minor · S** — table views from storage or sync (`store.load()` in `public/tableViewPrefs.ts:33`, `public/BundlesBrowseRoute.tsx:316`, a list's synced `tableView`, the revert baseline) reach `setViewState` unchecked, while a `?tv=` link now goes through `isTableViewState`: a view written by an older or newer build throws there. Run them through the same check. Upstream fix requested: https://github.com/vatesfr/data-table/issues/44.
+- **C200 · minor · S** — an achievements rarity call refused by the client share (`server.js:1029`) only sets `rarityFailed`, so the panel shows the generic rarity failure, not the share message `achievementsRefusal` (`public/panelData.ts`) shows on a 429. Rethrow on `isClientBudgetExhausted` so the route answers 429.
 
 ## Compliance
 
