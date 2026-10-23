@@ -7,7 +7,7 @@
 // operates on a plain scalar (`row.shop`, not `row.page?.name`), which is also what the table's
 // own filter checklists/group keys are built from.
 
-import { compareByOrder, formatMoney } from './utils.ts';
+import { compareByOrder, formatMoney, fmtLocalDate } from './utils.ts';
 import type { PriceAmount } from './types.ts';
 
 // ITAD-hosted artwork for one game, as the bundle list itself returns it — `boxart` (300×450
@@ -211,7 +211,7 @@ function parseBundleDate(iso: string | null | undefined): Date | null {
 
 export function fmtBundleDatePart(iso: string | null | undefined): string {
   const d = parseBundleDate(iso);
-  return d ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : '—';
+  return d ? fmtLocalDate(d) : '—';
 }
 
 // Empty (not '—') for a missing date — the stacked cell renders no second line at all in that

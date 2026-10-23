@@ -48,6 +48,7 @@ import {
   PROTON_TIER_COLORS,
   PROTON_TIER_UNKNOWN,
   fadeInOnLoad,
+  fmtLocalDate,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -306,7 +307,7 @@ export function endOfReleasePeriod(str: string): number {
 export function fmtReleaseDate(str: string): string {
   const d = /\b\d{1,2}\b/.test(str) ? new Date(str) : null;
   if (!d || isNaN(d.getTime())) return str;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return fmtLocalDate(d);
 }
 
 // Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a

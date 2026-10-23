@@ -611,12 +611,25 @@ test('B2 edge: Taste fit says an opened Owned has too few games played, and stay
   await page.goto('/lists/wishlist');
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
   await expect(note).toHaveText('Taste fit: Alice has too few games played');
+  await page.goto('/lists/wishlist?u=alice');
+  await expect(rows(page)).toHaveCount(ALICE.wishlist!.length);
+  await expect(note).toHaveText('Taste fit: Alice has too few games played');
 
   // Someone else's wishlist from a link: nothing for the viewer to open about the sender.
   await page.goto('/lists/wishlist?u=bob');
   await expect(rows(page)).toHaveCount(BOB.wishlist!.length);
   await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
   await expect(note).toHaveCount(0);
+
+  // Once the viewer has opened that account's Owned here, its taste is on this device.
+  await page.goto('/lists/owned?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('steam.isonoe.net:taste:'))))
+    .toHaveLength(2);
+  await page.goto('/lists/wishlist?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.wishlist!.length);
+  await expect(note).toHaveText('Taste fit: Bob has too few games played');
 });
 
 test('C1 edge: Tag match averages the filtered tags, or with All takes the weakest', async ({ page }) => {

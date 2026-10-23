@@ -285,6 +285,12 @@ export function fmtLastPlayed(epochSec: number | null | undefined): string {
   return new Date(epochSec * 1000).toISOString().slice(0, 10);
 }
 
+// YYYY-MM-DD on the viewer's calendar.
+export function fmtLocalDate(d: Date): string {
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 // A Steam profile's `loccountrycode` (ISO 3166-1 alpha-2, e.g. "US") as a flag emoji — computed
 // from the Unicode regional-indicator formula rather than a hand-maintained per-country lookup
 // table (region.ts's own COUNTRY_OPTIONS is deliberately a curated ~15-country pricing list, not

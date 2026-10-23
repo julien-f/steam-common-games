@@ -103,6 +103,7 @@ import {
   hoursFromMinutes,
   oldestFetchedAt,
   scoreColor,
+  fmtLocalDate,
 } from './utils.ts';
 import {
   restoreTableView,
@@ -154,6 +155,7 @@ import {
   accountDisplayLabel,
   getMyAccount,
   getAccountOverride,
+  getCurrentAccount,
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
 import { fetchAccountOverview, fetchAccountWishlist, resolveAccountSlot, type GameOwner } from './accountData.ts';
@@ -327,13 +329,14 @@ const TASTE_FIT_KEY = 'tasteFit';
 interface TasteSource {
   label: string | null; // null: no current account
   taste: Taste | null; // null: its Owned list not opened on this device yet
+  linked: boolean; // someone else's account from a `?u=` link, whose Owned the viewer has no reason to open
 }
 
-function tasteFitNote({ label, taste }: TasteSource): string {
+function tasteFitNote({ label, taste, linked }: TasteSource): string | null {
   if (!label) return 'Taste fit needs an account: pick one on Home';
-  if (!taste) return `Taste fit needs ${label}'s Owned list opened on this device`;
+  if (!taste) return linked ? null : `Taste fit needs ${label}'s Owned list opened on this device`;
   if (!taste.profile) return `Taste fit: ${label} has too few games played`;
-  return `Taste fit: ${label}'s taste as of ${new Date(taste.at).toISOString().slice(0, 10)}`;
+  return `Taste fit: ${label}'s taste as of ${fmtLocalDate(new Date(taste.at))}`;
 }
 
 // How close a game is to the current account's taste.
@@ -2480,9 +2483,9 @@ export default function ListRoute() {
       const tasteSource: TasteSource = {
         label: tasteAccount && accountDisplayLabel(tasteAccount),
         taste: tasteAccount && loadTaste(tasteAccount.id),
+        linked: !!getAccountOverride() && tasteAccount?.id !== getCurrentAccount()?.id,
       };
-      // A `?u=` link's account: what its taste needs is on the sender's device, not the viewer's.
-      setTasteFitSource(getAccountOverride() ? null : tasteSource);
+      setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = (kind === 'shared' || kind === 'creator') && pricesShown;
       const columns = insertColumnsAfter(
@@ -3179,7 +3182,8 @@ export default function ListRoute() {
     const visible = filterTable()?.columns.visible();
     const notes: string[] = [];
     const source = tasteFitSource();
-    if (source && visible?.has(TASTE_FIT_KEY)) notes.push(tasteFitNote(source));
+    const tasteNote = source && visible?.has(TASTE_FIT_KEY) && tasteFitNote(source);
+    if (tasteNote) notes.push(tasteNote);
     if (kind === 'compare' && visible?.has(GROUP_FIT_KEY) && loadFraction() == null) {
       const fits = groupFits();
       const left = comparePlayers.filter((_, i) => !fits?.profiled[i]).map((p) => p.label);
