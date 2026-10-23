@@ -666,6 +666,26 @@
     min-width: 5em;
     font-weight: 600;
   }
+  .list-players-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+  }
+  .list-players-own {
+    color: var(--muted);
+  }
+  .list-players-game {
+    min-height: 24px;
+    padding: 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
   .list-players-none {
     color: var(--muted);
   }

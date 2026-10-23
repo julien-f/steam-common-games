@@ -870,17 +870,20 @@ async function openPlayers(page: Page): Promise<Locator> {
   return players;
 }
 
+const playerLine = (players: Locator, name: string) =>
+  players.getByRole('listitem').filter({ has: players.page().locator('.list-players-name', { hasText: name }) });
+
 test("C7.2: Players shows each player's top tags and play style, open on desktop, folded on a phone", async ({
   page,
 }, testInfo) => {
   await page.goto('/lists/compare?u=dave&u=erin');
   const players = page.locator('.list-players');
-  await expect(players.locator('summary')).toHaveText('Players (2)');
+  await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
   const phone = testInfo.project.name === 'phone';
   await expect(players).toHaveJSProperty('open', !phone);
   if (phone) await players.locator('summary').click();
-  const dave = players.getByRole('listitem').filter({ hasText: 'Dave' });
-  const erin = players.getByRole('listitem').filter({ hasText: 'Erin' });
+  const dave = playerLine(players, 'Dave');
+  const erin = playerLine(players, 'Erin');
   await expect(dave).toContainText('Mostly single-player games');
   await expect(erin).toContainText('Mostly co-op games');
   const pvp = erin.getByRole('button', { name: 'PvP' });
@@ -890,19 +893,30 @@ test("C7.2: Players shows each player's top tags and play style, open on desktop
   await expect(row(page, 'The Witcher 3: Wild Hunt')).toHaveCount(0);
 });
 
+test('C7.3-4: Players says how many top tags each pair shares, which, and the favourites they have in common', async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
+  await expect(playerLine(players, 'Dave')).toContainText('more than Erin: Open World, Story Rich, RPG');
+  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
+  await players.getByRole('button', { name: 'Terraria' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Terraria');
+});
+
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
   await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
   await expect(rows(page)).toHaveCount(3);
   await page.getByRole('button', { name: 'Switch to Grouped by membership' }).click();
-  await expect(page.locator('.list-players summary')).toHaveText('Players (2)');
+  await expect(page.locator('.list-players summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
 });
 
 test('C7 edge: a player with too few games played says so', async ({ page }) => {
   await page.goto('/lists/compare?u=alice&u=dave');
   const players = await openPlayers(page);
-  await expect(players.getByRole('listitem').filter({ hasText: 'Alice' })).toContainText(
-    'too few games played here for a profile',
-  );
+  await expect(playerLine(players, 'Alice')).toContainText('too few games played here for a profile');
 });
 
 test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {

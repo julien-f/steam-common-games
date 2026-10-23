@@ -225,3 +225,118 @@ export function fitTo(taste: Taste, game: Omit<Tagged, 'appid'>): number | null 
   const v = vectorOf(featuresOf(game), idfOf(taste));
   return Math.round(cosine(profile, v) * 100);
 }
+
+export interface ComparedPlayer {
+  owns: (appid: number) => boolean;
+  hours: (appid: number) => number;
+}
+
+export interface CommonGround {
+  sharedTags: string[]; // in every profiled player's top tags, strongest for the least keen first
+  ownTags: string[][]; // per player, top tags they play more than any other player
+  pairs: { a: number; b: number; shared: number | null }[]; // top tags in common; null: a player without a profile
+  closest: { a: number; b: number; shared: number } | null; // 3+ players, when one pair shares the most
+  oddOneOut: number | null; // 3+ players, when one shares fewer with each than any other pair does
+  favourites: number[]; // appids every player has at least their median (and 5 h) in
+}
+
+// How many of each player's top tags are compared: a count of them is how alike a pair is, a fact
+// that needs no calibration, unlike a similarity score with no population to say what's typical.
+export const TOP_TAGS = 10;
+const TAGS_SHOWN = 3;
+const FAVOURITES_SHOWN = 5;
+const MIN_FAVOURITE_HOURS = 5;
+
+const median = (xs: readonly number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length ? (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2 : 0;
+};
+
+export function commonGround(games: readonly Tagged[], players: readonly ComparedPlayer[]): CommonGround {
+  const weighted = games.filter((g) => g.details?.tagWeights);
+  const idf = inverseFrequency(weighted.map(featuresOf));
+  const shares = players.map((p) => {
+    const profile = playProfile(
+      weighted
+        .filter((g) => p.hours(g.appid) && !isSoftware(g))
+        .map((g) => ({ hours: p.hours(g.appid), weights: featuresOf(g) })),
+      idf,
+    );
+    if (!profile) return null;
+    const shown = [...profile].filter(([tag, x]) => x > 0 && !tag.startsWith(TIER_PREFIX));
+    const total = shown.reduce((sum, [, x]) => sum + x, 0);
+    return new Map(shown.map(([tag, x]) => [tag, x / total]));
+  });
+  const tops = shares.map(
+    (s) =>
+      s &&
+      new Set(
+        [...s]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, TOP_TAGS)
+          .map(([tag]) => tag),
+      ),
+  );
+  const profiled = players.map((_, i) => i).filter((i) => tops[i]);
+  const compared = profiled.length >= 2;
+  const ranked = (scores: [string, number][]) =>
+    scores
+      .filter(([, x]) => x > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, TAGS_SHOWN)
+      .map(([tag]) => tag);
+  const sharedTags = compared
+    ? ranked(
+        [...tops[profiled[0]]!]
+          .filter((tag) => profiled.every((i) => tops[i]!.has(tag)))
+          .map((tag) => [tag, Math.min(...profiled.map((i) => shares[i]!.get(tag)!))]),
+      )
+    : [];
+  const ownTags = players.map((_, i) =>
+    compared && shares[i]
+      ? ranked(
+          [...tops[i]!]
+            .filter((tag) => !sharedTags.includes(tag))
+            .map((tag) => [
+              tag,
+              shares[i]!.get(tag)! - Math.max(...profiled.filter((j) => j !== i).map((j) => shares[j]!.get(tag) ?? 0)),
+            ]),
+        )
+      : [],
+  );
+
+  const pairs = players.flatMap((_, a) =>
+    players.slice(a + 1).map((__, k) => {
+      const b = a + 1 + k;
+      const [ta, tb] = [tops[a], tops[b]];
+      return { a, b, shared: ta && tb ? [...ta].filter((tag) => tb.has(tag)).length : null };
+    }),
+  );
+  let closest: CommonGround['closest'] = null;
+  let oddOneOut: number | null = null;
+  const counted = pairs.filter((p): p is typeof p & { shared: number } => p.shared != null);
+  if (players.length >= 3 && counted.length === pairs.length) {
+    const [best, next] = [...counted].sort((x, y) => y.shared - x.shared);
+    if (best.shared > next.shared) closest = best;
+    const involving = (i: number, inPair: boolean) =>
+      counted.filter((p) => (p.a === i || p.b === i) === inPair).map((p) => p.shared);
+    oddOneOut =
+      players.map((_, i) => i).find((i) => Math.max(...involving(i, true)) < Math.min(...involving(i, false))) ?? null;
+  }
+
+  const thresholds = players.map((p) => {
+    const hours = games
+      .filter((g) => !isSoftware(g))
+      .map((g) => p.hours(g.appid))
+      .filter((h) => h > 0);
+    return hours.length ? Math.max(MIN_FAVOURITE_HOURS, median(hours)) : Infinity;
+  });
+  const favourites = games
+    .filter((g) => !isSoftware(g) && players.every((p, i) => p.hours(g.appid) >= thresholds[i]))
+    .map((g) => ({ appid: g.appid, weight: players.reduce((sum, p) => sum + Math.log1p(p.hours(g.appid)), 0) }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, FAVOURITES_SHOWN)
+    .map((f) => f.appid);
+
+  return { sharedTags, ownTags, pairs, closest, oddOneOut, favourites };
+}

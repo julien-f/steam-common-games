@@ -62,7 +62,7 @@ export const DAVE: Player = {
     646570: h(150),
     431960: h(3000), // Wallpaper Engine, left running: software, kept out of the profile
     548430: h(120),
-    105600: h(40),
+    105600: h(60),
     620: h(15),
   },
 };
@@ -82,7 +82,7 @@ export const ERIN: Player = {
     413150: h(70),
     322330: h(30),
     728880: h(10),
-    105600: h(60),
+    105600: h(120),
     620: h(12),
     1426210: h(15),
   },

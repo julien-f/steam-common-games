@@ -63,7 +63,17 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import { fitTo, playerFits, similarGames, tasteOf, topPlayedTags, type PlayerFits, type Taste } from './tagTaste.ts';
+import {
+  commonGround,
+  fitTo,
+  playerFits,
+  similarGames,
+  tasteOf,
+  topPlayedTags,
+  TOP_TAGS,
+  type PlayerFits,
+  type Taste,
+} from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
 import { playStyle, storyGames, storySentence, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
 import {
@@ -3223,7 +3233,7 @@ export default function ListRoute() {
     if (kind !== 'compare' || loadFraction() != null || !profilesShown()) return null;
     return untrack(() => {
       const rows = tableData();
-      return comparePlayers.map((player) => {
+      const players = comparePlayers.map((player) => {
         const hours = playerHours(player);
         const ofRow = (g: { appid: number }) => hours(g.appid);
         return {
@@ -3232,8 +3242,41 @@ export default function ListRoute() {
           style: playStyle(rows, ofRow),
         };
       });
+      const ground = commonGround(
+        rows,
+        comparePlayers.map((player) => ({ owns: (appid) => player.owners.has(appid), hours: playerHours(player) })),
+      );
+      return { players, ground };
     });
   });
+  const sharedNote = (shared: number) => `share ${shared} of their top ${TOP_TAGS} tags`;
+  function playersSummary(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string {
+    const { players, ground } = profiles;
+    const shared = players.length === 2 && ground.pairs[0].shared;
+    return shared === false || shared == null
+      ? `Players (${players.length})`
+      : `Players · ${players[0].label} & ${players[1].label} ${sharedNote(shared)}`;
+  }
+  function similarityNote(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string | null {
+    const { players, ground } = profiles;
+    const parts = [
+      ground.closest &&
+        `Closest: ${players[ground.closest.a].label} & ${players[ground.closest.b].label} ${sharedNote(ground.closest.shared)}`,
+      ground.oddOneOut != null && `Odd one out: ${players[ground.oddOneOut].label}`,
+    ].filter((part) => !!part);
+    return parts.length ? parts.join(' · ') : null;
+  }
+  const tagButton = (tag: string) => (
+    <button
+      type="button"
+      class="list-plays-mostly-tag"
+      aria-pressed={tableReady() && isTagActive('tags', tag)}
+      title={`Filter by ${tag}`}
+      onClick={() => onTagClick('tags', tag)}
+    >
+      {tag}
+    </button>
+  );
   const [playersOpen, setPlayersOpen] = createSignal(window.matchMedia('(min-width: 768px)').matches);
   function playersSection(): JSX.Element | undefined {
     if (kind !== 'compare') return undefined;
@@ -3257,35 +3300,46 @@ export default function ListRoute() {
           <Show when={playerProfiles()}>
             {(profiles) => (
               <details class="list-players" open={playersOpen()} onToggle={(e) => setPlayersOpen(e.currentTarget.open)}>
-                <summary>Players ({profiles().length})</summary>
+                <summary>{playersSummary(profiles())}</summary>
                 <ul>
-                  <For each={profiles()}>
-                    {(p) => (
+                  <For each={profiles().players}>
+                    {(p, i) => (
                       <li>
                         <span class="list-players-name">{p.label}</span>
                         <Show
                           when={p.tags.length}
                           fallback={<span class="list-players-none">too few games played here for a profile</span>}
                         >
-                          <For each={p.tags}>
-                            {(tag) => (
-                              <button
-                                type="button"
-                                class="list-plays-mostly-tag"
-                                aria-pressed={tableReady() && isTagActive('tags', tag)}
-                                title={`Filter by ${tag}`}
-                                onClick={() => onTagClick('tags', tag)}
-                              >
-                                {tag}
-                              </button>
-                            )}
-                          </For>
+                          <For each={p.tags}>{tagButton}</For>
                           <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
+                          <Show when={profiles().ground.ownTags[i()].length}>
+                            <span class="list-players-own">
+                              more than{' '}
+                              {profiles().players.length === 2 ? profiles().players[1 - i()].label : 'the others'}:{' '}
+                              {profiles().ground.ownTags[i()].join(', ')}
+                            </span>
+                          </Show>
                         </Show>
                       </li>
                     )}
                   </For>
                 </ul>
+                <Show when={similarityNote(profiles())}>{(note) => <p class="list-players-row">{note()}</p>}</Show>
+                <Show when={profiles().ground.sharedTags.length}>
+                  <p class="list-players-row">
+                    In common: <For each={profiles().ground.sharedTags}>{tagButton}</For>
+                  </p>
+                </Show>
+                <p class="list-players-row">
+                  Everyone's favourites:{' '}
+                  <For each={profiles().ground.favourites} fallback={<span class="list-players-none">none yet</span>}>
+                    {(appid) => (
+                      <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
+                        {rowStore.getRow(appid)?.name}
+                      </button>
+                    )}
+                  </For>
+                </p>
               </details>
             )}
           </Show>

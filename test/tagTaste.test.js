@@ -10,6 +10,7 @@ const {
   tasteOf,
   fitTo,
   isSoftware,
+  commonGround,
 } = require('../public/tagTaste.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
@@ -219,4 +220,72 @@ test("tasteOf: keeps only each game's top tags, so a large library stays small",
   const kept = Object.keys(taste.games[0].tags);
   assert.equal(kept.length, 10);
   assert.ok(kept.includes('tier:Indie') && kept.includes('T0') && !kept.includes('T19'));
+});
+
+// A comparison: each player owns some games and has hours on some of them.
+const player = (hoursByAppid, owned = Object.keys(hoursByAppid).map(Number)) => ({
+  owns: (appid) => owned.includes(appid),
+  hours: (appid) => hoursByAppid[appid] ?? 0,
+});
+const library = (from, to, tagWeights) =>
+  Array.from({ length: to - from + 1 }, (_, i) => game(from + i, tagWeights(from + i)));
+const tenHours = (from, to) => Object.fromEntries(Array.from({ length: to - from + 1 }, (_, i) => [from + i, 10]));
+
+test('commonGround: players with the same taste share all their top tags, and the ones in common', () => {
+  const games = [
+    ...library(1, 12, (id) => ({ Roguelike: 1, Deckbuilder: 0.8, [`T${id % 3}`]: 0.5 })),
+    ...library(13, 24, (id) => ({ Farming: 1, Cozy: 0.8, [`T${id % 3}`]: 0.5 })),
+  ];
+  const ground = commonGround(games, [player(tenHours(1, 12)), player(tenHours(1, 12))]);
+  assert.deepEqual(ground.pairs, [{ a: 0, b: 1, shared: 5 }]);
+  assert.deepEqual(ground.sharedTags.slice(0, 2).sort(), ['Deckbuilder', 'Roguelike']);
+  assert.deepEqual(ground.ownTags, [[], []]);
+});
+
+test('commonGround: opposite tastes share few top tags, each with tags of their own', () => {
+  const games = [
+    ...library(1, 12, (id) => ({ Roguelike: 1, Deckbuilder: 0.8, [`T${id % 4}`]: 0.4 })),
+    ...library(13, 24, (id) => ({ Farming: 1, Cozy: 0.8, [`T${id % 4}`]: 0.4 })),
+  ];
+  const ground = commonGround(games, [player(tenHours(1, 12)), player(tenHours(13, 24))]);
+  assert.deepEqual(ground.pairs, [{ a: 0, b: 1, shared: 4 }]); // only the T0–T3 every game carries
+  assert.deepEqual(ground.ownTags[0].slice(0, 2), ['Roguelike', 'Deckbuilder']);
+  assert.deepEqual(ground.ownTags[1].slice(0, 2), ['Farming', 'Cozy']);
+});
+
+test('commonGround: no count, shared tags or own tags for a player without a profile', () => {
+  const games = library(1, 12, (id) => ({ [`T${id % 3}`]: 1 }));
+  const ground = commonGround(games, [player(tenHours(1, 4)), player(tenHours(1, 12))]);
+  assert.deepEqual(ground.pairs, [{ a: 0, b: 1, shared: null }]);
+  assert.deepEqual(ground.sharedTags, []);
+  assert.deepEqual(ground.ownTags, [[], []]);
+});
+
+test('commonGround: favourites are games every player has at least their median and 5 h in', () => {
+  const games = library(1, 12, (id) => ({ [`T${id % 3}`]: 1 }));
+  const twoHours = Object.fromEntries([...Array(9).keys()].map((i) => [i + 4, 2]));
+  const a = player({ ...twoHours, 1: 100, 2: 50, 3: 4 });
+  const b = player({ ...twoHours, 1: 80, 2: 30, 3: 200 });
+  assert.deepEqual(commonGround(games, [a, b]).favourites, [1, 2]);
+  assert.deepEqual(commonGround(games, [a, player({})]).favourites, []);
+});
+
+test('commonGround: with three players, the closest pair and the odd one out, only when clear-cut', () => {
+  const games = [
+    ...library(1, 12, (id) => ({ Roguelike: 1, Deckbuilder: 0.8, [`T${id % 4}`]: 0.4 })),
+    ...library(13, 24, (id) => ({ Farming: 1, Cozy: 0.8, [`T${id % 4}`]: 0.4 })),
+  ];
+  const rogue = () => player(tenHours(1, 12));
+  const ground = commonGround(games, [rogue(), rogue(), player(tenHours(13, 24))]);
+  assert.deepEqual(ground.closest, { a: 0, b: 1, shared: 6 });
+  assert.equal(ground.oddOneOut, 2);
+  const same = commonGround(games, [rogue(), rogue(), rogue()]);
+  assert.equal(same.closest, null);
+  assert.equal(same.oddOneOut, null);
+});
+
+test("commonGround: a tag shared by everyone isn't also one player's own", () => {
+  const games = library(1, 24, (id) => ({ Shared: 1, [id <= 12 ? 'Mine' : 'Yours']: 0.8, [`T${id % 4}`]: 0.3 }));
+  const ground = commonGround(games, [player({ ...tenHours(1, 12), 13: 1 }), player(tenHours(1, 24))]);
+  for (const own of ground.ownTags) for (const tag of ground.sharedTags) assert.ok(!own.includes(tag));
 });

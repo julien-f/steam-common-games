@@ -146,11 +146,11 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. C1
   2. open **Players**
-  3. read each player's top tags and play style, and how alike the pairs are ◇
-  4. read the shared favourites and the tags in common ◇
+  3. read each player's top tags and play style, and how many top tags each pair shares
+  4. read the shared favourites and the tags in common
   5. **Suggest to** a player: games another played a lot that they never have ◇
   6. open one in the panel
-- **Done when**: similarity is a plain band, never a bare percentage, and silent when the data can't support it; each suggestion says who played it, how long, and whether the player owns it.
+- **Done when**: how alike players are is a count of top tags they share, never an uncalibrated score; each suggestion says who played it, how long, and whether the player owns it.
 - **Edges**: a player without a profile (says why); no shared favourites ("none yet"); **Intersect** or **Subtract** (the profiles need whole libraries).
 
 ## Lists
