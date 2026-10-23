@@ -95,8 +95,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## The e2e run fails at start while agents run in parallel
 
 - **Symptom**: `npm run test:e2e` (or the pre-commit hook's e2e step) fails at start with `http://localhost:28992 is already used, make sure that nothing is running on the port/url`.
-- **Cause**: every checkout serves e2e on port 28992, and a run never reuses a server already there (it would serve another checkout's build), so a second run while one is going fails.
-- **Fix**: give each checkout its own port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).
+- **Cause**: a run never reuses a server already on its port (it would serve another checkout's build). Each worktree draws its own port from its path (`e2ePort` in `scripts/e2e.js`), so this takes two runs in the same checkout, or two worktree paths landing on the same port.
+- **Fix**: wait for the other run, or pick a port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).
 
 ## A column menu opened by an e2e click closes at once on phone, on CI only
 

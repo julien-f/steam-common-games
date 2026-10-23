@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Setup facts count skills that subagents follow, and no longer take background task notifications for prompts
 - End-to-end tests render with bundled DejaVu fonts, so layout checks measure the same locally and in CI
 - A Steam store endpoint that starts redirecting now logs where it redirects to and shows as a 302 in the metrics, instead of a JSON parse error
+- Each git worktree runs end-to-end tests on its own port, so agents testing in parallel don't collide.
 
 ## [0.11.0] - 2026-10-14
 
