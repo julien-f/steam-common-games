@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Owned's count of games played 2 h or less opens its Play next view, best Taste fit first
 - A comparison's Players section shows each player's own tags and play style, the tags and favourites they share, and what to suggest to each
 - Saved views of Owned and Wishlist, as tabs under the list's header: ready-made Recently played, Play next and Bargains, or the table as it is
+- Short games suggested view on Owned: barely played games with a main story of 5 h or less, best rated first
 
 ### Changed
 
@@ -37,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Owned's player profile is a card: an archetype, the tags played most as bars, a story-games ring and the barely-played count
 - Why these? opens each figure's games in place, with their art and hours, and story games against their main story's length
 - A comparison shows each player as a card with avatar and archetype, and what they share with game art
+- Suggested views show only the columns that matter to them, the one they sort or filter on first
 
 ### Fixed
 

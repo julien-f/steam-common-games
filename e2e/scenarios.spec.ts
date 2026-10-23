@@ -2,7 +2,18 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, DAVE, ERIN, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import {
+  ALICE,
+  BOB,
+  BUNDLE,
+  CAROL,
+  DAVE,
+  ERIN,
+  PICK_BUNDLE,
+  SIGNED_IN,
+  SYNCED_LIST,
+  signedInPrefs,
+} from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -1768,7 +1779,7 @@ test('L5.1-3: a suggested view opens as its own tab, and is suggested once', asy
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   let menu = await newView(page);
-  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Play next', 'Save as view']);
+  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Play next', 'Short games', 'Save as view']);
   await menu.getByRole('button', { name: 'Play next' }).click();
 
   await expect(page).toHaveURL(/view=/);
@@ -1780,9 +1791,21 @@ test('L5.1-3: a suggested view opens as its own tab, and is suggested once', asy
   await expect(page.getByRole('button', { name: 'New view' })).toBeFocused();
 
   menu = await newView(page);
-  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Save as view']);
+  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Short games', 'Save as view']);
   await page.reload();
   await expect(rows(page)).toHaveCount(4);
+});
+
+test('L5 edge: Short games keeps barely played games with a short main story, known', async ({ page }) => {
+  await asPlayer(page, CAROL);
+  await page.goto('/lists/owned');
+  const menu = await newView(page);
+  await expect(menu.getByRole('button')).toHaveText(['Recently played', 'Play next', 'Short games', 'Save as view']);
+  await menu.getByRole('button', { name: 'Short games' }).click();
+  await expect(page).toHaveURL(/view=/);
+  await expect(rows(page)).toHaveCount(1); // not Portal 2 (6.3 h main), nor Counter-Strike 2 (no HLTB entry)
+  await expect(rows(page).first()).toContainText('Quiet Little Game');
+  await expect(page.locator('.pref-unsaved-banner')).toBeHidden(); // a fresh view has nothing to save
 });
 
 test('L5.2: the table as it is saves as a named view', async ({ page }) => {

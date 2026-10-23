@@ -35,7 +35,11 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 
 - **Owned** and **Wishlist** for the current account, and one list per **bundle** you browse, follow their source — nothing to maintain. Their "Updated" figure says how old they are (see [How fresh is this?](#how-fresh-is-this)).
 - **Views** of Owned and Wishlist keep several named layouts of one list (columns, sort, grouping, filters), opened as tabs under its header: **All games**, then each view.
-  - **New view** (beside Rank this list) offers ready-made ones, **Recently played** and **Play next** (played 2 h or less, best Taste fit first) on Owned, **Bargains** (at a 1-year or all-time low, biggest discount first) on Wishlist, or saves the table as it is now.
+  - **New view** (beside Rank this list) saves the table as it is now, or offers ready-made ones, each showing only the columns that matter to it:
+    - **Recently played** (Owned): last played first.
+    - **Play next** (Owned): played 2 h or less, best Taste fit first.
+    - **Short games** (Owned): played 2 h or less with a main story of 5 h or less on How Long To Beat, best rated first.
+    - **Bargains** (Wishlist): at a 1-year or all-time low, biggest discount first.
   - Changing a view's table doesn't save it: **Save** or **Revert** in the banner above it; leaving the view drops the changes. Its **⋯** renames or deletes it.
   - A view follows the account you're exploring, like Owned and Wishlist themselves; Home's Owned and Wishlist cards link each one.
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.

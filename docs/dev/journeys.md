@@ -199,7 +199,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ### L5 Switch between views of my library
 
-- **Who / goal**: keep "Recently played" and "Play next" on Owned, or "Bargains" on Wishlist, and switch between them without filtering again.
+- **Who / goal**: keep "Recently played", "Play next" and "Short games" on Owned, or "Bargains" on Wishlist, and switch between them without filtering again.
 - **Steps**:
   1. Owned
   2. **New view**: a suggested view, or **Save as view** for the table as it is
@@ -207,7 +207,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. change a view's sort or filters, then **Save** or **Revert**
   5. Home: open a view from the Owned card
 - **Done when**: each view keeps its own layout; a friend's Owned opens through the same views; leaving a view drops its unsaved edits; Share view sends the layout, not the view.
-- **Edges**: a link to a deleted view; Bargains while prices load; the tabs on a phone.
+- **Edges**: a link to a deleted view; Bargains while prices load; Short games while HLTB loads, and games with no HLTB entry; the tabs on a phone.
 
 ## Ranking
 
@@ -318,7 +318,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. filter to never played
   4. sort by HLTB (shortest first) or rating
   5. **Pick a random game** (or **R**) for a random pick, or browse with ↑/↓
-- **Or**: steps 2–4 as Owned's **Play next** view (L5).
+- **Or**: steps 2–4 as Owned's **Play next** view, or **Short games** for the short ones (L5).
 - **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?); Plays mostly's **Why these?** on a phone (each tag's games stack under its bar).
 

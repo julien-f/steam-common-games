@@ -33,7 +33,8 @@ export const CAROL: Player = {
   steamid: '76561198000000003',
   vanity: 'carol',
   personaname: 'Carol',
-  owned: [620, 322330, 1426210],
+  // Never played: Quiet Little Game is short (L5's Short games), Counter-Strike 2 has no HLTB entry.
+  owned: [620, 322330, 1426210, 3999990, 730],
 };
 
 // Rich libraries for the player profile (A5) and comparing two players' tastes (C7). Dave plays

@@ -62,13 +62,14 @@ export function deleteListView(kind: ViewKind, id: string): void {
 // Play next's bound, shared with Owned's profile-line count that opens it.
 export const PLAY_NEXT_MAX_HOURS = 2;
 
-// Suggested views, stamped into a SavedView at creation. `show` joins the list's default columns.
+// Suggested views, stamped into a SavedView at creation; `cols` are its visible columns in display order. No price
+// column without `needsPrices`, nor a sort or column set equal to the list's default: either reads back as unsaved.
 export interface ViewTemplate {
   id: string;
   kind: ViewKind;
   name: string;
   view: TableViewState;
-  show: string[];
+  cols: string[];
   needsPrices?: boolean;
 }
 
@@ -82,7 +83,7 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
     name: 'Recently played',
     // No filter: Last Played sorts never-played games last.
     view: { sorts: [{ key: 'lastPlayed', dir: 'desc' }] },
-    show: ['lastPlayed', 'playtime'],
+    cols: ['capsule', 'name', 'lastPlayed', 'playtime', 'hltbAll', 'steamdbRating'],
   },
   {
     id: 'play-next',
@@ -92,14 +93,38 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
       rangeFilters: { playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) } },
       sorts: [{ key: 'tasteFit', dir: 'desc' }],
     },
-    show: ['tasteFit', 'playtime', 'hltbAll'],
+    cols: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres'],
+  },
+  {
+    id: 'short-games',
+    kind: 'owned',
+    name: 'Short games',
+    view: {
+      rangeFilters: {
+        playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) },
+        // The range filter reads a missing length as 0: the lower bound keeps out games with no HLTB entry.
+        hltbMain: { min: '0.1', max: '5' },
+      },
+      // No sort: Owned's default, best rated first.
+    },
+    cols: ['capsule', 'name', 'hltbMain', 'steamdbRating', 'tasteFit', 'playtime', 'genres'],
   },
   {
     id: 'bargains',
     kind: 'wishlist',
     name: 'Bargains',
     view: { filters: { priceStatus: BARGAIN_STATUSES }, sorts: [{ key: 'bestDealCut', dir: 'desc' }] },
-    show: ['bestDealPrice', 'bestDealCut', 'priceStatus'],
+    cols: [
+      'capsule',
+      'name',
+      'priceStatus',
+      'bestDealCut',
+      'bestDealPrice',
+      'tasteFit',
+      'steamdbRating',
+      'hltbAll',
+      'hasDemo',
+    ],
     needsPrices: true,
   },
 ];
@@ -115,7 +140,13 @@ export function templateView(kind: ViewKind, templateId: string): SavedView | un
   return getListViews(kind).find((v) => v.template === templateId);
 }
 
-export function createFromTemplate(template: ViewTemplate, defaultVisible: readonly string[]): SavedView {
-  const visibleCols = [...new Set([...defaultVisible, ...template.show])];
-  return createListView(template.kind, template.name, { ...template.view, visibleCols }, template.id);
+export function createFromTemplate(template: ViewTemplate): SavedView {
+  // `visibleCols` is a set: the order comes from `columnOrder`.
+  const { cols } = template;
+  return createListView(
+    template.kind,
+    template.name,
+    { ...template.view, visibleCols: cols, columnOrder: cols },
+    template.id,
+  );
 }
