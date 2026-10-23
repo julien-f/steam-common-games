@@ -25,7 +25,7 @@ Two account slots, both optional, distinct from any list:
 Both are full `AccountSlot` objects (see the schema below), not id references, so clearing history never orphans either.
 
 - **Picking `currentAccount`** draws from `myAccount`, `recentAccounts`, or a fresh resolve. The resolve form takes several identifiers at once ("Add Steam Family account") and produces one `AccountSlot` with several `members`: a Family.
-- **`recentAccounts`** is global and uncapped, with individual removal and clear-all. Removing one a dynamic list still references soft-removes it (`removedAt`, see [Soft-delete](#soft-delete)).
+- **`recentAccounts`** is global and uncapped, with individual removal and clear-all. Read in one order everywhere (`getRecentAccounts`): `myAccount` first, then by display label (case- and accent-insensitive, ties by id) — a fixed place per account rather than most-recently-used. Removing one a dynamic list still references soft-removes it (`removedAt`, see [Soft-delete](#soft-delete)).
 - **Account header**: avatar, persona name and profile link, online status (as of the last library refresh), owned and wishlist counts.
 - **Display fields stay current**: `label`/`avatarUrl`/`vanities` are captured when the account is picked; Home's account card refreshes them wherever the account is stored (`refreshAccountInfo`) from the profile it fetches anyway.
 - **Copyable identifier**: ⧉ copies each member's nicest identifier (`accountsStore.ts`'s `accountIdentifiers`): its Steam custom-URL name (`AccountSlot.vanities`, captured at resolve time from `/api/common-games`' `profileurl`), else its steam64 id. One per member: a Family's joined label is nothing an input accepts back. Offered wherever an account is named (account card, the nav chip and its recents), with no fetch.
@@ -82,8 +82,8 @@ Unsaved combined lists, viewed live with "Save as a list", come from `/lists/com
 
 **Comparing libraries — `/lists/compare?u=alice&u=bob`.** A dynamic list that was never saved: the URL's player slots are its formula (one `account-owned` source each), built in memory and resolved through the same path as a stored one. "Save as a list" is one `createList` call with that formula, named as the page was ("Alice vs. Bob"); renaming an account later doesn't rename it. Machinery (canonical URL rewrite, player form, ordering) is in [frontend.md](frontend.md#each-list-kind-in-practice).
 
-- Slots are resolved by the route and **never land in `recentAccounts`**, nor bump `lastUsedAt` — comparing someone isn't picking them, the same rule as a `?u=` override.
-- The players form (`ComparePlayersForm.tsx`) offers `getRecentAccounts()` (which already includes `myAccount`/`currentAccount`, both upserted into recents) plus a `?u=` link's account when one is being explored.
+- Slots are resolved by the route and **never land in `recentAccounts`** — comparing someone isn't picking them, the same rule as a `?u=` override.
+- The players form (`ComparePlayersForm.tsx`) offers `getRecentAccounts()` (which already includes `myAccount`/`currentAccount`, both upserted into recents) plus a `?u=` link's account, listed first, when one is being explored.
 
 **Sharing a dynamic list — `/lists/shared?f=<formula>`.** The same idea for any dynamic list's formula (owned/wishlist/bundle/developer/publisher/recent-games/nested user-list sources, any op): encoded into a compact URL grammar (`listShare.ts`) and resolved in memory on arrival. A `user` source pointing at a _manual_ list has no token in the grammar, so the hero's "🔗 Share list" is disabled with a tooltip. Grammar and nesting: [frontend.md](frontend.md#routes).
 
@@ -137,7 +137,7 @@ One flat blob under the localStorage key `steam.isonoe.net:prefs` (`prefs.ts`): 
 ```
 AccountSlot  id (sorted-joined member steam64 ids) · members[] · rawInputs[] · label? · avatarUrl?
              vanities? (steam64 → Steam custom-URL name, for the members that set one)
-             lastUsedAt · removedAt?
+             removedAt?
 Folder       id · name · parentId (null = root) · order
 GameList     id · name? (absent = unnamed, labeled by its formula) · parentId · order · createdAt · updatedAt
              orphanOf? { bundleId } (a bundle's last-known games — see Soft-delete)

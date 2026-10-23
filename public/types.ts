@@ -255,7 +255,6 @@ export interface AccountSlot {
   // nicest copyable identifier needs no fetch of its own
   // (accountsStore.ts's accountIdentifiers)
   unresolved?: string[]; // members whose player summaries failed; never stored (accountsStore.ts's withStoredDisplay)
-  lastUsedAt: number;
   removedAt?: number; // soft-removed from the recents UI, kept while referenced by a dynamic list
 }
 

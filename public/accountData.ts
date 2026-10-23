@@ -134,7 +134,6 @@ export function accountSlotFrom(players: SlotPlayer[], rawInputs: string[]): Acc
     label,
     avatarUrl: avatarUrl || undefined,
     vanities: vanities ?? {},
-    lastUsedAt: Date.now(),
   };
 }
 

@@ -59,8 +59,11 @@ export function getMyAccount(): AccountSlot | null {
 // of it, and it should show up there the same as any other resolve/pick would.
 export function setMyAccount(picked: AccountSlot | null): void {
   const account = picked && withStoredDisplay(picked);
-  setPref(MY_ACCOUNT_KEY, account);
-  if (account) upsertRecentAccount(account);
+  // One update for getRecentAccounts' readers, which sort on myAccount too.
+  batch(() => {
+    setPref(MY_ACCOUNT_KEY, account);
+    if (account) upsertRecentAccount(account);
+  });
 }
 
 export function getCurrentAccount(): AccountSlot | null {
@@ -120,21 +123,28 @@ export function getEffectiveCurrentAccount(): AccountSlot | null {
 
 // ── recentAccounts ───────────────────────────────────────────────────────────────────────────
 
-// Most-recently-used first. Excludes soft-removed entries by default — pass includeRemoved for
-// a "Trash"/removed-items view.
+const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
+// Mine first, then by name: each account keeps its place (the id tiebreak: on every device too).
+// Soft-removed entries only with includeRemoved.
 export function getRecentAccounts({ includeRemoved = false }: { includeRemoved?: boolean } = {}): AccountSlot[] {
   const list = readRecents();
   const filtered = includeRemoved ? list : list.filter((a) => !a.removedAt);
-  return [...filtered].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+  const myId = getMyAccount()?.id;
+  return [...filtered].sort(
+    (a, b) =>
+      Number(b.id === myId) - Number(a.id === myId) ||
+      byName.compare(accountDisplayLabel(a), accountDisplayLabel(b)) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
 }
 
-// Adds a new recent entry, or bumps an existing one's lastUsedAt (and clears any soft-remove) —
-// dedupe key is AccountSlot.id, so re-picking the same Family updates one entry rather than
-// piling up duplicates.
+// Adds or updates the entry for this AccountSlot.id (clearing any soft-remove), so re-picking the
+// same Family updates one entry rather than piling up duplicates.
 function upsertRecentAccount(account: AccountSlot): void {
   const recents = readRecents();
   const idx = recents.findIndex((a) => a.id === account.id);
-  const entry: AccountSlot = { ...account, lastUsedAt: Date.now(), removedAt: undefined };
+  const entry: AccountSlot = { ...account, removedAt: undefined };
   if (idx === -1) recents.push(entry);
   else recents[idx] = entry;
   writeRecents(recents);
@@ -143,8 +153,8 @@ function upsertRecentAccount(account: AccountSlot): void {
 // An account's display fields (label, avatar, custom-URL names) are captured when it's picked
 // and nothing else updates them — so one picked before a field existed, or renamed on Steam
 // since, kept its old face in the chip, recents and list labels. This refreshes them wherever
-// the account is stored, from a fetch that returned newer ones; lastUsedAt is left alone, and
-// nothing is written when nothing changed.
+// the account is stored, from a fetch that returned newer ones; nothing is written when nothing
+// changed.
 export function refreshAccountInfo(
   accountId: string,
   info: { label?: string; avatarUrl?: string; vanities?: Record<string, string> },

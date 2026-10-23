@@ -14,7 +14,6 @@ export async function asPlayer(
     members: [player.steamid],
     rawInputs: [player.vanity],
     ...(withLabel ? { label: player.personaname } : {}),
-    lastUsedAt: 0,
   };
   const entry = (value: unknown) => ({ value, updatedAt });
   const prefs = {

@@ -49,7 +49,7 @@ function tableViewSync() {
 }
 
 function makeAccount(id) {
-  return { id, members: [id], rawInputs: [id], lastUsedAt: 0 };
+  return { id, members: [id], rawInputs: [id] };
 }
 
 // Same shape resolveAccountSlot's own tests use (test/accountData.test.js) — a single member
