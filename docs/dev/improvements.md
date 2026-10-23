@@ -31,8 +31,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U190 · polish · C1, I1** — on a phone, Compare's players form shows a More actions ⋯ that expands to nothing (`secondaryActions` is set for every comparison, the folded Edit players/Save only exist with a result). Show the toggle only when the hero has `hero-secondary` actions.
-- **U191 · polish · C1, I2** — Enter in a player field never submits, even when it's empty, so typing "bob", Enter (chip), Enter does nothing; keyboard users must Tab to Compare libraries. Submit on Enter when the field is empty, as Home's lookup does.
 - **U170 · major · C3, L2** — saving a comparison names a player who isn't a stored account by steam64 id: the formula reads "Alice — Owned ∪ 76561198000000002 — Owned", and so do its group labels and Home's tree, though the comparison's own title said "Alice vs. Bob" and a reload doesn't fix it. Store or resolve each source account's name when the list is saved.
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
 - **U51 · polish · C1** — the membership chip reads "↑ Owned by × ⊞ ×": two identical × (remove sort, remove group) side by side. The table library draws that merged chip, so telling the two apart needs an upstream change.
@@ -61,7 +59,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U39 · polish** — the search box shifts sideways as the account chip's label changes length ("Alice" vs. "Alice + Bob + Carol"); missing thumbnails have no placeholder; wishlisted/owned name colours have no legend (still true in Recently Looked Up).
 - **U179 · polish · I2, I3** — the first Tab stop reads "Skip to table" on pages with no table (Home, Compare's form, About, the rank screen), where it skips to `main`. "Skip to content" there.
 - **U182 · polish · I2** — a second Esc in the nav search blurs it to `<body>`, so the next Tab starts from the page top. Hand focus to the main content's first stop, or back to where `/` was pressed.
-- **U186 · minor · A1, L1, B1, I2** — focus drops to `<body>` where a control under focus goes away: Home's Look up turns `disabled` ("Looking up…") while resolving, the selection bar unmounts after Add (the "Added 2 games…" toast takes no focus), and › Next bundle disables on the last bundle. Use `aria-disabled` as the hero tiles do (frontend.md), and move focus to the toast's Open list or the table after Add.
 - **U192 · polish · R1** — right after **Continue**, Undo is disabled with no reason given, so the last answer before Esc can't be undone (R1's edge "Undo right after resuming"); the stack is in memory only. Keep the undo stack with the ranking, or say "Undo covers this session's answers".
 
 ## Review tooling

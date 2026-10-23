@@ -99,6 +99,7 @@ import {
   fetchJson,
   fmtAge,
   fmtLastPlayed,
+  focusGameRow,
   formatMoney,
   hoursFromMinutes,
   oldestFetchedAt,
@@ -1254,6 +1255,8 @@ export default function ListRoute() {
   // The comparison currently in the URL. Read reactively (not captured), so editing the players
   // re-runs the load effect below without a remount.
   const compareSlots = (): string[][] => normalizeSlots(parseUrlState(routerLocation.search).slots);
+  // Gates the hero's Edit players, and with it whether a comparison has anything for its ⋯ to fold.
+  const canEditPlayers = (): boolean => compareSlots().length >= 2;
   function compareOp(): CombineOp {
     const raw = new URLSearchParams(routerLocation.search).get('op');
     return raw && isCombineOp(raw) ? raw : DEFAULT_COMPARE_OP;
@@ -1350,6 +1353,9 @@ export default function ListRoute() {
     setAddTarget('');
     setNewListName('');
     table?.selection.clear();
+    // Clearing the selection unmounts the bar that held focus: back to a row it added, not the
+    // toast's Open list, which would hold the toast up for as long as it kept focus.
+    if (!focusGameRow(document.querySelector('main'), appids[0])) document.querySelector<HTMLElement>('main')?.focus();
   }
 
   // Only ever called while viewing a manual list (`kind === 'user' && userList().kind ===
@@ -3229,19 +3235,30 @@ export default function ListRoute() {
   // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
   // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
   // ListHero renders no action row for them instead of an empty one.
+  // A step reloads the hero (load() clears heroTitle), so the pressed ‹/› gets focus back once it's
+  // back on screen, unless focus went elsewhere in the meantime.
+  let bundleStepFocus: HTMLElement | undefined;
+  function stepBundle(id: number | null, btn: HTMLElement): void {
+    if (id == null) return;
+    bundleStepFocus = btn;
+    navigate(withAccountParam(`/lists/bundle/${id}`));
+  }
+  createEffect(() => {
+    if (!heroTitle() || !bundleStepFocus) return;
+    if (document.activeElement === document.body) bundleStepFocus.focus();
+    bundleStepFocus = undefined;
+  });
   const heroLead: JSX.Element | undefined =
     kind !== 'bundle' ? undefined : (
       <div class="list-hero-nav">
+        {/* aria-disabled, not disabled: a disabled button can't take focus back on the last bundle. */}
         <button
           type="button"
           class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
-          disabled={prevBundleId() == null}
-          onClick={() => {
-            const id = prevBundleId();
-            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
-          }}
+          aria-disabled={prevBundleId() == null ? 'true' : undefined}
+          onClick={(e) => stepBundle(prevBundleId(), e.currentTarget)}
         >
           <ChevronLeft />
         </button>
@@ -3250,11 +3267,8 @@ export default function ListRoute() {
           class="btn"
           aria-label="Next bundle"
           title="Next bundle"
-          disabled={nextBundleId() == null}
-          onClick={() => {
-            const id = nextBundleId();
-            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
-          }}
+          aria-disabled={nextBundleId() == null ? 'true' : undefined}
+          onClick={(e) => stepBundle(nextBundleId(), e.currentTarget)}
         >
           <ChevronRight />
         </button>
@@ -3360,7 +3374,7 @@ export default function ListRoute() {
           <>
             {/* Gated on the players in the URL, not on the ones that resolved: a comparison naming
               a private or misspelled profile is exactly when editing them has to be reachable. */}
-            <Show when={compareSlots().length >= 2}>
+            <Show when={canEditPlayers()}>
               <button type="button" class="btn hero-secondary" onClick={() => setEditingPlayers((v) => !v)}>
                 {editingPlayers() ? 'Cancel' : 'Edit players'}
               </button>
@@ -3542,7 +3556,8 @@ export default function ListRoute() {
         <ListHero
           title={heroTitle()}
           lead={heroLead}
-          secondaryActions={kind === 'bundle' || kind === 'compare'}
+          // Save only shows with a result, which needs the players Edit players is gated on.
+          secondaryActions={kind === 'bundle' || (kind === 'compare' && canEditPlayers())}
           chips={
             <>
               {kind === 'bundle' && (

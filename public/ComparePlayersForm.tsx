@@ -94,6 +94,8 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const [openSlot, setOpenSlot] = createSignal<number | null>(null);
   const [query, setQuery] = createSignal('');
   const [highlight, setHighlight] = createSignal(0);
+  // Whether the arrow keys or the pointer moved to the highlighted row since its reset: Enter then means it.
+  let pointed = false;
   const listboxId = createUniqueId();
   const whyDisabledId = createUniqueId();
 
@@ -103,17 +105,20 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
     setOpenSlot(null);
     setQuery('');
     setHighlight(0);
+    pointed = false;
   }
 
   function openDropdown(slotIdx: number): void {
     setOpenSlot(slotIdx);
     setHighlight(0);
+    pointed = false;
   }
 
   function addEntry(slotIdx: number, entry: SlotEntry): void {
     setSlots((prev) => prev.map((slot, i) => (i === slotIdx ? [...slot, entry] : slot)));
     setQuery('');
     setHighlight(0);
+    pointed = false;
   }
 
   function removeEntry(slotIdx: number, entryIdx: number): void {
@@ -145,16 +150,19 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
         e.preventDefault();
         openDropdown(slotIdx);
         setHighlight((h) => (list.length === 0 ? 0 : (h + 1) % list.length));
+        pointed = true;
         break;
       case 'ArrowUp':
         e.preventDefault();
         setHighlight((h) => (list.length === 0 ? 0 : (h - 1 + list.length) % list.length));
+        pointed = true;
         break;
       case 'Enter':
-        // Always swallowed: this field commits a chip, it never submits the form. Submitting on
-        // Enter would throw away whatever is half-typed in it.
+        // Swallowed: Enter commits what's typed or pointed to as a chip. Only an empty field with
+        // nothing pointed to submits, so nothing half-typed is thrown away.
         e.preventDefault();
-        commit(slotIdx);
+        if (!query().trim() && !(pointed && list[highlight()]) && filledCount() >= 2) formEl.requestSubmit();
+        else commit(slotIdx);
         break;
       case 'Escape':
         // Only closes the dropdown — the route's own Escape (closing the panel) has nothing to do
@@ -290,7 +298,10 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                         aria-selected={highlight() === optionIdx()}
                         classList={{ active: highlight() === optionIdx() }}
                         onMouseDown={(e) => e.preventDefault()} // keep focus on the input, so focusout doesn't beat the click
-                        onMouseEnter={() => setHighlight(optionIdx())}
+                        onMouseEnter={() => {
+                          setHighlight(optionIdx());
+                          pointed = true;
+                        }}
                         onClick={() => addEntry(slotIdx, { kind: 'account', account })}
                       >
                         <Show when={account.avatarUrl}>

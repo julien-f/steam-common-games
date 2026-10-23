@@ -233,7 +233,7 @@ export default function HomeRoute() {
     const trimmed = resolveInputs()
       .map((s) => normalizeInput(s.trim()))
       .filter(Boolean);
-    if (trimmed.length === 0) return;
+    if (trimmed.length === 0 || resolving()) return;
     setResolving(true);
     setResolveError('');
     try {
@@ -730,7 +730,8 @@ export default function HomeRoute() {
           <button type="button" onClick={() => setResolveInputs((prev) => [...prev, ''])}>
             <Plus /> Add Steam Family account
           </button>
-          <button type="submit" class="btn btn-primary" disabled={resolving()}>
+          {/* aria-disabled, not disabled: a disabled button drops the focus of the press that started it. */}
+          <button type="submit" class="btn btn-primary" aria-disabled={resolving() ? 'true' : undefined}>
             {resolving() ? 'Looking up…' : 'Look up'}
           </button>
         </form>

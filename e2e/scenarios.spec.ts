@@ -2,7 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -40,6 +40,23 @@ test('A1 edge: a first visit says what the app does, and the account field looks
   await page.goto('/');
   await expect(page.locator('.home-intro')).toContainText('ratings, completion times and prices');
   await expect(page.getByRole('button', { name: 'Look up', exact: true })).toBeVisible();
+});
+
+test('A1 edge: Look up keeps focus while it resolves', async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/common-games', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('alice');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  const busy = page.getByRole('button', { name: 'Looking up…' });
+  await expect(busy).toHaveAttribute('aria-disabled', 'true');
+  await expect(busy).toBeFocused();
+  release();
+  await expect(page.getByRole('main')).toContainText('Owned: 6');
 });
 
 test('A1 edge: an Explore card opens its list from anywhere on the card', async ({ page }) => {
@@ -820,6 +837,42 @@ test('C1 edge: Add player focuses the player box it adds', async ({ page }) => {
   await expect(boxes.nth(2)).toBeFocused();
 });
 
+test('C1 edge: Enter in an empty player box compares, once two players are in', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  const box = page.locator('.compare-form').getByRole('combobox').nth(1);
+  await box.fill('bob');
+  await box.press('Enter'); // commits Bob's chip
+  await expect(page.locator('.compare-form')).toContainText('bob');
+  await box.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
+});
+
+test('C1 edge: Enter in an empty player box adds the suggestion pointed at, not compares', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2); // Bob is now a known account
+  await page.goto('/lists/compare');
+  const boxes = page.locator('.compare-form').getByRole('combobox');
+  await boxes.nth(1).fill('carol');
+  await boxes.nth(1).press('Enter');
+  await page.getByRole('button', { name: 'Add player' }).click();
+  await page.getByRole('option', { name: /Bob/ }).hover();
+  await boxes.nth(2).press('Enter');
+  await expect(page.locator('.compare-form')).toContainText('Bob');
+  await expect(page).toHaveURL(/\/lists\/compare$/);
+});
+
+test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  await expect(page.locator('.compare-form')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'More actions' })).toHaveCount(0);
+});
+
 test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare');
@@ -915,6 +968,19 @@ test('L1.1-3: select games, add them to a new list, open it', async ({ page }) =
   await toast.getByRole('link', { name: 'Open list' }).click();
   await expect(page.getByRole('heading', { name: 'To play with Bob' })).toBeVisible();
   await expect(rows(page)).toHaveCount(2);
+});
+
+test('L1 edge: Add hands focus to the row it added as the selection bar goes', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const added = rows(page).last();
+  await added.getByRole('checkbox').check();
+  const toolbar = page.locator('.selection-toolbar');
+  await toolbar.getByRole('combobox').selectOption({ label: 'Create new list…' });
+  await page.getByRole('textbox', { name: 'New list name' }).fill('Later');
+  await toolbar.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('status').getByRole('link', { name: 'Open list' })).toBeVisible();
+  await expect(added).toBeFocused();
 });
 
 test("L1 edge: the new list's toast stays while pointed at", async ({ page }) => {
@@ -1945,6 +2011,20 @@ test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on 
   await expect(page.locator('.list-hero')).toContainText('IsThereAnyDeal API key');
   await expect(page.getByLabel('Include expired')).toHaveCount(0);
   await expect(page.locator('.table-container')).toHaveCount(0);
+});
+
+test('B1 edge: stepping onto the last bundle keeps focus on › Next bundle, marked unavailable', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  await page.getByRole('cell', { name: BUNDLE.title }).click();
+  const next = page.getByRole('button', { name: 'Next bundle' });
+  await next.focus();
+  await next.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
+  await expect(next).toBeFocused();
+  await next.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
 });
 
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
