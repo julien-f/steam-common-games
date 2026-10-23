@@ -76,7 +76,6 @@ import Link from 'lucide-solid/icons/link';
 import Newspaper from 'lucide-solid/icons/newspaper';
 import Package from 'lucide-solid/icons/package';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
-import Search from 'lucide-solid/icons/search';
 import ShoppingCart from 'lucide-solid/icons/shopping-cart';
 import Star from 'lucide-solid/icons/star';
 import Timer from 'lucide-solid/icons/timer';
@@ -260,6 +259,20 @@ export function initPanel(options: PanelOptions) {
     )
       setMoreLinksOpen(false);
   });
+  // Capture, as bindNavPopover: ahead of panelKeyboard.ts's Esc, which skips a handled one.
+  // Not once focus has left the panel: a layer opened above it (the shortcuts dialog, nav search) owns Esc.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Escape' || !moreLinksOpen()) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && !active.closest('#game-panel')) return;
+      e.preventDefault();
+      setMoreLinksOpen(false);
+      document.querySelector<HTMLElement>('#game-panel .panel-icon-more-btn')?.focus();
+    },
+    true,
+  );
 
   initPanelSwipe();
   initHeroSwipe();
@@ -729,6 +742,7 @@ export function panelClose({ leavingRoute = false } = {}) {
   const game = panelGame();
   if (!game) return;
   setPanelGame(null);
+  setMoreLinksOpen(false);
   // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
   // was handed off but never opened (a bad appid, a failed lookup), which must not be left armed
   // to attach a stale trail to some later, unrelated open of that same game.
@@ -2277,15 +2291,10 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
         },
       props.game.details?.meta?.website && {
         icon: Globe,
-        label: 'Official Website',
+        label: 'Official website',
         href: props.game.details.meta.website,
       },
-      {
-        icon: Search,
-        label: 'More Like This (Steam)',
-        href: steamMoreLikeUrl(props.game.appid),
-      },
-    ].filter((it): it is { icon: typeof Search; label: string; href: string } => !!it);
+    ].filter((it): it is { icon: typeof Globe; label: string; href: string } => !!it);
 
   return (
     <Show when={items().length}>
@@ -2307,7 +2316,7 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
               {(it) => (
                 <li>
                   <a class="panel-icon-more-item" href={safeHref(it.href) || undefined} target="_blank" rel="noopener">
-                    <it.icon /> {it.label}
+                    <it.icon /> {it.label} ↗
                   </a>
                 </li>
               )}

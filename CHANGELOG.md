@@ -32,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A shared view link with a damaged layout no longer breaks the bundles page or a list's view saving; it opens on your own view instead
 - The limit on game lists loading at once now counts an IPv6 client by its network, as the rate limits do, so rotating addresses can't get around it
 - A large synced setting, such as many lists, now saves to your account instead of being refused past 100 KB
+- Back closes the open game or screenshot in a tab with a long history, instead of only changing the address
+- The game panel's More links menu closes on Esc, leaving the game open, and no longer repeats Similar games' More like this on Steam link
 
 ### Development
 
