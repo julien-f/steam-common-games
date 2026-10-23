@@ -813,6 +813,23 @@ test('C1 edge: Enter in an empty player box compares, once two players are in', 
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
 });
 
+test('C1 edge: Enter in an empty player box adds the suggestion pointed at, not compares', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2); // Bob is now a known account
+  await page.goto('/lists/compare');
+  const boxes = page.locator('.compare-form').getByRole('combobox');
+  await boxes.nth(1).fill('carol');
+  await boxes.nth(1).press('Enter');
+  await page.getByRole('button', { name: 'Add player' }).click();
+  await page.getByRole('option', { name: /Bob/ }).hover();
+  await boxes.nth(2).press('Enter');
+  await expect(page.locator('.compare-form')).toContainText('Bob');
+  await expect(page).toHaveURL(/\/lists\/compare$/);
+});
+
 test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
