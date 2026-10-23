@@ -35,7 +35,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Taste profile
 
-- **U204 · minor · F3, B1** — the profile counts every played game with tags: software (Wallpaper Engine) and idled games skew Plays mostly, Taste fit and Group fit, and the note doesn't say how many games it's built from. Leave out non-game apps, add an "exclude from my profile" toggle per game, and say "from 42 played games".
+- **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
 - **U205 · minor · F3, C1, B1** — the profile is tags only, though what decides a pick is often how long and with whom: say the co-op/online share of hours and the typical length (hours ÷ HLTB main, skipping endless and multiplayer games, silent below ~10 qualifying games), as sentences, not scores.
 - **U206 · minor · F3** — "what should I play next" from Owned takes a filter and a sort by hand. A **Play next** preset: never played, sorted by Taste fit.
 

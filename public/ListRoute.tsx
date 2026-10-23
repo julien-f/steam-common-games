@@ -336,13 +336,16 @@ function tasteFitNote({ label, taste, linked }: TasteSource): string | null {
 }
 
 // How close a game is to the current account's taste.
-function tasteFitColumn(source: TasteSource): ColumnDef<Record<string, any>> {
-  const { taste } = source;
+function tasteFitColumn(source: () => TasteSource | null): ColumnDef<Record<string, any>> {
+  const taste = () => source()?.taste;
   return {
     key: TASTE_FIT_KEY,
     label: 'Taste fit',
     type: 'number',
-    value: (row) => (taste ? fitTo(taste, row) : null),
+    value: (row) => {
+      const t = taste();
+      return t ? fitTo(t, row) : null;
+    },
     format: fmtPercent,
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
@@ -2569,7 +2572,7 @@ export default function ListRoute() {
           () => filterTable()?.filter.modes().tags === 'and',
         ),
         similarityColumn(similarityScores),
-        tasteFitColumn(tasteSource),
+        tasteFitColumn(tasteFitSource),
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
@@ -3236,17 +3239,34 @@ export default function ListRoute() {
     const account = untrack(getEffectiveCurrentAccount);
     const taste = account && tasteOf(tableData(), Date.now());
     const keep = untrack(() => [getMyAccount()?.id, getCurrentAccount()?.id]).filter((id) => id != null);
-    if (taste) saveTaste(account.id, taste, keep);
+    if (!taste) return;
+    saveTaste(account.id, taste, keep);
+    // So Owned's own Taste fit scores on a first visit, and not from a taste stored before a change.
+    setTasteFitSource((source) => source && { ...source, taste });
   });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
-  const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
+  const playsMostlyProfile = createMemo(() =>
+    loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 },
+  );
+  const playsMostly = () => playsMostlyProfile().tags;
+  // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
+  const playtimeHidden = createMemo(
+    () => loadFraction() == null && tableData().length > 0 && !tableData().some((g) => g.playtime),
+  );
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
     const pct = (weight: number) => `${Math.round(weight * 100)}%`;
     const hours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
     return (
-      <Show when={playsMostly().length}>
+      <Show
+        when={playsMostly().length}
+        fallback={
+          <Show when={playtimeHidden()}>
+            <div class="list-plays-mostly">No playtime to profile: it's private, or nothing was played yet.</div>
+          </Show>
+        }
+      >
         <div class="list-plays-mostly">
           Plays mostly:{' '}
           <For each={playsMostly()}>
@@ -3264,6 +3284,7 @@ export default function ListRoute() {
               </button>
             )}
           </For>
+          <span class="list-plays-mostly-count">from {playsMostlyProfile().played} played games</span>
           <button
             type="button"
             class="list-plays-mostly-why"

@@ -635,6 +635,9 @@
     border-color: var(--accent);
     color: var(--accent);
   }
+  .list-plays-mostly-count {
+    color: var(--muted);
+  }
   .list-plays-mostly-why {
     min-height: 24px;
     padding: 2px 4px;

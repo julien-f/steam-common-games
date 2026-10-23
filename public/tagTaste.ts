@@ -1,7 +1,27 @@
 type Weights = Record<string, number | null> | null | undefined;
 type TagWeights = Record<string, number | null>;
 type Vector = Map<string, number>;
-type Tagged = { appid: number; productionTier?: string | null; details?: { tagWeights?: Weights } | null };
+type Tagged = {
+  appid: number;
+  productionTier?: string | null;
+  genres?: string[];
+  details?: { tagWeights?: Weights } | null;
+};
+
+// Steam store genres only software carries; appdetails types it "game" all the same (integrations.md).
+const SOFTWARE_GENRES = new Set([
+  'Utilities',
+  'Animation & Modeling',
+  'Design & Illustration',
+  'Video Production',
+  'Audio Production',
+  'Photo Editing',
+  'Software Training',
+  'Web Publishing',
+  'Game Development',
+]);
+// Wallpaper Engine left running for 3000 h says nothing about what its owner plays.
+export const isSoftware = (g: { genres?: string[] }) => !!g.genres?.some((genre) => SOFTWARE_GENRES.has(genre));
 
 // Production Tier as one more dimension: budget is something Steam tags don't say (no "AAA" tag).
 const TIER_PREFIX = 'tier:';
@@ -52,7 +72,9 @@ export function similarGames<T extends Tagged>(target: T, games: readonly T[], l
 const MIN_PLAYED_FOR_PROFILE = 5;
 
 function playedOf<T extends Omit<Tagged, 'appid'> & { playtime?: number }>(weighted: readonly T[]) {
-  return weighted.filter((g) => g.playtime).map((game) => ({ game, hours: game.playtime!, weights: featuresOf(game) }));
+  return weighted
+    .filter((g) => g.playtime && !isSoftware(g))
+    .map((game) => ({ game, hours: game.playtime!, weights: featuresOf(game) }));
 }
 
 // Tag weights × log playtime (one 2000 h game can't drown the rest) × rarity; null if too few played.
@@ -72,10 +94,11 @@ export interface PlayedTag {
 
 const GAMES_PER_TAG = 3;
 
+// `played`: how many games the profile is built from.
 export function topPlayedTags(
   games: readonly (Omit<Tagged, 'appid'> & { name: string; playtime?: number })[],
   limit: number,
-): PlayedTag[] {
+): { tags: PlayedTag[]; played: number } {
   const weighted = games.filter((g) => g.details?.tagWeights);
   const idf = inverseFrequency(weighted.map(featuresOf));
   const played = playedOf(weighted);
@@ -83,7 +106,7 @@ export function topPlayedTags(
     .filter(([tag, score]) => score > 0 && !tag.startsWith(TIER_PREFIX))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit);
-  return top.map(([tag, score]) => ({
+  const tags = top.map(([tag, score]) => ({
     tag,
     weight: score / top[0][1],
     // A tag's idf is the same for every game, so this orders them by their share of its score.
@@ -94,6 +117,7 @@ export function topPlayedTags(
       .slice(0, GAMES_PER_TAG)
       .map(({ name, hours }) => ({ name, hours })),
   }));
+  return { tags, played: played.length };
 }
 
 export interface PlayerFits {
@@ -110,7 +134,9 @@ export function playerFits(
   const idf = inverseFrequency(weighted.map(featuresOf));
   const profiles = hoursPlayed.map((hours) =>
     playProfile(
-      weighted.filter((g) => hours(g.appid)).map((g) => ({ hours: hours(g.appid)!, weights: featuresOf(g) })),
+      weighted
+        .filter((g) => hours(g.appid) && !isSoftware(g))
+        .map((g) => ({ hours: hours(g.appid)!, weights: featuresOf(g) })),
       idf,
     ),
   );

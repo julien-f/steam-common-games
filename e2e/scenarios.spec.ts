@@ -2,7 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, DAVE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -658,6 +658,25 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await expect(rows(page)).toHaveCount(4);
   await expect(page.getByRole('columnheader', { name: /Tag match/ })).toBeVisible();
   await expect(coop).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('A5.1-2: Plays mostly says how many played games it is built from, leaving software out', async ({ page }) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  const note = page.locator('.list-plays-mostly');
+  // 15 played, minus Wallpaper Engine's 3000 h.
+  await expect(note).toContainText('from 14 played games');
+  await expect(note.locator('.list-plays-mostly-tag')).not.toContainText(['Utilities']);
+});
+
+test('A5 edge: an account with no playtime at all says why it has no profile', async ({ page }) => {
+  await asPlayer(page, BOB);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+  await expect(page.locator('.list-plays-mostly')).toHaveText(
+    "No playtime to profile: it's private, or nothing was played yet.",
+  );
 });
 
 test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {
