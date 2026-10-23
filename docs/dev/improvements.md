@@ -32,7 +32,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 ## Comparing
 
-- **U190 · polish · C1, I1** — on a phone, Compare's players form shows a More actions ⋯ that expands to nothing (`secondaryActions` is set for every comparison, the folded Edit players/Save only exist with a result). Show the toggle only when the hero has `hero-secondary` actions.
 - **U191 · polish · C1, I2** — Enter in a player field never submits, even when it's empty, so typing "bob", Enter (chip), Enter does nothing; keyboard users must Tab to Compare libraries. Submit on Enter when the field is empty, as Home's lookup does.
 - **U170 · major · C3, L2** — saving a comparison names a player who isn't a stored account by steam64 id: the formula reads "Alice — Owned ∪ 76561198000000002 — Owned", and so do its group labels and Home's tree, though the comparison's own title said "Alice vs. Bob" and a reload doesn't fix it. Store or resolve each source account's name when the list is saved.
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.

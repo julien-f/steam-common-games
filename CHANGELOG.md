@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The combined-list form fits a phone's width
 - A game's DLC no longer reorder and reload once they all arrive
+- On a phone, Compare's players form no longer shows a More actions button with nothing behind it
 
 ### Development
 

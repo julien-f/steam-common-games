@@ -785,6 +785,14 @@ test('C1 edge: Add player focuses the player box it adds', async ({ page }) => {
   await expect(boxes.nth(2)).toBeFocused();
 });
 
+test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'phone layout only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/compare');
+  await expect(page.locator('.compare-form')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'More actions' })).toHaveCount(0);
+});
+
 test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare');

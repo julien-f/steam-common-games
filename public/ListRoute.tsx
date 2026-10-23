@@ -3532,7 +3532,8 @@ export default function ListRoute() {
         <ListHero
           title={heroTitle()}
           lead={heroLead}
-          secondaryActions={kind === 'bundle' || kind === 'compare'}
+          // A comparison's folded actions (Edit players, Save) need its players.
+          secondaryActions={kind === 'bundle' || (kind === 'compare' && compareSlots().length >= 2)}
           chips={
             <>
               {kind === 'bundle' && (
