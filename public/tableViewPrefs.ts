@@ -41,11 +41,41 @@ function takeSharedView(): TableViewState | null {
   if (!raw) return null;
   params.delete(VIEW_PARAM);
   history.replaceState(null, '', urlWithParams(params));
+  let view: unknown;
   try {
-    return JSON.parse(raw) as TableViewState;
+    view = JSON.parse(raw);
   } catch {
     return null; // malformed — fall back to the stored default
   }
+  return isTableViewState(view) ? view : null; // setViewState throws on a wrong shape
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isStrings = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
+const isMapOf = (v: unknown, isValue: (value: unknown) => boolean): boolean =>
+  isRecord(v) && Object.values(v).every(isValue);
+
+const VIEW_FIELD_CHECKS: Record<keyof TableViewState, (v: unknown) => boolean> = {
+  visibleCols: isStrings,
+  columnOrder: isStrings,
+  groupBy: isStrings,
+  collapsedGroups: isStrings,
+  sorts: (v) =>
+    Array.isArray(v) &&
+    v.every((s) => isRecord(s) && typeof s.key === 'string' && (s.dir === 'asc' || s.dir === 'desc')),
+  filters: (v) => isMapOf(v, isStrings),
+  excludeFilters: (v) => isMapOf(v, isStrings),
+  filterModes: (v) => isMapOf(v, (m) => m === 'and' || m === 'or'),
+  rangeFilters: (v) => isMapOf(v, (r) => isRecord(r) && typeof r.min === 'string' && typeof r.max === 'string'),
+  page: (v) => typeof v === 'number',
+  pageSize: (v) => typeof v === 'number',
+  searchQuery: (v) => typeof v === 'string',
+};
+
+function isTableViewState(v: unknown): v is TableViewState {
+  return (
+    isRecord(v) && Object.entries(VIEW_FIELD_CHECKS).every(([key, check]) => v[key] === undefined || check(v[key]))
+  );
 }
 
 // Saves every future view change — the only ongoing side effect table interaction has; the URL

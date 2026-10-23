@@ -86,6 +86,51 @@ test('restoreTableView: a malformed param falls through to the stored default', 
   });
 });
 
+test('restoreTableView: valid JSON of the wrong shape falls through to the stored default', () => {
+  const bad = [
+    '{"filters":{"name":5}}',
+    '[]',
+    '5',
+    'null',
+    '{"sorts":[{"key":"name","dir":"up"}]}',
+    '{"rangeFilters":{"price":{"min":1}}}',
+    '{"filterModes":{"tags":"xor"}}',
+    '{"pageSize":"25"}',
+    '{"visibleCols":"name"}',
+  ];
+  for (const raw of bad) {
+    withLocation(`?tv=${encodeURIComponent(raw)}`, () => {
+      const { setPref } = require('../public/prefs.ts');
+      setPref('libraryView', { pageSize: 10 });
+      const table = fakeTable();
+      assert.equal(restoreTableView(table, prefViewStore('libraryView')), false, raw);
+      assert.deepEqual(table.getViewState(), { pageSize: 10 }, raw);
+    });
+  }
+});
+
+test('restoreTableView: a full well-formed view is applied', () => {
+  const view = {
+    visibleCols: ['name'],
+    columnOrder: ['name', 'price'],
+    sorts: [{ key: 'name', dir: 'asc' }],
+    filters: { tags: ['RPG'] },
+    excludeFilters: { tags: ['Horror'] },
+    filterModes: { tags: 'and' },
+    rangeFilters: { price: { min: '1', max: '' } },
+    groupBy: ['tags'],
+    collapsedGroups: ['RPG'],
+    page: 2,
+    pageSize: 25,
+    searchQuery: 'portal',
+  };
+  withLocation(`?tv=${encodeURIComponent(JSON.stringify(view))}`, () => {
+    const table = fakeTable();
+    assert.equal(restoreTableView(table, prefViewStore('libraryView')), true);
+    assert.deepEqual(table.getViewState(), view);
+  });
+});
+
 test('restoreTableView: no param at all falls back to whatever is already stored', () => {
   withLocation('', () => {
     const { setPref } = require('../public/prefs.ts');

@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The combined-list form fits a phone's width
 - A game's DLC no longer reorder and reload once they all arrive
+- A shared view link with a damaged layout no longer breaks the bundles page or a list's view saving; it opens on your own view instead
 
 ### Development
 
