@@ -11,6 +11,7 @@ const {
   fitTo,
   isSoftware,
   commonGround,
+  suggestionsFor,
 } = require('../public/tagTaste.ts');
 
 const game = (appid, tagWeights) => ({ appid, details: { tagWeights } });
@@ -288,4 +289,47 @@ test("commonGround: a tag shared by everyone isn't also one player's own", () =>
   const games = library(1, 24, (id) => ({ Shared: 1, [id <= 12 ? 'Mine' : 'Yours']: 0.8, [`T${id % 4}`]: 0.3 }));
   const ground = commonGround(games, [player({ ...tenHours(1, 12), 13: 1 }), player(tenHours(1, 24))]);
   for (const own of ground.ownTags) for (const tag of ground.sharedTags) assert.ok(!own.includes(tag));
+});
+
+test("suggestionsFor: what others played a lot that the player never has, closest to the player's taste first", () => {
+  const games = [
+    ...library(1, 12, (id) => ({ Roguelike: 1, Deckbuilder: 0.8, [`T${id % 4}`]: 0.4 })),
+    ...library(13, 24, (id) => ({ Farming: 1, Cozy: 0.8, [`T${id % 4}`]: 0.4 })),
+  ];
+  const me = player(
+    tenHours(1, 10),
+    [...Array(12).keys()].map((i) => i + 1),
+  ); // owns 11 and 12, never played
+  const friend = player({ ...tenHours(13, 24), 11: 40, 12: 3, 13: 50 });
+  const suggested = suggestionsFor(games, [me, friend], 0);
+  // 11: a roguelike the friend played a lot, first. 12: too few hours. Farming games fit less.
+  assert.deepEqual(suggested[0], { appid: 11, from: 1, hours: 40, owns: true });
+  assert.ok(!suggested.some((s) => s.appid === 12));
+  assert.ok(suggested.slice(1).every((s) => s.appid >= 13 && !s.owns));
+  // Mine to them: at most 5, all from me, and never one they played.
+  const theirs = suggestionsFor(games, [me, friend], 1);
+  assert.ok(theirs.length <= 5 && theirs.every((s) => s.from === 0 && s.appid <= 10));
+});
+
+test("suggestionsFor: ranks among the player's unplayed games, not against those their profile is made of", () => {
+  const games = library(1, 30, (id) => ({
+    Shooter: id <= 20 ? 1 : 0.2,
+    Puzzle: id <= 20 ? 0.2 : 1,
+    [`T${id % 5}`]: 0.5,
+  }));
+  const me = player(tenHours(1, 20));
+  const friend = player({ 21: 40, 22: 40, 23: 40, 24: 40, 25: 40, 26: 40 });
+  assert.ok(suggestionsFor(games, [me, friend], 0).length > 0);
+});
+
+test('suggestionsFor: nothing for a player without a profile, and never software', () => {
+  const games = library(1, 12, (id) => ({ Roguelike: 1, [`T${id % 4}`]: 0.4 }));
+  assert.equal(suggestionsFor(games, [player(tenHours(1, 3)), player(tenHours(1, 12))], 0), null);
+  const tool = { ...game(13, { Roguelike: 1, T1: 0.4 }), genres: ['Utilities'] };
+  const suggested = suggestionsFor(
+    [...games, tool],
+    [player(tenHours(1, 10)), player({ ...tenHours(1, 12), 13: 900 })],
+    0,
+  );
+  assert.ok(!suggested.some((s) => s.appid === 13));
 });

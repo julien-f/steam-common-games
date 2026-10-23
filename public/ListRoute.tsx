@@ -66,6 +66,8 @@ import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/da
 import {
   commonGround,
   fitTo,
+  suggestionsFor,
+  type ComparedPlayer,
   playerFits,
   similarGames,
   tasteOf,
@@ -647,6 +649,7 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
+const fmtHours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
 const PLAYER_TAGS_SHOWN = 3;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
@@ -730,7 +733,7 @@ export default function ListRoute() {
 
   let tableContainer!: HTMLDivElement;
   // Each compared player's label and owned games, in `compareAccounts` order (also the panel's Owned by, see getOwners).
-  let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
+  let comparePlayers: { id: string; label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // The details stream's `{ limited }` message: this client spent its share, said once for the load.
@@ -2260,6 +2263,7 @@ export default function ListRoute() {
       });
       const resolved = await resolveRows(list, fetchers, (sources) => {
         comparePlayers = shown.map((account) => ({
+          id: account.id,
           label: accountDisplayLabel(account),
           owners: ownersByAccount.get(account.id) ?? new Map(),
         }));
@@ -3242,12 +3246,28 @@ export default function ListRoute() {
           style: playStyle(rows, ofRow),
         };
       });
-      const ground = commonGround(
-        rows,
-        comparePlayers.map((player) => ({ owns: (appid) => player.owners.has(appid), hours: playerHours(player) })),
-      );
-      return { players, ground };
+      const compared = comparePlayers.map((player): ComparedPlayer => ({
+        owns: (appid) => player.owners.has(appid),
+        hours: playerHours(player),
+      }));
+      return { players, ground: commonGround(rows, compared), compared };
     });
+  });
+  // Defaults to the first player who isn't my account: suggesting to myself is what Taste fit does.
+  const [suggestTarget, setSuggestTarget] = createSignal<number | null>(null);
+  const suggestTo = () => {
+    const chosen = suggestTarget();
+    if (chosen != null) return chosen;
+    const mine = getMyAccount()?.id;
+    return Math.max(
+      0,
+      comparePlayers.findIndex((p) => p.id !== mine),
+    );
+  };
+  const suggestions = createMemo(() => {
+    const profiles = playerProfiles();
+    const target = suggestTo();
+    return profiles && untrack(() => suggestionsFor(tableData(), profiles.compared, target));
   });
   const sharedNote = (shared: number) => `share ${shared} of their top ${TOP_TAGS} tags`;
   function playersSummary(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string {
@@ -3340,6 +3360,42 @@ export default function ListRoute() {
                     )}
                   </For>
                 </p>
+                <div class="list-players-row">
+                  <label>
+                    Suggest to{' '}
+                    <select value={suggestTo()} onChange={(e) => setSuggestTarget(Number(e.currentTarget.value))}>
+                      <For each={profiles().players}>{(p, i) => <option value={i()}>{p.label}</option>}</For>
+                    </select>
+                  </label>
+                  <Show when={!suggestions()?.length}>
+                    <span class="list-players-none">
+                      {suggestions()
+                        ? 'nothing the others played a lot fits yet'
+                        : 'too few games played here for a profile'}
+                    </span>
+                  </Show>
+                </div>
+                <Show when={suggestions()?.length}>
+                  <ul class="list-players-suggestions">
+                    <For each={suggestions()}>
+                      {(s) => (
+                        <li>
+                          <button
+                            type="button"
+                            class="list-players-game"
+                            onClick={() => openGame(rowStore.getRow(s.appid)!)}
+                          >
+                            {rowStore.getRow(s.appid)?.name}
+                          </button>
+                          <span class="list-players-own">
+                            {profiles().players[s.from].label} {fmtHours(s.hours)} ·{' '}
+                            {s.owns ? 'owns it' : "doesn't own it"}
+                          </span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
               </details>
             )}
           </Show>
@@ -3412,7 +3468,6 @@ export default function ListRoute() {
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
     const pct = (weight: number) => `${Math.round(weight * 100)}%`;
-    const hours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
     return (
       <>
         <Show
@@ -3496,7 +3551,7 @@ export default function ListRoute() {
                       <span class="visually-hidden">{pct(weight)}</span>
                     </span>
                     <span class="list-plays-mostly-games">
-                      {games.map((g) => `${g.name} ${hours(g.hours)}`).join(' · ')}
+                      {games.map((g) => `${g.name} ${fmtHours(g.hours)}`).join(' · ')}
                     </span>
                   </li>
                 )}

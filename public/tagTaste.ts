@@ -252,6 +252,15 @@ const median = (xs: readonly number[]) => {
   return s.length ? (s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2 : 0;
 };
 
+// The hours past which a game counts as one a player played a lot: their median, and 5 h at least.
+function playedALot(games: readonly Tagged[], player: ComparedPlayer): number {
+  const hours = games
+    .filter((g) => !isSoftware(g))
+    .map((g) => player.hours(g.appid))
+    .filter((h) => h > 0);
+  return hours.length ? Math.max(MIN_FAVOURITE_HOURS, median(hours)) : Infinity;
+}
+
 export function commonGround(games: readonly Tagged[], players: readonly ComparedPlayer[]): CommonGround {
   const weighted = games.filter((g) => g.details?.tagWeights);
   const idf = inverseFrequency(weighted.map(featuresOf));
@@ -324,13 +333,7 @@ export function commonGround(games: readonly Tagged[], players: readonly Compare
       players.map((_, i) => i).find((i) => Math.max(...involving(i, true)) < Math.min(...involving(i, false))) ?? null;
   }
 
-  const thresholds = players.map((p) => {
-    const hours = games
-      .filter((g) => !isSoftware(g))
-      .map((g) => p.hours(g.appid))
-      .filter((h) => h > 0);
-    return hours.length ? Math.max(MIN_FAVOURITE_HOURS, median(hours)) : Infinity;
-  });
+  const thresholds = players.map((p) => playedALot(games, p));
   const favourites = games
     .filter((g) => !isSoftware(g) && players.every((p, i) => p.hours(g.appid) >= thresholds[i]))
     .map((g) => ({ appid: g.appid, weight: players.reduce((sum, p) => sum + Math.log1p(p.hours(g.appid)), 0) }))
@@ -339,4 +342,51 @@ export function commonGround(games: readonly Tagged[], players: readonly Compare
     .map((f) => f.appid);
 
   return { sharedTags, ownTags, pairs, closest, oddOneOut, favourites };
+}
+
+export interface Suggestion {
+  appid: number;
+  from: number; // the player who played it most
+  hours: number; // theirs
+  owns: boolean; // whether the suggested-to player owns it
+}
+
+const SUGGESTIONS_SHOWN = 5;
+
+// Games other players played a lot that `target` never has, among the third of those unplayed
+// games closest to `target`'s taste, closest first; null when `target` has no profile.
+export function suggestionsFor(
+  games: readonly Tagged[],
+  players: readonly ComparedPlayer[],
+  target: number,
+): Suggestion[] | null {
+  const tagged = games.filter((g) => g.details?.tagWeights);
+  const idf = inverseFrequency(tagged.map(featuresOf));
+  const candidates = tagged.filter((g) => !isSoftware(g));
+  const me = players[target];
+  const profile = playProfile(
+    candidates.filter((g) => me.hours(g.appid)).map((g) => ({ hours: me.hours(g.appid), weights: featuresOf(g) })),
+    idf,
+  );
+  if (!profile) return null;
+  // Ranked among the games `target` hasn't played: the ones they have are what the profile is made of.
+  const unplayed = candidates.filter((g) => !me.hours(g.appid));
+  const fits = new Map(unplayed.map((g) => [g.appid, cosine(profile, vectorOf(featuresOf(g), idf))]));
+  const sorted = [...fits.values()].sort((a, b) => b - a);
+  const topThird = sorted[Math.ceil(sorted.length / 3) - 1];
+  const bars = players.map((p) => playedALot(games, p));
+  return unplayed
+    .filter((g) => fits.get(g.appid)! >= topThird && fits.get(g.appid)! > 0)
+    .flatMap((g) => {
+      const from = players
+        .map((p, i) => ({ i, hours: p.hours(g.appid) }))
+        .filter(({ i, hours }) => i !== target && hours >= bars[i])
+        .sort((a, b) => b.hours - a.hours)[0];
+      return from
+        ? [{ appid: g.appid, from: from.i, hours: from.hours, owns: me.owns(g.appid), fit: fits.get(g.appid)! }]
+        : [];
+    })
+    .sort((a, b) => b.fit - a.fit || b.hours - a.hours)
+    .slice(0, SUGGESTIONS_SHOWN)
+    .map(({ appid, from, hours, owns }) => ({ appid, from, hours, owns }));
 }

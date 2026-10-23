@@ -673,6 +673,9 @@
     gap: 6px;
     margin: 6px 0 0;
   }
+  .list-players-suggestions {
+    margin: 6px 0 0;
+  }
   .list-players-own {
     color: var(--muted);
   }

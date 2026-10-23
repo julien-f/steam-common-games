@@ -148,7 +148,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. open **Players**
   3. read each player's top tags and play style, and how many top tags each pair shares
   4. read the shared favourites and the tags in common
-  5. **Suggest to** a player: games another played a lot that they never have ◇
+  5. **Suggest to** a player: games another played a lot that they never have
   6. open one in the panel
 - **Done when**: how alike players are is a count of top tags they share, never an uncalibrated score; each suggestion says who played it, how long, and whether the player owns it.
 - **Edges**: a player without a profile (says why); no shared favourites ("none yet"); **Intersect** or **Subtract** (the profiles need whole libraries).

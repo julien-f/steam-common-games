@@ -906,6 +906,23 @@ test('C7.3-4: Players says how many top tags each pair shares, which, and the fa
   await expect(page.locator('#panel-title')).toHaveText('Terraria');
 });
 
+test('C7.5-6: Suggest to a player what another played a lot, closest to their taste, then open it', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  // My account is Dave: the picker starts on Erin.
+  const to = players.getByLabel('Suggest to');
+  await expect(to).toHaveValue('1');
+  const first = players.locator('.list-players-suggestions li').first();
+  await expect(first).toHaveText(/^Deep Rock Galactic\s*Dave 120h · owns it$/);
+  await to.selectOption({ label: 'Dave' });
+  await expect(players.locator('.list-players-suggestions li').first()).toContainText("Erin 90h · doesn't own it");
+  await players.getByRole('button', { name: 'Valheim' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Valheim');
+});
+
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
   await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
   await expect(rows(page)).toHaveCount(3);
@@ -980,7 +997,7 @@ test('C1 edge: the comparison states its mode once, in its select', async ({ pag
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
-  await expect(page.locator('.list-hero select')).toHaveValue('group-by-membership');
+  await expect(page.getByLabel("How to combine these players' libraries")).toHaveValue('group-by-membership');
   await expect(page.locator('.list-hero-chip', { hasText: 'Grouped by membership' })).toHaveCount(0);
 });
 
