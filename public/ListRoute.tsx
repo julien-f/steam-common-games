@@ -63,8 +63,21 @@ import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
-import { fitTo, playerFits, similarGames, tasteOf, topPlayedTags, type PlayerFits, type Taste } from './tagTaste.ts';
+import {
+  commonGround,
+  fitTo,
+  suggestionsFor,
+  type ComparedPlayer,
+  playerFits,
+  similarGames,
+  tasteOf,
+  topPlayedTags,
+  TOP_TAGS,
+  type PlayerFits,
+  type Taste,
+} from './tagTaste.ts';
 import { loadTaste, saveTaste } from './tasteCache.ts';
+import { playStyle, storyGames, storySentence, STYLE_SENTENCES, type ProfileGame } from './playerProfile.ts';
 import {
   fmt,
   insertColumnsAfter,
@@ -83,6 +96,8 @@ import {
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
   SOURCE_NAMES,
+  endOfDay,
+  releasedBy,
 } from './gameColumns.ts';
 import {
   computeSteamdbRating,
@@ -98,6 +113,7 @@ import {
   oldestFetchedAt,
   scoreColor,
   fmtLocalDate,
+  smoothScroll,
   refusalMessage,
 } from './utils.ts';
 import {
@@ -336,13 +352,16 @@ function tasteFitNote({ label, taste, linked }: TasteSource): string | null {
 }
 
 // How close a game is to the current account's taste.
-function tasteFitColumn(source: TasteSource): ColumnDef<Record<string, any>> {
-  const { taste } = source;
+function tasteFitColumn(source: () => TasteSource | null): ColumnDef<Record<string, any>> {
+  const taste = () => source()?.taste;
   return {
     key: TASTE_FIT_KEY,
     label: 'Taste fit',
     type: 'number',
-    value: (row) => (taste ? fitTo(taste, row) : null),
+    value: (row) => {
+      const t = taste();
+      return t ? fitTo(t, row) : null;
+    },
     format: fmtPercent,
     compare: compareNumMissingLast,
     defaultSortDir: 'desc',
@@ -633,6 +652,10 @@ interface DetailsEvent {
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
+const fmtHours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
+const PLAYER_TAGS_SHOWN = 3;
+// A large library may have hundreds of story games: the first few say enough.
+const STORY_GAMES_SHOWN = 5;
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -715,7 +738,7 @@ export default function ListRoute() {
 
   let tableContainer!: HTMLDivElement;
   // Each compared player's label and owned games, in `compareAccounts` order (also the panel's Owned by, see getOwners).
-  let comparePlayers: { label: string; owners: Map<number, GameOwner[]> }[] = [];
+  let comparePlayers: { id: string; label: string; owners: Map<number, GameOwner[]> }[] = [];
   const [statusText, setStatusText] = createSignal('');
   const [priceStatusText, setPriceStatusText] = createSignal('');
   // The details stream's `{ limited }` message: this client spent its share, said once for the load.
@@ -2245,6 +2268,7 @@ export default function ListRoute() {
       });
       const resolved = await resolveRows(list, fetchers, (sources) => {
         comparePlayers = shown.map((account) => ({
+          id: account.id,
           label: accountDisplayLabel(account),
           owners: ownersByAccount.get(account.id) ?? new Map(),
         }));
@@ -2569,7 +2593,7 @@ export default function ListRoute() {
           () => filterTable()?.filter.modes().tags === 'and',
         ),
         similarityColumn(similarityScores),
-        tasteFitColumn(tasteSource),
+        tasteFitColumn(tasteFitSource),
       ) as unknown as ColumnDef<Game>[];
       const defaultVisible = isRanked
         ? [...RANKED_DEFAULT_VISIBLE, ...(priced ? PRICED_DEFAULT_VISIBLE : [])]
@@ -3202,18 +3226,194 @@ export default function ListRoute() {
     );
   }
 
+  // A comparison player's hours on a game, summed over a Family's members.
+  const playerHours = (player: (typeof comparePlayers)[number]) => (appid: number) => {
+    const minutes = player.owners.get(appid)?.reduce((sum, o) => sum + o.minutes, 0);
+    return minutes ? minutes / 60 : 0;
+  };
   // Once every row's details are in, like Plays mostly.
   const groupFits = createMemo(() =>
-    kind === 'compare' && loadFraction() == null
-      ? playerFits(
-          tableData(),
-          comparePlayers.map((player) => (appid) => {
-            const minutes = player.owners.get(appid)?.reduce((sum, o) => sum + o.minutes, 0);
-            return minutes && minutes / 60;
-          }),
-        )
-      : null,
+    kind === 'compare' && loadFraction() == null ? playerFits(tableData(), comparePlayers.map(playerHours)) : null,
   );
+  // Profiles need every player's whole library among the rows: Intersect and Subtract drop some.
+  const profilesShown = () => compareOp() === 'group-by-membership' || compareOp() === 'union';
+  // Untracked rows: price loading and ownership stamping after the details mustn't recompute it.
+  const playerProfiles = createMemo(() => {
+    if (kind !== 'compare' || loadFraction() != null || !profilesShown()) return null;
+    return untrack(() => {
+      const rows = tableData();
+      const players = comparePlayers.map((player) => {
+        const hours = playerHours(player);
+        const ofRow = (g: { appid: number }) => hours(g.appid);
+        return {
+          label: player.label,
+          tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
+          style: playStyle(rows, ofRow),
+        };
+      });
+      const compared = comparePlayers.map((player): ComparedPlayer => ({
+        owns: (appid) => player.owners.has(appid),
+        hours: playerHours(player),
+      }));
+      return { players, ground: commonGround(rows, compared), compared };
+    });
+  });
+  // Defaults to the first player with a profile who isn't me (my ★ or current account): suggesting
+  // to myself is what Taste fit does.
+  const [suggestTarget, setSuggestTarget] = createSignal<number | null>(null);
+  const suggestTo = () => {
+    const chosen = suggestTarget();
+    if (chosen != null) return chosen;
+    const me = [getMyAccount()?.id, getCurrentAccount()?.id];
+    const profiled = (i: number) => !!playerProfiles()?.players[i].tags.length;
+    const first = (ok: (i: number) => boolean) => comparePlayers.findIndex((p, i) => ok(i) && !me.includes(p.id));
+    return [first(profiled), first(() => true)].find((i) => i >= 0) ?? 0;
+  };
+  const suggestions = createMemo(() => {
+    const profiles = playerProfiles();
+    const target = suggestTo();
+    return profiles && untrack(() => suggestionsFor(tableData(), profiles.compared, target));
+  });
+  // At least two players with a profile: each line then says what sets that player apart.
+  const compared = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
+    profiles.players.filter((p) => p.tags.length).length >= 2;
+  const sharedNote = (shared: number) => `share ${shared} of their top ${TOP_TAGS} tags`;
+  function playersSummary(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string {
+    const { players, ground } = profiles;
+    const shared = players.length === 2 && ground.pairs[0].shared;
+    return shared === false || shared == null
+      ? `Players (${players.length})`
+      : `Players · ${players[0].label} & ${players[1].label} ${sharedNote(shared)}`;
+  }
+  function similarityNote(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string | null {
+    const { players, ground } = profiles;
+    const parts = [
+      ground.closest &&
+        `Closest: ${players[ground.closest.a].label} & ${players[ground.closest.b].label} ${sharedNote(ground.closest.shared)}`,
+      ground.oddOneOut != null && `Odd one out: ${players[ground.oddOneOut].label}`,
+    ].filter((part) => !!part);
+    return parts.length ? parts.join(' · ') : null;
+  }
+  // A game named in the hero, opening its panel.
+  const gameButton = (appid: number) => (
+    <button type="button" class="list-players-game" onClick={() => openGame(rowStore.getRow(appid)!)}>
+      {rowStore.getRow(appid)?.name}
+    </button>
+  );
+  const tagButton = (tag: string) => (
+    <button
+      type="button"
+      class="list-plays-mostly-tag"
+      aria-pressed={tableReady() && isTagActive('tags', tag)}
+      title={`Filter by ${tag}`}
+      onClick={() => {
+        onTagClick('tags', tag);
+        // An open Players can push the table off a phone's screen: show what the tag did.
+        const toolbar = document.querySelector('.dt-toolbar');
+        if (toolbar && toolbar.getBoundingClientRect().top > innerHeight / 2)
+          toolbar.scrollIntoView({ block: 'start', behavior: smoothScroll() });
+      }}
+    >
+      {tag}
+    </button>
+  );
+  const [playersOpen, setPlayersOpen] = createSignal(window.matchMedia('(min-width: 768px)').matches);
+  function playersSection(): JSX.Element | undefined {
+    if (kind !== 'compare') return undefined;
+    return (
+      <Show when={compareList()}>
+        <Show
+          when={profilesShown()}
+          fallback={
+            <p class="list-players-switch">
+              Comparing the players' tastes needs their whole libraries.{' '}
+              <button
+                type="button"
+                class="btn"
+                onClick={() => navigate(compareUrl(compareSlots(), DEFAULT_COMPARE_OP))}
+              >
+                Switch to {OP_LABELS[DEFAULT_COMPARE_OP]}
+              </button>
+            </p>
+          }
+        >
+          <Show when={playerProfiles()}>
+            {(profiles) => (
+              <details class="list-players" open={playersOpen()} onToggle={(e) => setPlayersOpen(e.currentTarget.open)}>
+                <summary>{playersSummary(profiles())}</summary>
+                <ul>
+                  <For each={profiles().players}>
+                    {(p, i) => (
+                      <li>
+                        <span class="list-players-name">{p.label}</span>
+                        <Show
+                          when={p.tags.length}
+                          fallback={<span class="list-players-none">too few games played here for a profile</span>}
+                        >
+                          {/* Once compared, what sets them apart: what they share is under In common. */}
+                          <Show when={compared(profiles())} fallback={<For each={p.tags}>{tagButton}</For>}>
+                            <For
+                              each={profiles().ground.ownTags[i()]}
+                              fallback={<span class="list-players-none">no tags of their own</span>}
+                            >
+                              {tagButton}
+                            </For>
+                          </Show>
+                          <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
+                        </Show>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+                <Show when={similarityNote(profiles())}>{(note) => <p class="list-players-row">{note()}</p>}</Show>
+                <Show when={profiles().ground.sharedTags.length}>
+                  <p class="list-players-row">
+                    In common: <For each={profiles().ground.sharedTags}>{tagButton}</For>
+                  </p>
+                </Show>
+                <p class="list-players-row">
+                  Everyone's favourites:{' '}
+                  <For each={profiles().ground.favourites} fallback={<span class="list-players-none">none yet</span>}>
+                    {gameButton}
+                  </For>
+                </p>
+                <div class="list-players-row">
+                  <label>
+                    Suggest to{' '}
+                    <select value={suggestTo()} onChange={(e) => setSuggestTarget(Number(e.currentTarget.value))}>
+                      <For each={profiles().players}>{(p, i) => <option value={i()}>{p.label}</option>}</For>
+                    </select>
+                  </label>
+                  <Show when={!suggestions()?.length}>
+                    <span class="list-players-none">
+                      {suggestions()
+                        ? 'nothing the others played a lot fits yet'
+                        : 'too few games played here for a profile'}
+                    </span>
+                  </Show>
+                </div>
+                <Show when={suggestions()?.length}>
+                  <ul class="list-players-suggestions">
+                    <For each={suggestions()}>
+                      {(s) => (
+                        <li>
+                          {gameButton(s.appid)}
+                          <span class="list-players-own">
+                            {profiles().players[s.from].label} {fmtHours(s.hours)} ·{' '}
+                            {s.owns ? 'owns it' : "doesn't own it"}
+                          </span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+              </details>
+            )}
+          </Show>
+        </Show>
+      </Show>
+    );
+  }
   // The table's score columns explained in the status line, since a cell's title is hover-only.
   const [tasteFitSource, setTasteFitSource] = createSignal<TasteSource | null>(null);
   const scoreNotes = createMemo(() => {
@@ -3222,7 +3422,13 @@ export default function ListRoute() {
     const source = tasteFitSource();
     const tasteNote = source && visible?.has(TASTE_FIT_KEY) && tasteFitNote(source);
     if (tasteNote) notes.push(tasteNote);
-    if (kind === 'compare' && visible?.has(GROUP_FIT_KEY) && loadFraction() == null) {
+    // An open Players says who has no profile; folded (a phone's default), nothing would.
+    if (
+      kind === 'compare' &&
+      visible?.has(GROUP_FIT_KEY) &&
+      loadFraction() == null &&
+      !(playerProfiles() && playersOpen())
+    ) {
       const fits = groupFits();
       const left = comparePlayers.filter((_, i) => !fits?.profiled[i]).map((p) => p.label);
       if (left.length) notes.push(`Group fit leaves out ${left.join(', ')}: too few games played here`);
@@ -3236,67 +3442,172 @@ export default function ListRoute() {
     const account = untrack(getEffectiveCurrentAccount);
     const taste = account && tasteOf(tableData(), Date.now());
     const keep = untrack(() => [getMyAccount()?.id, getCurrentAccount()?.id]).filter((id) => id != null);
-    if (taste) saveTaste(account.id, taste, keep);
+    if (!taste) return;
+    saveTaste(account.id, taste, keep);
+    // So Owned's own Taste fit scores on a first visit, and not from a taste stored before a change.
+    setTasteFitSource((source) => source && { ...source, taste });
   });
   // Once every row's details are in, so it doesn't reshuffle as they stream.
-  const playsMostly = createMemo(() => (loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : []));
+  const playsMostlyProfile = createMemo(() =>
+    loadFraction() == null ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 },
+  );
+  const playsMostly = () => playsMostlyProfile().tags;
+  // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
+  const playtimeHidden = createMemo(
+    () => loadFraction() == null && tableData().length > 0 && !tableData().some((g) => g.playtime),
+  );
+  const profileFacts = createMemo(() => {
+    if (loadFraction() != null) return { style: null, story: null };
+    const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
+    return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
+  });
+  const unplayed = createMemo(() =>
+    loadFraction() == null && !playtimeHidden()
+      ? tableData().filter((g) => !g.playtime && releasedBy(g, endOfDay(new Date()))).length
+      : 0,
+  );
+  const backlogShown = () => {
+    const t = filterTable();
+    return (
+      tableReady() &&
+      !!t &&
+      t.filter.ranges().playtime?.max === '0' &&
+      t.filter.ranges().releaseDate?.max === endOfDay(new Date()) &&
+      t.sort.entries()[0]?.key === TASTE_FIT_KEY
+    );
+  };
+  // The facts line's sentences, leading into the backlog button when it follows.
+  const factSentences = () => {
+    const { style, story } = profileFacts();
+    const sentences = [style && STYLE_SENTENCES[style], story && storySentence(story)].filter((s) => !!s);
+    return sentences.join(' · ') + (sentences.length && unplayed() ? ' · ' : '');
+  };
+  // What to play next: the never-launched games, closest to the account's taste first.
+  function showBacklog(): void {
+    const t = filterTable();
+    if (!t) return;
+    t.filter.setRange('playtime', 'max', '0');
+    // Not yet out: nothing to play next, though it shows no playtime either.
+    t.filter.setRange('releaseDate', 'max', endOfDay(new Date()));
+    syncLeadColumn(t, TASTE_FIT_KEY, true);
+  }
   // Out here: the hero note re-renders, which would close the breakdown.
   const [playsMostlyWhy, setPlaysMostlyWhy] = createSignal(false);
   function playsMostlyNote(): JSX.Element {
     const pct = (weight: number) => `${Math.round(weight * 100)}%`;
-    const hours = (h: number) => fmtH(h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
     return (
-      <Show when={playsMostly().length}>
-        <div class="list-plays-mostly">
-          Plays mostly:{' '}
-          <For each={playsMostly()}>
-            {({ tag, weight }, i) => (
-              <button
-                type="button"
-                class="list-plays-mostly-tag"
-                classList={{ active: tableReady() && isTagActive('tags', tag) }}
-                aria-pressed={tableReady() && isTagActive('tags', tag)}
-                title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
-                onClick={() => onTagClick('tags', tag)}
-              >
-                {tag}
-                <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
-              </button>
-            )}
-          </For>
-          <button
-            type="button"
-            class="list-plays-mostly-why"
-            aria-expanded={playsMostlyWhy()}
-            aria-controls="plays-mostly-breakdown"
-            onClick={() => setPlaysMostlyWhy((open) => !open)}
-          >
-            Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
-          </button>
-        </div>
-        <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
-          <p>
-            Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
-            players tagged it).
-          </p>
-          <ul>
+      <>
+        <Show
+          when={playsMostly().length}
+          fallback={
+            <Show when={playtimeHidden()}>
+              <div class="list-plays-mostly">No playtime to profile: it's private, or nothing was played yet.</div>
+            </Show>
+          }
+        >
+          <div class="list-plays-mostly">
+            Plays mostly:{' '}
             <For each={playsMostly()}>
-              {({ tag, weight, games }) => (
-                <li>
-                  <span class="list-plays-mostly-name">{tag}</span>
-                  <span class="list-plays-mostly-bar">
-                    <span style={{ width: pct(weight) }} />
-                    <span class="visually-hidden">{pct(weight)}</span>
-                  </span>
-                  <span class="list-plays-mostly-games">
-                    {games.map((g) => `${g.name} ${hours(g.hours)}`).join(' · ')}
-                  </span>
-                </li>
+              {({ tag, weight }, i) => (
+                <button
+                  type="button"
+                  class="list-plays-mostly-tag"
+                  classList={{ active: tableReady() && isTagActive('tags', tag) }}
+                  aria-pressed={tableReady() && isTagActive('tags', tag)}
+                  title={`Filter by ${tag}, ranked by Tag match · ${i() === 0 ? 'the top tag' : `${pct(weight)} as strong as ${playsMostly()[0].tag}`}`}
+                  onClick={() => onTagClick('tags', tag)}
+                >
+                  {tag}
+                  <span class="tag-weight tag-weight--tags" style={{ width: pct(weight) }} />
+                </button>
               )}
             </For>
-          </ul>
-        </div>
-      </Show>
+            <span class="list-plays-mostly-count">from {playsMostlyProfile().played} played games</span>
+            <button
+              type="button"
+              class="list-plays-mostly-why"
+              aria-expanded={playsMostlyWhy()}
+              aria-controls="plays-mostly-breakdown"
+              onClick={() => setPlaysMostlyWhy((open) => !open)}
+            >
+              Why these? <span aria-hidden="true">{playsMostlyWhy() ? '▴' : '▾'}</span>
+            </button>
+          </div>
+        </Show>
+        <Show when={profileFacts().style || profileFacts().story || unplayed()}>
+          <p class="list-profile-facts">
+            {factSentences()}
+            <Show when={unplayed()}>
+              <button
+                type="button"
+                class="list-profile-backlog"
+                aria-pressed={backlogShown()}
+                title="List them, best Taste fit first"
+                onClick={showBacklog}
+              >
+                {unplayed()} {unplayed() === 1 ? 'game shows' : 'games show'} no playtime
+              </button>
+            </Show>
+          </p>
+        </Show>
+        <Show when={playsMostly().length}>
+          <div id="plays-mostly-breakdown" class="list-plays-mostly-breakdown" hidden={!playsMostlyWhy()}>
+            <p>
+              Bars compare each tag with the top one. Games: those counting most toward it (hours played × how strongly
+              players tagged it).
+            </p>
+            <Show when={profileFacts().style}>
+              <p>
+                Play style: the kind of game (single-player, co-op, PvP) holding over half the played games' weight, by
+                log hours; a game with several modes goes by the one players tag it most for.
+              </p>
+            </Show>
+            <Show when={profileFacts().story}>
+              {(story) => (
+                <>
+                  <p>
+                    Story games: single-player games with a How Long To Beat main story and no endless tag (roguelike,
+                    sandbox…), counted when played for at least 80% of it.
+                  </p>
+                  <For
+                    each={[
+                      { label: 'Main story length reached:', appids: story().reached },
+                      { label: 'Fell short:', appids: story().fellShort },
+                    ]}
+                  >
+                    {({ label, appids }) => (
+                      <Show when={appids.length}>
+                        <p class="list-profile-story">
+                          {label} <For each={appids.slice(0, STORY_GAMES_SHOWN)}>{gameButton}</For>
+                          <Show when={appids.length > STORY_GAMES_SHOWN}>
+                            <span class="list-players-none">+{appids.length - STORY_GAMES_SHOWN} more</span>
+                          </Show>
+                        </p>
+                      </Show>
+                    )}
+                  </For>
+                </>
+              )}
+            </Show>
+            <ul>
+              <For each={playsMostly()}>
+                {({ tag, weight, games }) => (
+                  <li>
+                    <span class="list-plays-mostly-name">{tag}</span>
+                    <span class="list-plays-mostly-bar">
+                      <span style={{ width: pct(weight) }} />
+                      <span class="visually-hidden">{pct(weight)}</span>
+                    </span>
+                    <span class="list-plays-mostly-games">
+                      {games.map((g) => `${g.name} ${fmtHours(g.hours)}`).join(' · ')}
+                    </span>
+                  </li>
+                )}
+              </For>
+            </ul>
+          </div>
+        </Show>
+      </>
     );
   }
 
@@ -3686,6 +3997,7 @@ export default function ListRoute() {
           actions={heroActions}
           tiles={heroTiles()}
           note={heroNote()}
+          section={playersSection()}
         />
       </Show>
       {/* The players form is this route's empty state (fewer than two players in the URL) and its

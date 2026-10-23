@@ -635,6 +635,84 @@
     border-color: var(--accent);
     color: var(--accent);
   }
+  .list-profile-facts {
+    margin: 4px 0 0;
+    font-size: var(--fs-label);
+    font-style: normal;
+  }
+  .list-players {
+    margin-top: 8px;
+    font-size: var(--fs-label);
+  }
+  .list-players summary {
+    min-height: 24px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .list-players ul {
+    display: grid;
+    gap: 6px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .list-players li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .list-players-name {
+    min-width: 5em;
+    font-weight: 600;
+  }
+  .list-players-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+  }
+  .list-players-suggestions {
+    margin: 6px 0 0;
+  }
+  .list-players-own {
+    color: var(--muted);
+  }
+  .list-players-game {
+    min-height: 24px;
+    padding: 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .list-players-none {
+    color: var(--muted);
+  }
+  .list-players-switch {
+    margin: 8px 0 0;
+    font-size: var(--fs-label);
+  }
+  .list-profile-backlog {
+    min-height: 24px;
+    padding: 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .list-profile-backlog[aria-pressed='true'] {
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .list-plays-mostly-count {
+    color: var(--muted);
+  }
   .list-plays-mostly-why {
     min-height: 24px;
     padding: 2px 4px;
@@ -658,6 +736,12 @@
   }
   .list-plays-mostly-breakdown p {
     margin: 0;
+  }
+  .list-profile-story {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 4px;
   }
   .list-plays-mostly-breakdown ul {
     display: grid;
@@ -687,7 +771,8 @@
   }
   @media (max-width: 480px) {
     .list-plays-mostly-breakdown ul {
-      grid-template-columns: max-content 60px;
+      /* Not max-content: the games line spanning both columns would size it to its unwrapped width. */
+      grid-template-columns: fit-content(70%) 60px;
     }
     .list-plays-mostly-games {
       grid-column: 1 / -1;

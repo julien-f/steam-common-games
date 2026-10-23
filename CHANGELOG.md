@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A developer's or publisher's list shows which of its games you don't own, and can be saved as a list
 - `GET /api/health` says which version and commit the server runs, and since when
 - `GET /api/metrics` keeps 30 days of outbound status counts per day, across restarts, to date when an upstream started failing
+- Owned says whether the account mostly plays single-player, co-op or PvP games and how many story games it plays through
+- Owned's count of games with no playtime lists them, best Taste fit first, as what to play next
+- A comparison's Players section shows each player's own tags and play style, the tags and favourites they share, and what to suggest to each
 
 ### Changed
 
@@ -29,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Expired bundles stay dimmed even with the Bundle column hidden, and a phone's Filter pane sits centred.
 - On search results, the open game's row is marked like in every other list, without an extra outline.
 - Home's recent accounts are now Accounts: one avatar tile each (overlapping faces for a Steam Family), yours first then by name everywhere, filterable past 8; star yours from the account card
+- Plays mostly, Taste fit and Group fit leave software such as Wallpaper Engine out, and Plays mostly says how many played games it's built from
 
 ### Fixed
 
@@ -71,6 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A Steam store endpoint that starts redirecting now logs where it redirects to and shows as a 302 in the metrics, instead of a JSON parse error
 - Each git worktree runs end-to-end tests on its own port, so agents testing in parallel don't collide.
 - Each worktree's mock server runs on its own port, and `node scripts/worktree.js <branch>` sets up a worktree in one step.
+- Two mock players with rich libraries, Dave and Erin, for the profile and comparison tests
 
 ## [0.11.0] - 2026-10-14
 

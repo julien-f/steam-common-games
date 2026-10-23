@@ -2,7 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, DAVE, ERIN, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -660,6 +660,78 @@ test('F3 edge: Owned says which tags the account plays most, each filtering the 
   await expect(coop).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  const note = page.locator('.list-plays-mostly');
+  // 15 played, minus Wallpaper Engine's 3000 h.
+  await expect(note).toContainText('from 14 played games');
+  await expect(note.locator('.list-plays-mostly-tag')).not.toContainText(['Utilities']);
+  // Sekiro and Hogwarts Legacy fell short; Dead Cells and Slay the Spire are endless.
+  await expect(page.locator('.list-profile-facts')).toContainText(
+    'Mostly single-player games · Plays 7 of 9 story games for as long as their main story · ',
+  );
+  await note.getByRole('button', { name: 'Why these?' }).click();
+  await expect(page.locator('#plays-mostly-breakdown')).toContainText('Story games: single-player games');
+});
+
+test('A5.4: the no-playtime count lists those games, best Taste fit first, on a first visit', async ({ page }) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  const backlog = page.getByRole('button', { name: '3 games show no playtime' });
+  await backlog.click();
+  await expect(rows(page)).toHaveCount(3);
+  await expect(backlog).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('columnheader', { name: /Taste fit/ })).toBeVisible();
+  // Scored against the taste this visit just learned: nothing was stored before it.
+  await expect(
+    rows(page)
+      .first()
+      .getByRole('cell', { name: /^\d+%$/ }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Clear all' }).click();
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+});
+
+test('A5 edge: Why these? names the story games that fell short of their main story, each opening its panel', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await page.getByRole('button', { name: 'Why these?' }).click();
+  const short = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'Fell short:' });
+  await expect(short.getByRole('button')).toHaveText(['Sekiro: Shadows Die Twice', 'Hogwarts Legacy']);
+  // Capped, as a library may have hundreds: 5 of Dave's 7, then how many more.
+  const reached = page.locator('#plays-mostly-breakdown .list-profile-story').filter({ hasText: 'reached:' });
+  await expect(reached.getByRole('button')).toHaveCount(5);
+  await expect(reached).toContainText('+2 more');
+  await short.getByRole('button', { name: 'Hogwarts Legacy' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Hogwarts Legacy');
+});
+
+test("A5 edge: what to play next leaves out games that aren't out yet", async ({ page }) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  await page.getByRole('button', { name: '3 games show no playtime' }).click();
+  await expect(rows(page)).toHaveCount(3);
+  await expect(row(page, 'Someday Saga')).toHaveCount(0);
+  await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
+});
+
+test('A5 edge: an account with no playtime at all says why it has no profile', async ({ page }) => {
+  await asPlayer(page, BOB);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+  await expect(page.locator('.list-plays-mostly')).toHaveText(
+    "No playtime to profile: it's private, or nothing was played yet.",
+  );
+});
+
 test("B2 edge: Taste fit scores the wishlist by the account's taste, once Owned has been opened", async ({ page }) => {
   await asPlayer(page, ALICE);
   // 10 h on every game, so Owned has enough played games to learn a taste from.
@@ -800,7 +872,9 @@ test("C1 edge: a comparison's Group fit scores games for its least suited player
   const fit = row(page, 'Valheim').locator('span[title^="Alice "]');
   await expect(fit).toHaveText(/^\d+% · Alice$/);
   await expect(fit).toHaveAttribute('title', /· Bob: too few games played to tell$/);
-  await expect(page.locator('.list-score-note')).toHaveText('Group fit leaves out Bob: too few games played here');
+  // Said once, by Players (the status line says it where Players doesn't show).
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Bob')).toContainText('too few games played here for a profile');
 });
 
 test('C6 edge: a comparison has a Played column per player', async ({ page }) => {
@@ -814,6 +888,139 @@ test('C6 edge: a comparison has a Played column per player', async ({ page }) =>
   const portal = row(page, 'Portal 2').locator('td');
   await expect(portal.nth(col('Played (h) · Alice'))).toHaveText('10.0');
   await expect(portal.nth(col('Played (h) · Bob'))).toHaveText('—');
+});
+
+// A comparison's Players section, opened: it starts folded on a phone.
+async function openPlayers(page: Page): Promise<Locator> {
+  const players = page.locator('.list-players');
+  await expect(players.locator('summary')).toBeVisible();
+  if (!(await players.evaluate((d: HTMLDetailsElement) => d.open))) await players.locator('summary').click();
+  return players;
+}
+
+const playerLine = (players: Locator, name: string) =>
+  players.getByRole('listitem').filter({ has: players.page().locator('.list-players-name', { hasText: name }) });
+
+test("C7.2: Players shows each player's top tags and play style, open on desktop, folded on a phone", async ({
+  page,
+}, testInfo) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = page.locator('.list-players');
+  await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
+  const phone = testInfo.project.name === 'phone';
+  await expect(players).toHaveJSProperty('open', !phone);
+  if (phone) await players.locator('summary').click();
+  const dave = playerLine(players, 'Dave');
+  const erin = playerLine(players, 'Erin');
+  await expect(dave).toContainText('Mostly single-player games');
+  await expect(erin).toContainText('Mostly co-op games');
+  const pvp = erin.getByRole('button', { name: 'PvP' });
+  await pvp.click();
+  await expect(pvp).toHaveAttribute('aria-pressed', 'true');
+  await expect(row(page, 'Dead by Daylight')).toBeVisible();
+  await expect(row(page, 'The Witcher 3: Wild Hunt')).toHaveCount(0);
+});
+
+test('C7.3-4: Players says how many top tags each pair shares, which, and the favourites they have in common', async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(players.locator('summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
+  await expect(playerLine(players, 'Dave').getByRole('button')).toHaveText(['Open World', 'Story Rich', 'RPG']);
+  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
+  await players.getByRole('button', { name: 'Terraria' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Terraria');
+});
+
+test('C7.5-6: Suggest to a player what another played a lot, closest to their taste, then open it', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  // My account is Dave: the picker starts on Erin.
+  const to = players.getByLabel('Suggest to');
+  await expect(to).toHaveValue('1');
+  const first = players.locator('.list-players-suggestions li').first();
+  await expect(first).toHaveText(/^Deep Rock Galactic\s*Dave 120h · owns it$/);
+  await to.selectOption({ label: 'Dave' });
+  await expect(players.locator('.list-players-suggestions li').first()).toContainText("Erin 90h · doesn't own it");
+  await players.getByRole('button', { name: 'Valheim' }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Valheim');
+});
+
+test("C7 edge: a player's tag filters a table that comes into view, even under an open Players on a phone", async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await playerLine(players, 'Erin').getByRole('button', { name: 'PvP' }).click();
+  await expect(row(page, 'Dead by Daylight')).toBeInViewport();
+});
+
+test("C7 edge: each player's line names their own tags once, those everyone shares under In common", async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Erin').getByRole('button')).toHaveText(['PvP', 'Horror', 'Co-op']);
+  await expect(players).not.toContainText('more than');
+  const common = players.locator('.list-players-row').filter({ hasText: 'In common:' });
+  await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
+});
+
+test('C7 edge: Suggest to starts on a player it can suggest to, not one without a profile', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(players.getByLabel('Suggest to')).toHaveValue('1'); // Dave: Alice has too few games played
+  await expect(players.locator('.list-players-suggestions li').first()).toBeVisible();
+});
+
+test('C7 edge: a player without a profile is said once, in Players while it is open', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin');
+  const players = await openPlayers(page);
+  await expect(players).toContainText('too few games played here for a profile');
+  await expect(page.locator('.list-score-note')).toHaveCount(0);
+  // Folded (a phone's default), the status line says it again.
+  await players.locator('summary').click();
+  await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
+  // Intersect has no Players section: the status line says it.
+  await page.goto('/lists/compare?u=alice&u=dave&u=erin&op=intersect');
+  await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
+});
+
+test('C7 edge: a player whose top tags are all shared has none of their own, not In common again', async ({ page }) => {
+  // Bob, as a copy of Erin's library and hours.
+  await page.route('**/api/common-games', async (route) => {
+    const req = route.request();
+    const post = req.postData() ?? '';
+    if (!post.includes(BOB.steamid) && !post.includes('"bob"')) return route.fallback();
+    const asErin = post.replaceAll(BOB.steamid, ERIN.steamid).replaceAll('"bob"', '"erin"');
+    const body = JSON.parse(
+      respond(req.method(), new URL(req.url()), asErin).body.replaceAll(ERIN.steamid, BOB.steamid),
+    );
+    body.players[0].personaname = 'Bob';
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/compare?u=bob&u=erin');
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Bob').getByRole('button')).toHaveCount(0);
+  await expect(playerLine(players, 'Bob')).toContainText('no tags of their own');
+});
+
+test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
+  await page.goto('/lists/compare?u=dave&u=erin&op=intersect');
+  await expect(rows(page)).toHaveCount(3);
+  await page.getByRole('button', { name: 'Switch to Grouped by membership' }).click();
+  await expect(page.locator('.list-players summary')).toHaveText('Players · Dave & Erin share 2 of their top 10 tags');
+});
+
+test('C7 edge: a player with too few games played says so', async ({ page }) => {
+  await page.goto('/lists/compare?u=alice&u=dave');
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Alice')).toContainText('too few games played here for a profile');
 });
 
 test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
@@ -877,7 +1084,7 @@ test('C1 edge: the comparison states its mode once, in its select', async ({ pag
   await asPlayer(page, ALICE);
   await page.goto('/lists/compare?u=alice&u=bob');
   await expect(page.getByRole('heading', { name: 'Alice vs. Bob' })).toBeVisible();
-  await expect(page.locator('.list-hero select')).toHaveValue('group-by-membership');
+  await expect(page.getByLabel("How to combine these players' libraries")).toHaveValue('group-by-membership');
   await expect(page.locator('.list-hero-chip', { hasText: 'Grouped by membership' })).toHaveCount(0);
 });
 

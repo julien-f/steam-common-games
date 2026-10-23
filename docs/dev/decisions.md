@@ -32,6 +32,13 @@ It is also one dimension (`tier:<tier>`, weight 1) of `tagTaste.ts`'s tag vector
 - **No publisher/developer allowlist**: it would be the strongest signal, but needs externally maintained knowledge (name variants, acquisitions, spin-offs); the heuristic stays self-updating from Steam's data.
 - **Accepted misclassifications**: cheap rereleases of old AAA IP, prestige-priced niche sims from small studios, veteran-founded studios shipping a small polished game. Hence "(est.)" in the label.
 
+## How alike two players are — a count, not a score
+
+- A comparison's Players section says how many of their top 10 tags two players share (`tagTaste.ts`'s `commonGround`), not a similarity score.
+- A raw cosine of two play profiles is high for almost any pair (common tags dominate even after IDF), so "65% similar" can mean "typical".
+- Centering it needs a typical player to subtract. The only one available is built from the compared players' own libraries, and players mostly own what they play: with two players it's their midpoint, so any pair comes out opposite (two players sharing 11 of 12 games scored −0.98).
+- A count states a fact the shared tags beside it explain, and needs no calibration. A score could come back once there are enough libraries to calibrate it against.
+
 ## Linting: Babel, not typescript-eslint
 
 - `eslint.config.mjs` parses with `@babel/eslint-parser`: TypeScript 7 (`tsgo`) ships no JavaScript compiler API, so `@typescript-eslint/parser` can't run here, and its peer range refuses `typescript@7`. None of the Solid rules are type-aware, so a syntax-only parser loses nothing.

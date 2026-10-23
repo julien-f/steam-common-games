@@ -62,6 +62,7 @@ interface ListHeroProps {
   secondaryActions?: boolean;
   tiles?: HeroTile[];
   note?: JSX.Element; // its own line under the tiles — prose (ITAD's note, a list's formula)
+  section?: JSX.Element; // a block of its own under the note — a comparison's players
 }
 
 export function ListHero(props: ListHeroProps): JSX.Element {
@@ -174,6 +175,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
       <Show when={props.note}>
         <div class="list-hero-note">{props.note}</div>
       </Show>
+      {props.section}
     </header>
   );
 }
