@@ -771,7 +771,8 @@
   }
   @media (max-width: 480px) {
     .list-plays-mostly-breakdown ul {
-      grid-template-columns: max-content 60px;
+      /* Not max-content: the games line spanning both columns would size it to its unwrapped width. */
+      grid-template-columns: fit-content(70%) 60px;
     }
     .list-plays-mostly-games {
       grid-column: 1 / -1;
