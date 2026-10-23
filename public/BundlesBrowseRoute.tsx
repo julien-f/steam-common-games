@@ -104,13 +104,9 @@ function renderCovers(_value: unknown, row: BundleRow): Node {
   return wrap;
 }
 
-// Also the marker CSS uses to dim a whole expired row (`.dt-tr:has(.bundle-expired)` in
-// style.css): the table library exposes no per-row class hook, so the row's own expired-ness has
-// to reach CSS through one of its cells. The Bundle column is the one to hang it on — it's the
-// identity column nobody hides, and `:has()` stops matching if its carrier column is hidden.
-function renderBundleTitle(value: unknown, row: BundleRow): Node {
+function renderBundleTitle(value: unknown): Node {
   const span = document.createElement('span');
-  span.className = row.status === 'Expired' ? 'bundle-title bundle-expired' : 'bundle-title';
+  span.className = 'bundle-title';
   span.textContent = value == null || value === '' ? '—' : String(value);
   return span;
 }
@@ -172,7 +168,7 @@ function renderEnds(value: unknown): Node {
     rel.style.color =
       urgency.tier === 'urgent' ? scoreColor(20) : urgency.tier === 'soon' ? scoreColor(55) : 'var(--muted)';
   }
-  // An expired row is dimmed as a whole (see renderBundleTitle), so nothing further here.
+  // An expired row is dimmed as a whole (the table's rowClass), so nothing further here.
   return renderDateTime(value, rel);
 }
 
@@ -512,6 +508,7 @@ export default function BundlesBrowseRoute() {
           <DataTableView<BundleRow>
             table={table}
             rowKey="id"
+            rowClass={(row) => (row.status === 'Expired' ? 'bundle-row--expired' : undefined)}
             onRowClick={(row) => navigate(withAccountParam(`/lists/bundle/${row.id}`))}
             toolbarEnd={
               <ViewActions
