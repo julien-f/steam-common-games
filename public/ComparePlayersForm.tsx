@@ -94,31 +94,37 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   const [openSlot, setOpenSlot] = createSignal<number | null>(null);
   const [query, setQuery] = createSignal('');
   const [highlight, setHighlight] = createSignal(0);
-  // Whether the arrow keys or the pointer moved to the highlighted row since its reset: Enter then means it.
-  let pointed = false;
+  // Whether the arrow keys or the pointer moved to the highlighted row since its reset.
+  const [pointed, setPointed] = createSignal(false);
   const listboxId = createUniqueId();
   const whyDisabledId = createUniqueId();
 
   const matches = createMemo(() => (openSlot() == null ? [] : filterAccounts(known(), slots(), query())));
+  // The row shown selected, and so the one Enter adds: one pointed at, or the top match for what's typed.
+  const activeIdx = (): number | null => (pointed() || query().trim() ? highlight() : null);
+  const activeAccount = () => {
+    const idx = activeIdx();
+    return idx == null ? undefined : matches()[idx];
+  };
 
   function closeDropdown(): void {
     setOpenSlot(null);
     setQuery('');
     setHighlight(0);
-    pointed = false;
+    setPointed(false);
   }
 
   function openDropdown(slotIdx: number): void {
     setOpenSlot(slotIdx);
     setHighlight(0);
-    pointed = false;
+    setPointed(false);
   }
 
   function addEntry(slotIdx: number, entry: SlotEntry): void {
     setSlots((prev) => prev.map((slot, i) => (i === slotIdx ? [...slot, entry] : slot)));
     setQuery('');
     setHighlight(0);
-    pointed = false;
+    setPointed(false);
   }
 
   function removeEntry(slotIdx: number, entryIdx: number): void {
@@ -134,7 +140,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
   // matches, otherwise whatever they typed — an identifier for someone the app has never seen is
   // the case this whole form has to keep working for.
   function commit(slotIdx: number): void {
-    const account = matches()[highlight()];
+    const account = activeAccount();
     if (account) {
       addEntry(slotIdx, { kind: 'account', account });
       return;
@@ -149,19 +155,19 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
       case 'ArrowDown':
         e.preventDefault();
         openDropdown(slotIdx);
-        setHighlight((h) => (list.length === 0 ? 0 : (h + 1) % list.length));
-        pointed = true;
+        setHighlight((h) => (list.length === 0 || activeIdx() == null ? 0 : (h + 1) % list.length));
+        setPointed(true);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlight((h) => (list.length === 0 ? 0 : (h - 1 + list.length) % list.length));
-        pointed = true;
+        setHighlight((h) => (list.length === 0 ? 0 : ((activeIdx() == null ? 0 : h) - 1 + list.length) % list.length));
+        setPointed(true);
         break;
       case 'Enter':
         // Swallowed: Enter commits what's typed or pointed to as a chip. Only an empty field with
         // nothing pointed to submits, so nothing half-typed is thrown away.
         e.preventDefault();
-        if (!query().trim() && !(pointed && list[highlight()]) && filledCount() >= 2) formEl.requestSubmit();
+        if (!query().trim() && !activeAccount() && filledCount() >= 2) formEl.requestSubmit();
         else commit(slotIdx);
         break;
       case 'Escape':
@@ -277,7 +283,7 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                 aria-controls={listboxId}
                 aria-autocomplete="list"
                 aria-activedescendant={
-                  openSlot() === slotIdx && matches().length > 0 ? `${listboxId}-${highlight()}` : undefined
+                  openSlot() === slotIdx && activeAccount() ? `${listboxId}-${activeIdx()}` : undefined
                 }
                 placeholder={slot().length > 0 ? 'Add another account…' : 'Steam name, profile URL, or 64-bit ID…'}
                 value={openSlot() === slotIdx ? query() : ''}
@@ -295,12 +301,12 @@ export function ComparePlayersForm(props: ComparePlayersFormProps): JSX.Element 
                       <li
                         id={`${listboxId}-${optionIdx()}`}
                         role="option"
-                        aria-selected={highlight() === optionIdx()}
-                        classList={{ active: highlight() === optionIdx() }}
+                        aria-selected={activeIdx() === optionIdx()}
+                        classList={{ active: activeIdx() === optionIdx() }}
                         onMouseDown={(e) => e.preventDefault()} // keep focus on the input, so focusout doesn't beat the click
                         onMouseEnter={() => {
                           setHighlight(optionIdx());
-                          pointed = true;
+                          setPointed(true);
                         }}
                         onClick={() => addEntry(slotIdx, { kind: 'account', account })}
                       >

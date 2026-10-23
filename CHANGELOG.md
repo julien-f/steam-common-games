@@ -35,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Back closes the open game or screenshot in a tab with a long history, instead of only changing the address
 - The game panel's More links menu closes on Esc, leaving the game open, and no longer repeats Similar games' More like this on Steam link
 - On a phone, Compare's players form no longer shows a More actions button with nothing behind it
-- Enter in an empty player field on Compare starts the comparison once two players are in
+- Enter in an empty player field on Compare adds the suggestion you pointed at, or else starts the comparison once two players are in
 - Keyboard focus stays in place after Look up, Add to list and stepping onto the last bundle
 
 ### Development

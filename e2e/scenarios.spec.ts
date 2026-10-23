@@ -878,6 +878,30 @@ test('C1 edge: Enter in an empty player box adds the suggestion pointed at, not 
   await expect(page).toHaveURL(/\/lists\/compare$/);
 });
 
+test('C1 edge: an empty player box highlights no suggestion until one is pointed at, and Enter follows that', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill('bob');
+  await page.getByRole('button', { name: 'Look up', exact: true }).click();
+  await expect(page.locator('.recent-accounts li')).toHaveCount(2); // Bob is now a known account
+  await page.goto('/lists/compare');
+  const box = page.locator('.compare-form').getByRole('combobox').nth(1);
+  await box.focus();
+  const bob = page.getByRole('option', { name: /Bob/ });
+  await expect(bob).toHaveAttribute('aria-selected', 'false');
+  await expect(box).not.toHaveAttribute('aria-activedescendant');
+  const chips = page.locator('.compare-token');
+  await box.press('Enter');
+  await expect(chips).toHaveCount(1); // Alice only
+  await box.press('ArrowDown');
+  await expect(bob).toHaveAttribute('aria-selected', 'true');
+  await expect(box).toHaveAttribute('aria-activedescendant', (await bob.getAttribute('id'))!);
+  await box.press('Enter');
+  await expect(chips.filter({ hasText: 'Bob' })).toHaveCount(1);
+});
+
 test('C1 edge: the players form offers no More actions with nothing to fold', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'phone layout only');
   await asPlayer(page, ALICE);
