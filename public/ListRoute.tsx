@@ -3223,20 +3223,30 @@ export default function ListRoute() {
   // button/link inside reads its own signals, so nothing here needs rebuilding when they change.
   // `undefined` (rather than an empty fragment) for the kinds with no actions at all, so
   // ListHero renders no action row for them instead of an empty one.
+  // A step reloads the hero (load() clears heroTitle), so the pressed ‹/› gets focus back once it's
+  // back on screen, unless focus went elsewhere in the meantime.
+  let bundleStepFocus: HTMLElement | undefined;
+  function stepBundle(id: number | null, btn: HTMLElement): void {
+    if (id == null) return;
+    bundleStepFocus = btn;
+    navigate(withAccountParam(`/lists/bundle/${id}`));
+  }
+  createEffect(() => {
+    if (!heroTitle() || !bundleStepFocus) return;
+    if (document.activeElement === document.body) bundleStepFocus.focus();
+    bundleStepFocus = undefined;
+  });
   const heroLead: JSX.Element | undefined =
     kind !== 'bundle' ? undefined : (
       <div class="list-hero-nav">
-        {/* aria-disabled, not disabled: stepping onto the last bundle would otherwise drop the focus of its press. */}
+        {/* aria-disabled, not disabled: a disabled button can't take focus back on the last bundle. */}
         <button
           type="button"
           class="btn"
           aria-label="Previous bundle"
           title="Previous bundle"
           aria-disabled={prevBundleId() == null ? 'true' : undefined}
-          onClick={() => {
-            const id = prevBundleId();
-            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
-          }}
+          onClick={(e) => stepBundle(prevBundleId(), e.currentTarget)}
         >
           <ChevronLeft />
         </button>
@@ -3246,10 +3256,7 @@ export default function ListRoute() {
           aria-label="Next bundle"
           title="Next bundle"
           aria-disabled={nextBundleId() == null ? 'true' : undefined}
-          onClick={() => {
-            const id = nextBundleId();
-            if (id != null) navigate(withAccountParam(`/lists/bundle/${id}`));
-          }}
+          onClick={(e) => stepBundle(nextBundleId(), e.currentTarget)}
         >
           <ChevronRight />
         </button>

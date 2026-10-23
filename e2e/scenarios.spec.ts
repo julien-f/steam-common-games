@@ -2,7 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -1978,15 +1978,18 @@ test('O1 edge: once the instance is known to have no ITAD key, Bundles opens on 
   await expect(page.locator('.table-container')).toHaveCount(0);
 });
 
-test('B1 edge: a bundle with no next one keeps › Next bundle focusable, marked unavailable', async ({ page }) => {
+test('B1 edge: stepping onto the last bundle keeps focus on › Next bundle, marked unavailable', async ({ page }) => {
   await asPlayer(page, ALICE);
-  await page.goto(`/lists/bundle/${BUNDLE.id}`); // opened directly: no browsed bundles to step through
+  await page.goto('/bundles');
+  await page.getByRole('cell', { name: BUNDLE.title }).click();
   const next = page.getByRole('button', { name: 'Next bundle' });
-  await expect(next).toHaveAttribute('aria-disabled', 'true');
   await next.focus();
+  await next.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
   await expect(next).toBeFocused();
   await next.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${BUNDLE.id}`));
+  await expect(page).toHaveURL(new RegExp(`/lists/bundle/${PICK_BUNDLE.id}(\\?|$)`));
 });
 
 test('B1 edge: games ITAD lists under the first tier only show the tier range', async ({ page }) => {
