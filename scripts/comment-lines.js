@@ -15,10 +15,19 @@ function addedFileDiff(file, content) {
   return `+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join('\n')}\n`;
 }
 
+// The lines' words without comment markers, space-delimited so a substring test matches whole words.
+const words = (texts) =>
+  ` ${texts
+    .map((t) => t.replace(/^\*+|\/\/+|\/\*+|\*+\/|[{}]/g, ' '))
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ')} `;
+
 // `diff`: `git diff -U0` output. Returns "file:line" for each added comment block of 3+ lines,
-// except one whose every line the diff also removes: a moved or re-indented comment isn't new.
+// except one whose words the diff also removes in order: a moved, re-indented or reflowed comment isn't new.
 function longComments(diff) {
-  const removed = new Set(
+  const removed = words(
     diff
       .split('\n')
       .filter((raw) => raw.startsWith('-') && !raw.startsWith('---'))
@@ -29,7 +38,7 @@ function longComments(diff) {
   let block = null;
   let inBlock = false;
   const flush = () => {
-    if (block && block.lines >= MAX_LINES + 1 && !block.texts.every((t) => removed.has(t)))
+    if (block && block.lines >= MAX_LINES + 1 && !removed.includes(words(block.texts)))
       found.push(`${file}:${block.start}`);
     block = null;
   };

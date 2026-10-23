@@ -43,3 +43,18 @@ test('longComments: a long comment the diff also removes (moved or re-indented) 
   const edited = moved.replace('+     two', '+     two, edited');
   assert.deepEqual(longComments(edited), ['public/style.css:9']);
 });
+
+test('longComments: a comment reflowed with its words unchanged passes, one with new words is flagged', () => {
+  const reflowed = [
+    '+++ b/public/a.ts',
+    '@@ -5,2 +5,3 @@',
+    '-// survives the router replace — the `overlay` marker',
+    '-// of ours beside it does not.',
+    '+// survives the router replace —',
+    '+// the `overlay` marker of ours',
+    '+// beside it does not.',
+    '',
+  ].join('\n');
+  assert.deepEqual(longComments(reflowed), []);
+  assert.deepEqual(longComments(reflowed.replace('+// beside it', '+// beside it now')), ['public/a.ts:5']);
+});

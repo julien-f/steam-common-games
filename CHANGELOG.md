@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The stylesheet is split into cascade layers and icons come from lucide-solid
 - The mock API answers an unknown game instead of crashing
 - The long-comment check prints plain paths under a mnemonic-prefix git config
+- The long-comment check lets an existing comment be rewrapped when its words are unchanged
 
 ## [0.11.0] - 2026-10-14
 
