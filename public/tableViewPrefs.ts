@@ -52,6 +52,7 @@ function takeSharedView(): TableViewState | null {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStrings = (v: unknown): boolean => Array.isArray(v) && v.every((s) => typeof s === 'string');
+const isPositiveInteger = (v: unknown): boolean => Number.isInteger(v) && (v as number) >= 1;
 const isMapOf = (v: unknown, isValue: (value: unknown) => boolean): boolean =>
   isRecord(v) && Object.values(v).every(isValue);
 
@@ -67,8 +68,8 @@ const VIEW_FIELD_CHECKS: Record<keyof TableViewState, (v: unknown) => boolean> =
   excludeFilters: (v) => isMapOf(v, isStrings),
   filterModes: (v) => isMapOf(v, (m) => m === 'and' || m === 'or'),
   rangeFilters: (v) => isMapOf(v, (r) => isRecord(r) && typeof r.min === 'string' && typeof r.max === 'string'),
-  page: (v) => typeof v === 'number',
-  pageSize: (v) => typeof v === 'number',
+  page: isPositiveInteger,
+  pageSize: isPositiveInteger,
   searchQuery: (v) => typeof v === 'string',
 };
 

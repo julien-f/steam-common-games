@@ -96,6 +96,9 @@ test('restoreTableView: valid JSON of the wrong shape falls through to the store
     '{"rangeFilters":{"price":{"min":1}}}',
     '{"filterModes":{"tags":"xor"}}',
     '{"pageSize":"25"}',
+    '{"pageSize":0}',
+    '{"page":-3}',
+    '{"page":1.5}',
     '{"visibleCols":"name"}',
   ];
   for (const raw of bad) {
