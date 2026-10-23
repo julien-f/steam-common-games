@@ -18,6 +18,9 @@ Everything else in `default.env` is a limit or a lifetime with a sensible defaul
 
 - **Rate limits** (`*_RATE_LIMIT_MAX`, `MAX_USERS`, `STREAM_MAX_GAMES`, `STREAM_CONCURRENCY`, `STREAM_MAX_PER_IP`) — per-client request budgets, how much work one request may queue, and how many game lists one client may load at once.
 - **Outbound budgets** (`OUTBOUND_HOURLY_MAX`, `OUTBOUND_DAILY_MAX`) — a hard ceiling on requests this app makes to each third-party service per hour and per day, protecting an API key's quota no matter how many clients are asking. `0` disables.
+- **Client share** (`OUTBOUND_CLIENT_SHARE_PERCENT`) — how much of each outbound budget one client (an IP address, or an IPv6 /56) may spend, so one visitor can't use it up for everyone; past it, that visitor's new lookups are refused until the window rolls over. `0` disables.
+  - A cold library costs about 2 Steam store calls per game not yet cached, so a client's share covers about `OUTBOUND_HOURLY_MAX × share ÷ 2` such games an hour (default.env's values: about 1,250).
+  - Behind a reverse proxy without `TRUST_PROXY`, every visitor is the proxy's address: they all share one client's share.
 - **Upstream pacing** (`STORE_MIN_INTERVAL_MS`, 500; `UPSTREAM_MIN_INTERVAL_MS`, 1000) — the pause before a request slot is reused: Steam's store, then HLTB, ProtonDB and Steam's store browse API. Leave them: lowering them raises traffic to undocumented endpoints.
 - **Cache lifetimes** (`*_CACHE_TTL_MINUTES`) — how long each kind of upstream data is kept. They're generous on purpose; every screen that shows cached data says how old it is, and the age itself is the button that fetches fresh.
 - **Session lifetime** (`SESSION_TTL_DAYS`) — how long "Sign in with Steam" lasts before signing in again.

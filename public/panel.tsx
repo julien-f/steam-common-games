@@ -31,7 +31,9 @@ import {
   achievementsAccountKey,
   fetchNews,
   fetchAchievements,
+  achievementsRefusal,
   fetchPrice,
+  priceRefusal,
   fetchBundles,
   fetchDlc,
   isItadOff,
@@ -1305,7 +1307,9 @@ function AchievementsSection(props: { game: ReadonlyGame }): JSX.Element {
               fallback={
                 <>
                   <h3 class="panel-section-title">Achievements</h3>
-                  <div class="panel-no-data">Steam didn't answer.</div>
+                  <div class="panel-no-data">
+                    {achievementsRefusal(props.game.appid, currentMembers()) ?? "Steam didn't answer."}
+                  </div>
                 </>
               }
             >
@@ -1586,7 +1590,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                   {isItadOff()
                     ? PRICES_UNAVAILABLE
                     : p() === null || p()?.pricesFailed
-                      ? "IsThereAnyDeal didn't answer."
+                      ? (priceRefusal(props.game.appid, currentRegion()) ?? "IsThereAnyDeal didn't answer.")
                       : 'No pricing data available.'}
                 </div>
               }

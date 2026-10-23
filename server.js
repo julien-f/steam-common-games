@@ -14,7 +14,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, isCached, setCache, capExpiry, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
+const { getMetrics, recordLimiterTrip, runAsClient } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
 const {
   peekSteamId,
@@ -96,6 +96,8 @@ const parseCountry = (req) => (/^[A-Za-z]{2}$/.test(req.query.country || '') ? r
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
 const rateLimitBypassed = () => process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
+// One client as the limiters key it: an IPv4 address, or an IPv6 client's /56.
+const clientKey = (req) => rateLimit.ipKeyGenerator(req.ip);
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
@@ -182,7 +184,9 @@ function routeErrorStatus(route, err) {
   // [circuit-breaker] warning logged there at the moment it actually trips. Logging one more
   // near-identical [upstream:...] line per request blocked during the 5-minute window would
   // just repeat information already on record, potentially hundreds of times over.
-  // Same for an exhausted outbound budget: chargeBudget warns once per window.
+  // Same for an exhausted outbound budget: chargeBudget warns once per window. A client past its
+  // own share is told to slow down (429); the service itself is fine for everyone else.
+  if (err.isClientBudgetExhausted) return 429;
   if (err.isCircuitOpen || err.isBudgetExhausted) return 502;
   // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
   if (err.isUpstream || err.name === 'SyntaxError') {
@@ -213,6 +217,9 @@ app.use((req, _res, next) => {
 const prefsRouter = express.Router();
 app.use('/api/me/prefs', prefsRouter);
 app.use(express.json());
+// Charges a request's outbound calls to its client's share (chargeBudget); after the body parser, whose stream
+// callbacks needn't keep the context. The prefs routes above make none; tests bypassing the limiters skip it.
+app.use((req, _res, next) => (rateLimitBypassed() ? next() : runAsClient(clientKey(req), next)));
 
 // Serves the real Vite production build (`npm run build`) once one exists, and falls back to
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
@@ -665,7 +672,8 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
   }
 });
 
-const dedupDetails = createDedup();
+// A result that one client's spent share left short (`limited`) is fetched again for another client.
+const dedupDetails = createDedup(undefined, { isRefused: (details) => !!details.limited });
 // Steam app types HLTB doesn't time, so searching for them would only spend requests on a miss.
 // `dlc` and `mod` stay: HLTB lists some.
 const NOT_PLAYED_TYPES = new Set(['music', 'video', 'series', 'episode', 'hardware', 'demo', 'advertising']);
@@ -731,6 +739,10 @@ function fetchGameDetails(appid, { force = false } = {}) {
       })
         .filter(([, r]) => r.status === 'rejected')
         .map(([source]) => source);
+      // A source refused because this client spent its share: the stream says so once, not per game.
+      const refused = [ratingRes, hltbRes, metaRes, tagsRes, demoRes, protondbRes].find(
+        (r) => r.status === 'rejected' && r.reason?.isClientBudgetExhausted,
+      );
       // A game that isn't out yet has no reviews, ProtonDB reports or HLTB times; those misses
       // expire like any other miss, so they fill in after release instead of a year later.
       if (metaRes.value?.comingSoon) {
@@ -762,6 +774,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
         demo: demoRes.status === 'fulfilled' ? demoRes.value : null,
         protondb: protondbRes.status === 'fulfilled' ? protondbRes.value : null,
         ...(failed.length && { failed }),
+        ...(refused && { limited: refused.reason.message }),
       };
     });
   });
@@ -1020,7 +1033,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       // schema/player-achievements failure does, so it degrades (flagged as rarityFailed)
       // instead of rejecting the whole Promise.all.
       getGlobalAchievementPercentages(appid, { force }).catch((err) => {
-        console.warn(`[achievements] rarity (appid ${appid}):`, err.message);
+        if (!err.isBudgetExhausted) console.warn(`[achievements] rarity (appid ${appid}):`, err.message);
         rarityFailed = true;
         return null;
       }),
@@ -1085,7 +1098,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // how many requests/minute the budget above allows.
 // detailsLimit counts a stream once whatever its size, so this caps how many one client can have
 // open at once: otherwise parallel streams of uncached games fill the shared store queue.
-const openStreams = new Map(); // client key (an IPv6 client's /56, as the limiters key it) -> open stream count
+const openStreams = new Map(); // clientKey -> open stream count
 
 app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
@@ -1106,7 +1119,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   }
 
   if (!rateLimitBypassed()) {
-    const client = rateLimit.ipKeyGenerator(req.ip);
+    const client = clientKey(req);
     const open = openStreams.get(client) ?? 0;
     if (open >= STREAM_MAX_PER_IP) {
       recordLimiterTrip('stream');
@@ -1157,13 +1170,19 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   // STREAM_CONCURRENCY appids are ever in flight for one request, and `closed` is re-checked
   // before each one — so a disconnect stops the work within one appid per worker.
   let next = 0;
+  // Said once per stream; the workers go on, since cached games still fill in.
+  let limitedSent = false;
   const worker = async () => {
     while (!closed) {
       const i = next++;
       if (i >= validated.length) return;
       const appid = validated[i];
       try {
-        const result = await fetchGameDetails(appid);
+        const { limited, ...result } = await fetchGameDetails(appid);
+        if (limited && !limitedSent) {
+          limitedSent = true;
+          send({ limited });
+        }
         send({ appid, ...result });
       } catch (err) {
         // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should

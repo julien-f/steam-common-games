@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Keyboard focus stays in place after Look up, Add to list and stepping onto the last bundle
 - ArrowDown in a Compare player box steps through every suggestion instead of sticking on one
 - When the browser's storage is full, list and preference changes are no longer silently lost: cached tastes make room first, and a banner says when a change still couldn't be saved
+- One visitor can no longer use up the app's hourly Steam and IsThereAnyDeal lookups for everyone: past their share they are told once that they made too many new lookups, and everyone else is unaffected
 
 ### Development
 

@@ -33,7 +33,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 
 ## Security
 
-- **C179 · major · M** — one anonymous IP can exhaust the shared outbound budgets (`chargeBudget`, `lib/metrics.js`) for every user: `achievementsLimit` (`server.js:410`) counts requests, but each `/api/achievements/:appid?steamids=` with fresh ids makes one uncached `GetPlayerAchievements` per id, so a few minutes at the per-IP cap use up `OUTBOUND_HOURLY_MAX`, after which every library load 502s until the window rolls; `/api/bundles/:id` with a new `country` and `/api/prices` with random gids do the same to ITAD. Charge each IP per uncached upstream call, or cap each IP's share of the budget.
 - **C181 · minor · S** — no security headers: no CSP, `X-Content-Type-Options`, `frame-ancestors` or `Referrer-Policy`, and `X-Powered-By` is still sent (`server.js`), so any XSS through upstream text runs uncontained and any site can frame the app. Not checked whether the live site's proxy adds them. Set a strict CSP (`script-src 'self'`, Steam CDN images), `nosniff`, `frame-ancestors 'none'`, and disable `x-powered-by`.
 - **C182 · minor · S** — `GET /api/me` (`server.js:1249`) has no rate limit and `getSessionUser` parses the account's whole prefs (up to `PREFS_MAX_BYTES`) on every call: a signed-in client hammering it blocks the event loop. Put it behind a limiter; have auth read only the session row and load prefs only where returned.
 
