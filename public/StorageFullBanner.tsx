@@ -13,7 +13,7 @@ export function StorageFullBanner(): JSX.Element {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) returnTo = e.relatedTarget as Element | null;
       }}
     >
-      This browser's storage is full: your last change wasn't saved on this device.
+      This browser didn't save your last change on this device.
       <button
         type="button"
         class="btn"

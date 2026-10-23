@@ -1210,7 +1210,7 @@ test("L1 edge: a list edit the browser can't store says so", async ({ page }) =>
   await page.getByRole('button', { name: 'New list' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Shortlist');
   await page.keyboard.press('Enter');
-  const alert = page.getByRole('alert').filter({ hasText: 'storage is full' });
+  const alert = page.getByRole('alert').filter({ hasText: "didn't save" });
   await expect(alert).toHaveCount(0);
 
   await page.evaluate(() => ((window as { storageFull?: boolean }).storageFull = true));
@@ -1218,9 +1218,7 @@ test("L1 edge: a list edit the browser can't store says so", async ({ page }) =>
   await page.getByRole('button', { name: 'Rename Shortlist' }).click();
   await page.getByRole('textbox', { name: 'List name' }).fill('Picks');
   await page.keyboard.press('Enter');
-  await expect(alert).toHaveText(
-    "This browser's storage is full: your last change wasn't saved on this device.Dismiss",
-  );
+  await expect(alert).toHaveText("This browser didn't save your last change on this device.Dismiss");
 
   // Dismiss hands focus back to where it was.
   const focused = await page.evaluateHandle(() => document.activeElement);
