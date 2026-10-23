@@ -14,7 +14,7 @@ const rateLimit = require('express-rate-limit');
 
 const { getCached, getCachedAt, isCached, setCache, capExpiry, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
-const { getMetrics, recordLimiterTrip } = require('./lib/metrics');
+const { getMetrics, recordLimiterTrip, runAsClient } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
 const {
   peekSteamId,
@@ -96,6 +96,8 @@ const parseCountry = (req) => (/^[A-Za-z]{2}$/.test(req.query.country || '') ? r
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
 const rateLimitBypassed = () => process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== 'true';
+// One client as the limiters key it: an IPv4 address, or an IPv6 client's /56.
+const clientKey = (req) => rateLimit.ipKeyGenerator(req.ip);
 
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
@@ -182,7 +184,9 @@ function routeErrorStatus(route, err) {
   // [circuit-breaker] warning logged there at the moment it actually trips. Logging one more
   // near-identical [upstream:...] line per request blocked during the 5-minute window would
   // just repeat information already on record, potentially hundreds of times over.
-  // Same for an exhausted outbound budget: chargeBudget warns once per window.
+  // Same for an exhausted outbound budget: chargeBudget warns once per window. A client past its
+  // own share is told to slow down (429); the service itself is fine for everyone else.
+  if (err.isClientBudgetExhausted) return 429;
   if (err.isCircuitOpen || err.isBudgetExhausted) return 502;
   // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
   if (err.isUpstream || err.name === 'SyntaxError') {
@@ -213,6 +217,10 @@ app.use((req, _res, next) => {
 const prefsRouter = express.Router();
 app.use('/api/me/prefs', prefsRouter);
 app.use(express.json());
+// Charges each request's outbound calls to its client's share (lib/metrics.js's chargeBudget); the prefs routes above make none.
+// After the body parser, so the context never depends on which async resource its stream callbacks
+// run in. Skipped with the limiters, so the suite's requests, all from one address, share no share.
+app.use((req, _res, next) => (rateLimitBypassed() ? next() : runAsClient(clientKey(req), next)));
 
 // Serves the real Vite production build (`npm run build`) once one exists, and falls back to
 // serving public/ directly otherwise — but that fallback no longer serves a working frontend
@@ -1020,7 +1028,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
       // schema/player-achievements failure does, so it degrades (flagged as rarityFailed)
       // instead of rejecting the whole Promise.all.
       getGlobalAchievementPercentages(appid, { force }).catch((err) => {
-        console.warn(`[achievements] rarity (appid ${appid}):`, err.message);
+        if (!err.isBudgetExhausted) console.warn(`[achievements] rarity (appid ${appid}):`, err.message);
         rarityFailed = true;
         return null;
       }),
@@ -1085,7 +1093,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
 // how many requests/minute the budget above allows.
 // detailsLimit counts a stream once whatever its size, so this caps how many one client can have
 // open at once: otherwise parallel streams of uncached games fill the shared store queue.
-const openStreams = new Map(); // client key (an IPv6 client's /56, as the limiters key it) -> open stream count
+const openStreams = new Map(); // clientKey -> open stream count
 
 app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   const { games: gameList } = req.body;
@@ -1106,7 +1114,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   }
 
   if (!rateLimitBypassed()) {
-    const client = rateLimit.ipKeyGenerator(req.ip);
+    const client = clientKey(req);
     const open = openStreams.get(client) ?? 0;
     if (open >= STREAM_MAX_PER_IP) {
       recordLimiterTrip('stream');

@@ -325,8 +325,10 @@ test('getMetrics: lists a bound outbound group at 0 used before its first call',
   assert.deepEqual(getMetrics().budgets['bound-only'], {
     hourUsed: 0,
     hourMax: Number(process.env.OUTBOUND_HOURLY_MAX),
+    hourTopClient: 0,
     dayUsed: 0,
     dayMax: Number(process.env.OUTBOUND_DAILY_MAX),
+    dayTopClient: 0,
   });
 });
 
