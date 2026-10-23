@@ -1,5 +1,5 @@
-// A key cap. Its arrows draw as Lucide icons: Geist's self-hosted subset has ↑ ↓ but not ← →, which
-// fall back to a system face drawn far smaller (docs/dev/pitfalls.md). The glyph stays as hidden text.
+// A key cap. Its arrows draw as Lucide icons, one size on every platform: system faces lack some or draw
+// ← → far smaller than ↑ ↓ (docs/dev/pitfalls.md). The glyph stays as hidden text.
 import { For, type JSX } from 'solid-js';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import ArrowRight from 'lucide-solid/icons/arrow-right';

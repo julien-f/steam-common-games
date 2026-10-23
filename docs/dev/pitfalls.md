@@ -135,12 +135,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: a library bug ([vatesfr/data-table#43](https://github.com/vatesfr/data-table/issues/43)) triggered by any transition on a dropdown's `transform`. Its dropdown viewport clamp assumes the `translateX` it writes applies at once, and that write re-runs it through its own `MutationObserver` before a frame paints: under a transition the rect never moves, so the offset grows forever in microtasks. A near-zero `transition-duration` on every element (with the default `transition-property: all`) is enough.
 - **Fix**: transitions go to `0s` in that rule (`styles/base.css`); only animations keep a near-zero duration, for the `animationend` the lightbox waits on. Never give `.dt-dd` a transform transition until #43 is fixed.
 
-## A worktree's dev server renders without Geist
-
-- **Symptom**: in a git worktree whose `node_modules` is a symlink to the main checkout's, the app falls back to the system font, and the dev server logs `The request id ".../@fontsource-variable/geist/files/…woff2" is outside of Vite serving allow list`.
-- **Cause**: Vite resolves the symlink to its real path, outside the worktree's root, so it refuses to serve the font files.
-- **Fix**: copy `@fontsource-variable` into the worktree, as a real directory under its own root, rather than reaching it through the link.
-
 ## A tainted-canvas fallback can't be tested through `page.route`
 
 - **Symptom**: an image served by `route.fulfill` without `Access-Control-Allow-Origin` still loads with `crossOrigin = 'anonymous'` and its canvas reads fine, so the "no CORS" path never runs (seen checking the panel tint, `artTint.ts`).
@@ -153,11 +147,11 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: some icon names are aliases kept for renamed icons; they ship as source re-exports with no `.d.ts`.
 - **Fix**: import the canonical name the alias re-exports (`history.jsx` imports `./rotate-ccw-clock`), which has types.
 
-## ← and → draw smaller than ↑ and ↓ (and ↗ looks off)
+## ← and → draw smaller than ↑ and ↓, or in another face
 
-- **Symptom**: in the same Geist text, ← → (and ↗) render small and thin beside a bold ↑ ↓.
-- **Cause**: `@fontsource-variable/geist`'s latin subset covers U+2191 and U+2193 but not U+2190, U+2192 or U+2197 (its `unicode.json`), so those fall back to a system face.
-- **Fix**: key caps go through `Kbd.tsx`, which draws all four arrows as Lucide icons; elsewhere, check a glyph against `unicode.json` before relying on Geist for it.
+- **Symptom**: in the same text, ← → render small and thin beside ↑ ↓, or in a different face.
+- **Cause**: the system faces in the font stacks differ in arrow coverage; seen in Chromium on Fedora: Noto Sans has none of U+2190–U+2193, so each falls back on its own, and Liberation Mono draws ← → at half the height of ↑ ↓.
+- **Fix**: key caps go through `Kbd.tsx`, which draws all four arrows as Lucide icons; elsewhere, use a Lucide icon rather than a text arrow that must match its neighbours.
 
 ## An e2e locator's element goes `null` mid-test while the list looks unchanged
 

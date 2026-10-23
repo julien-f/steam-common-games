@@ -485,7 +485,7 @@
     text-align: left;
     cursor: pointer;
   }
-  /* Tables' figures line up; a value can't be told numeric from CSS, so Geist with tabular figures. */
+  /* Tables' figures line up; a value can't be told numeric from CSS, so the text face with tabular figures. */
   .list-stat-value {
     color: var(--text);
     font-size: var(--fs-body);

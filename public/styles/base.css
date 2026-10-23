@@ -56,9 +56,12 @@
     --fs-title: 16px;
     --fs-page: 18px;
     --fs-figure: 20px;
-    /* Self-hosted (AppRoot.tsx imports them); the fallbacks only show until they load. */
-    --font-sans: 'Geist Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+    /* The platform's own faces, so a page load downloads no font. */
+    --font-sans:
+      system-ui, -apple-system, 'Segoe UI', Roboto, Cantarell, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono:
+      ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono',
+      monospace;
   }
 
   @media (min-width: 1400px) {
