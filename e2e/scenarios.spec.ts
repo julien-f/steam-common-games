@@ -1517,7 +1517,10 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
   }
   // The search fills the middle on a wide screen, and gives way so the bar stays one row on a narrow one.
   await page.setViewportSize({ width: 1440, height: 900 });
-  expect((await page.locator('.app-search-wrap').boundingBox())!.width).toBeGreaterThan(400);
+  const search = page.locator('.app-search-wrap');
+  expect((await search.boundingBox())!.width).toBe(
+    await search.evaluate((el) => parseFloat(getComputedStyle(el).maxWidth)),
+  );
   await page.setViewportSize({ width: 800, height: 900 });
   expect((await page.locator('.site-nav').boundingBox())!.height).toBeLessThan(60);
 });
@@ -3904,11 +3907,19 @@ test("I1 edge: on a phone, a bundle's table starts high, its other actions behin
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  const top = await rows(page)
-    .first()
-    .evaluate((el) => el.getBoundingClientRect().top + scrollY);
-  expect(top).toBeLessThan(540); // 761 with the hero's tiles and actions wrapping
-  // CI's fonts run wider than a dev machine's: More actions must not drop to a line of its own there.
+  // How many lines a row of controls takes, by the distinct tops of those shown.
+  const lines = (selector: string) =>
+    page
+      .locator(selector)
+      .evaluateAll(
+        (els) =>
+          new Set(els.filter((el) => el.checkVisibility()).map((el) => Math.round(el.getBoundingClientRect().top)))
+            .size,
+      );
+  expect(await lines('.list-hero-stats > .list-stat')).toBe(1);
+  expect(await lines('.list-hero-actions > *')).toBe(1);
+  expect(await lines('.dt-toolbar-actions > *')).toBeLessThanOrEqual(2);
+  // Room to spare: with wider text still, More actions must not drop to a line of its own.
   await page.addStyleTag({ content: '.list-hero-actions { letter-spacing: 1px }' });
   const rowY = (name: string) => page.getByRole('link', { name }).evaluate((el) => el.getBoundingClientRect().top);
   const moreY = await page
