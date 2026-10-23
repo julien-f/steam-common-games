@@ -69,6 +69,17 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Or**: 5. select several friends 6. **Compare with me** ◇ 7. lands on C1's result with me plus them, my current account unchanged
 - **Edges**: private friends list; a Family's merged friends list; the list's refresh after adding a friend on Steam.
 
+### A5 What kind of player is this?
+
+- **Who / goal**: get a feel for an account's tastes and habits — mine, or a friend's before suggesting a game.
+- **Steps**:
+  1. Owned (mine, or a friend's via A2 or a `?u=` link)
+  2. read Plays mostly and how many played games it's built from ◇
+  3. read the profile line: solo, co-op or PvP; whether story games are played through ◇
+  4. click the backlog count to list the paid games with no playtime, best Taste fit first ◇
+- **Done when**: every figure says what it's counted from, and stays silent rather than guessing below its threshold; software (Wallpaper Engine) counts toward none of it.
+- **Edges**: private playtime (no profile, and it says so); fewer than 5 played games; a Family, whose profile mixes its members.
+
 ## Comparing libraries
 
 ### C1 What can we all play tonight?
@@ -128,6 +139,19 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   3. filter tag co-op
   4. filter low playtime for _both_ of us
 - **Done when**: each player has a Played column (`Played (h) · <name>`) to filter on.
+
+### C7 How alike are we, and what should I suggest to them?
+
+- **Who / goal**: two or more friends want to see where their tastes meet and differ, and what one could pass on to another.
+- **Steps**:
+  1. C1
+  2. open **Players** ◇
+  3. read each player's top tags and play style, and how alike the pairs are ◇
+  4. read the shared favourites and the tags in common ◇
+  5. **Suggest to** a player: games another played a lot that they never have ◇
+  6. open one in the panel
+- **Done when**: similarity is a plain band, never a bare percentage, and silent when the data can't support it; each suggestion says who played it, how long, and whether the player owns it.
+- **Edges**: a player without a profile (says why); no shared favourites ("none yet"); **Intersect** or **Subtract** (the profiles need whole libraries).
 
 ## Lists
 
