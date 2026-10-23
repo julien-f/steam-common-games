@@ -77,6 +77,8 @@ function parseSession(lines) {
   const calls = new Map();
   for (const line of lines) {
     const entry = JSON.parse(line);
+    // These replay earlier calls and results without a timestamp; they'd overwrite the timings with NaN.
+    if (entry.type === 'api-request-blob') continue;
     for (const part of Array.isArray(entry.message?.content) ? entry.message.content : []) {
       if (part.type === 'tool_use') {
         const key = part.name === 'Bash' ? commandKey(part.input.command ?? '') : part.name;

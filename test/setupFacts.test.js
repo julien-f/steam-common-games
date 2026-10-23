@@ -86,6 +86,21 @@ test('parseSession pairs each call with its result: output size, elapsed time, c
   ]);
 });
 
+test('parseSession skips api-request-blob lines, which replay earlier calls and results', () => {
+  const content = (part) => ({ message: { content: [part] } });
+  const use = { type: 'tool_use', id: 'a', name: 'Bash', input: { command: 'npm test' } };
+  const result = { type: 'tool_result', tool_use_id: 'a', content: 'ok' };
+  const calls = parseSession(
+    [
+      { timestamp: '2026-01-01T00:00:00Z', ...content(use) },
+      { timestamp: '2026-01-01T00:00:03Z', ...content(result) },
+      { type: 'api-request-blob', ...content(use) },
+      { type: 'api-request-blob', ...content(result) },
+    ].map((l) => JSON.stringify(l)),
+  );
+  assert.deepEqual(calls, [{ key: 'npm test', bytes: 2, ms: 3000, error: false, denied: false, rejected: false }]);
+});
+
 test('commitCalls counts the git commit calls that succeeded', () => {
   const call = (key, error = false) => ({ key, bytes: 0, ms: 0, error, denied: false, rejected: false });
   assert.equal(
