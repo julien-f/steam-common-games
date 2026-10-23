@@ -3272,6 +3272,9 @@ export default function ListRoute() {
     const target = suggestTo();
     return profiles && untrack(() => suggestionsFor(tableData(), profiles.compared, target));
   });
+  // At least two players with a profile: each line then says what sets that player apart.
+  const compared = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
+    profiles.players.filter((p) => p.tags.length).length >= 2;
   const sharedNote = (shared: number) => `share ${shared} of their top ${TOP_TAGS} tags`;
   function playersSummary(profiles: NonNullable<ReturnType<typeof playerProfiles>>): string {
     const { players, ground } = profiles;
@@ -3340,9 +3343,14 @@ export default function ListRoute() {
                           fallback={<span class="list-players-none">too few games played here for a profile</span>}
                         >
                           {/* Once compared, what sets them apart: what they share is under In common. */}
-                          <For each={profiles().ground.ownTags[i()].length ? profiles().ground.ownTags[i()] : p.tags}>
-                            {tagButton}
-                          </For>
+                          <Show when={compared(profiles())} fallback={<For each={p.tags}>{tagButton}</For>}>
+                            <For
+                              each={profiles().ground.ownTags[i()]}
+                              fallback={<span class="list-players-none">no tags of their own</span>}
+                            >
+                              {tagButton}
+                            </For>
+                          </Show>
                           <Show when={p.style}>{(style) => <span>{STYLE_SENTENCES[style()]}</span>}</Show>
                         </Show>
                       </li>

@@ -2,7 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { asPlayer, shot } from './state.ts';
-import { ALICE, BOB, BUNDLE, DAVE, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
+import { ALICE, BOB, BUNDLE, DAVE, ERIN, PICK_BUNDLE, SIGNED_IN, SYNCED_LIST, signedInPrefs } from './fixtures.ts';
 
 let pageErrors: string[];
 test.beforeEach(async ({ page }) => {
@@ -985,6 +985,25 @@ test('C7 edge: a player without a profile is said once, in Players while it is o
   // Intersect has no Players section: the status line says it.
   await page.goto('/lists/compare?u=alice&u=dave&u=erin&op=intersect');
   await expect(page.locator('.list-score-note')).toContainText('Group fit leaves out Alice');
+});
+
+test('C7 edge: a player whose top tags are all shared has none of their own, not In common again', async ({ page }) => {
+  // Bob, as a copy of Erin's library and hours.
+  await page.route('**/api/common-games', async (route) => {
+    const req = route.request();
+    const post = req.postData() ?? '';
+    if (!post.includes(BOB.steamid) && !post.includes('"bob"')) return route.fallback();
+    const asErin = post.replaceAll(BOB.steamid, ERIN.steamid).replaceAll('"bob"', '"erin"');
+    const body = JSON.parse(
+      respond(req.method(), new URL(req.url()), asErin).body.replaceAll(ERIN.steamid, BOB.steamid),
+    );
+    body.players[0].personaname = 'Bob';
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/compare?u=bob&u=erin');
+  const players = await openPlayers(page);
+  await expect(playerLine(players, 'Bob').getByRole('button')).toHaveCount(0);
+  await expect(playerLine(players, 'Bob')).toContainText('no tags of their own');
 });
 
 test('C7 edge: Intersect offers to switch back, since tastes need whole libraries', async ({ page }) => {
