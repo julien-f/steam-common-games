@@ -3749,6 +3749,29 @@ test('F1 edge: ←/→ on a Cover standing in while the media streams still lets
   await expect(counter).toHaveText('Screenshot 1 of 2');
 });
 
+test('F1 edge: a refresh that shrinks the media on screen still remembers where it was left', async ({ page }) => {
+  let shrunk = false;
+  await page.route('**/api/game-details/1145360?refresh=1', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    const body = JSON.parse(full.body);
+    if (shrunk) body.meta.screenshots = body.meta.screenshots.slice(0, 2);
+    return route.fulfill({ ...full, body: JSON.stringify(body) });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s3');
+  const counter = page.locator('.lb-counter');
+  await expect(counter).toHaveText('Screenshot 3 of 3');
+  shrunk = true;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).not.toHaveText('Hades');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(counter).toHaveText('Screenshot 2 of 2');
+});
+
 test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {
   // Hollow Knight (screenshots), Hades, Terraria (a trailer).
   await asPlayer(page, ALICE, { recentGames: [367520, 1145360, 105600] });

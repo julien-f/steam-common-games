@@ -1247,12 +1247,7 @@ function renderLbCaption() {
 // manually after mutating plain module variables.
 function renderLightbox() {
   const list = shots();
-  // Defensively clamped, same idiom panel.tsx's own hero index uses. Every *write* path
-  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) keeps idx()
-  // in bounds on its own, but the list itself is derived now and can shrink underneath a
-  // perfectly valid index — a ↻ Refresh whose new details carry fewer screenshots than the
-  // previous ones did is enough.
-  const i = Math.max(0, Math.min(idx(), list.length - 1));
+  const i = idx();
   const name = gameName();
   const lb = document.getElementById('screenshot-lightbox')!;
   const shot = list[i];
@@ -1395,6 +1390,14 @@ createRoot(() => {
     if (target === 0) return; // the Cover wanted, or trailers but no screenshots (not worth autoplaying unasked)
     setIdx(target);
     _onLightboxParamChange(list[target].shotId);
+  });
+  // A refresh can shrink the list under a valid index (fewer screenshots): every read of
+  // `shots()[idx()]` (the caption, the counter, the leave-memory) then stays in bounds.
+  createEffect(() => {
+    const list = shots();
+    if (!list.length || untrack(idx) < list.length) return;
+    setIdx(list.length - 1);
+    _onLightboxParamChange(list[list.length - 1].shotId);
   });
   createEffect(() => {
     const list = shots();
