@@ -4023,6 +4023,19 @@ test('F1 edge: on desktop, a trailer sits between the toolbar and its controls, 
   expect(video.y + video.height).toBeLessThanOrEqual(controls.y);
 });
 
+test('I2 edge: Space on a focused lightbox button presses that button, not play/pause', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  const mute = page.locator('.lb-vc-mute');
+  await mute.focus();
+  await page.keyboard.press(' ');
+  await expect(mute).toHaveAccessibleName('Unmute');
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+});
+
 test("F3 edge: the panel's ↑/↓ follow the table's current search, and hide once the game is out of it", async ({
   page,
 }) => {

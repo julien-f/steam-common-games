@@ -637,7 +637,8 @@ function wireKeyboard(lb: HTMLElement) {
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
       if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
       if (vid) {
-        if (e.key === ' ' && !onScrub) {
+        // A focused button takes Space as its own press.
+        if (e.key === ' ' && !onScrub && !(e.target as HTMLElement).closest('button')) {
           e.preventDefault();
           vid.paused ? vid.play().catch(() => {}) : vid.pause();
         }
