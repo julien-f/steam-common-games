@@ -39,7 +39,7 @@ import ZoomIn from 'lucide-solid/icons/zoom-in';
 // reasoning `panel.tsx`'s own hero zoom-equivalent state would have gotten if this file had
 // any (it doesn't).
 const [lbGame, setLbGame] = createSignal<ReadonlyGame | null>(null);
-const [idx, setIdx] = createSignal(0);
+const [lbIdx, setIdx] = createSignal(0);
 // Derived from the open game on each read, not snapshotted at open time — the same shape, for
 // the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its details
 // have streamed in has nothing but a banner to offer, and gains its screenshots and videos
@@ -51,6 +51,9 @@ const shots = () => {
   const g = lbGame();
   return g ? buildMediaItems(g.appid, g.details?.meta) : [];
 };
+// Clamped on read: a refresh can shrink the list under a valid index (fewer screenshots), and
+// every read of `shots()[idx()]` (the render, the caption, the leave-memory) must stay in bounds.
+const idx = () => Math.max(0, Math.min(lbIdx(), shots().length - 1));
 const gameName = () => lbGame()?.name ?? '';
 // The game `renderLightbox` last drew, so a render can tell a game step from a media step.
 let lbRenderedAppid: number | undefined;
@@ -612,7 +615,7 @@ function wireKeyboard(lb: HTMLElement) {
           stepLightbox(dir);
         }
       }
-      if (!onScrub && (e.key === 'Home' || e.key === 'End') && shots().length > 1) {
+      if (!onScrub && (e.key === 'Home' || e.key === 'End')) {
         e.preventDefault();
         gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
       }
@@ -1379,7 +1382,8 @@ createRoot(() => {
   // lands, take it. Created *before* the render effect below so it runs first within the same
   // flush — the render then happens once, on the shot actually wanted, rather than painting the
   // banner and immediately replacing it. Deliberately one-shot and cancelled by any viewer
-  // input (`stepLightbox`/`gotoLightbox`/a fresh open/close), so it can never move an image
+  // input that moves the media (a step `stepLightbox`/`gotoLightbox` takes — not one on a lone
+  // Cover, with nothing to step to — or a fresh open/close), so it can never move an image
   // out from under someone who is looking at it.
   createEffect(() => {
     const list = shots();
@@ -1390,14 +1394,6 @@ createRoot(() => {
     if (target === 0) return; // the Cover wanted, or trailers but no screenshots (not worth autoplaying unasked)
     setIdx(target);
     _onLightboxParamChange(list[target].shotId);
-  });
-  // A refresh can shrink the list under a valid index (fewer screenshots): every read of
-  // `shots()[idx()]` (the caption, the counter, the leave-memory) then stays in bounds.
-  createEffect(() => {
-    const list = shots();
-    if (!list.length || untrack(idx) < list.length) return;
-    setIdx(list.length - 1);
-    _onLightboxParamChange(list[list.length - 1].shotId);
   });
   createEffect(() => {
     const list = shots();
