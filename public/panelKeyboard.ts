@@ -1,6 +1,6 @@
 // The app-wide keyboard shortcuts around the game detail side panel, bound once by AppShell.
 // `pickRandom`/`stepGame` delegate to the mounted route, which knows whether it has a list to page.
-import { isLightboxOpen, lightboxHandleEscape } from './lightbox.tsx';
+import { isLightboxOpen } from './lightbox.tsx';
 import { isPanelOpen, panelClose, panelStepHero, presentHero } from './panel.tsx';
 import { isTextEntry } from './utils.ts';
 
@@ -15,10 +15,8 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (e.defaultPrevented) return; // a popover or the search dropdown took it
-      if (isLightboxOpen()) {
-        lightboxHandleEscape();
-        return;
-      }
+      // Each dialog closes itself on its own `cancel`; this one mustn't also close the panel behind.
+      if (isLightboxOpen()) return;
       if (opts.shortcuts.isOpen()) {
         opts.shortcuts.close();
         return;
@@ -26,15 +24,16 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
       panelClose(); // initPanel's onClose (AppShell) handles the URL/state cleanup
       return;
     }
-    // The lightbox owns the keyboard while open (its own arrows/Home/End/f/space/m, wired in
-    // lightbox.tsx's own listener) — every other page-level shortcut below is blocked rather
-    // than firing invisibly behind it.
-    if (isLightboxOpen()) return;
+    // Over the lightbox too: the shortcuts dialog stacks above it.
     if (e.key === '?') {
       e.preventDefault();
       opts.shortcuts.toggle();
       return;
     }
+    // The lightbox owns the keyboard while open (its own arrows/Home/End/f/space/m, wired in
+    // lightbox.tsx's own listener) — every other page-level shortcut below is blocked rather
+    // than firing invisibly behind it.
+    if (isLightboxOpen()) return;
     if (isTextEntry(document.activeElement)) return;
     if (e.key === '/') {
       e.preventDefault();

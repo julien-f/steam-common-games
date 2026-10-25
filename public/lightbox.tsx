@@ -7,7 +7,7 @@ import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } fro
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import { fmtTime } from './utils.ts';
-import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
+import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
 
@@ -114,8 +114,6 @@ let _getGamePosition: () => { index: number; total: number } | null = () => null
 // picked by the same rule the re-point itself would have used.
 let _awaitingMedia: ShotKind | null = null;
 let _lbPrevFocus: Element | null = null;
-// How the viewer last interacted — see openLightbox's focus call.
-let lastInputWasKey = false;
 // One mount at a time: a second initLightbox (Vite hot-reloading AppShell) tears the first down —
 // its DOM and every listener it put on `document` — instead of mounting a duplicate beside it.
 let _lbTeardown: (() => void) | null = null;
@@ -152,8 +150,6 @@ export function initLightbox({
   _lbSignal = abort.signal;
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
-  document.addEventListener('keydown', () => (lastInputWasKey = true), { capture: true, signal: _lbSignal });
-  document.addEventListener('pointerdown', () => (lastInputWasKey = false), { capture: true, signal: _lbSignal });
   document.addEventListener('fullscreenchange', lockLbLandscape, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', lockLbLandscape, { signal: _lbSignal });
   screen.orientation?.addEventListener('change', lockLbLandscape, { signal: _lbSignal });
@@ -181,7 +177,7 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
 // panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
-// button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
+// button doesn't walk focus away mid-click; the surface is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
 // A wrap past either end of the list enters from the other side, the cue that it went back round —
 // except after a swipe, where the new game follows the finger.
@@ -206,7 +202,7 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
     lbLastAxis = 'x';
   }
   if (lb.contains(document.activeElement)) return;
-  ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
+  ((before && lb.contains(before) ? before : lbSurface(lb)) as HTMLElement).focus();
 }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
@@ -235,9 +231,10 @@ function toggleLbFullscreen(lb: HTMLElement) {
   if (isFullscreen()) {
     exitFullscreen();
   } else {
+    const surface = lbSurface(lb);
     (
-      lb.requestFullscreen?.() ??
-      (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+      surface.requestFullscreen?.() ??
+      (surface as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
     )?.catch?.(() => {});
   }
 }
@@ -432,6 +429,10 @@ function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
 
+function lbSurface(lb: HTMLElement): HTMLElement {
+  return lb.querySelector<HTMLElement>('.lb-surface')!;
+}
+
 // Rendered ones only: the trap's wrap landing on a CSS-hidden button (‹ › with one item) loses focus.
 function getFocusable(lb: HTMLElement): HTMLElement[] {
   return [...lb.querySelectorAll<HTMLElement>('button:not([disabled]), input[type="range"]')].filter((el) =>
@@ -451,77 +452,83 @@ function getFocusable(lb: HTMLElement): HTMLElement[] {
 // itself is produced and mounted, not how the rest of the file finds or manipulates it.
 function LightboxDom() {
   return (
-    <div id="screenshot-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
-      <div class="lb-backdrop" />
-      <button class="lb-btn lb-prev" aria-label="Previous screenshot">
-        <ChevronLeft />
-      </button>
-      <img class="lb-img" src="" alt="Screenshot" />
-      <video class="lb-video" playsinline />
-      <button class="lb-btn lb-next" aria-label="Next screenshot">
-        <ChevronRight />
-      </button>
-      <div class="lb-error" style={{ display: 'none' }} role="alert">
-        <p class="lb-error-msg" />
-        <button class="lb-error-retry">Retry</button>
-      </div>
-      <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
-        <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
-      </div>
-      <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
-        {LB_TOUCH_SEEK_SECONDS}s <FastForward />
-      </div>
-      <button class="lb-bigplay" aria-label="Play trailer">
-        <Play />
-      </button>
-      <div class="lb-vctrls" style={{ display: 'none' }}>
-        {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
-        <button class="lb-vc-btn lb-vc-play" aria-label="Play">
-          <Play class="lb-icon-off" />
-          <Pause class="lb-icon-on" />
+    // A modal <dialog>: the page behind is inert. Fullscreen goes on `.lb-surface`, as a dialog can't be fullscreen.
+    <dialog id="screenshot-lightbox" aria-labelledby="lb-caption-text lb-title">
+      <div class="lb-surface" tabindex="-1" autofocus>
+        <span id="lb-title" hidden>
+          media viewer
+        </span>
+        <div class="lb-backdrop" />
+        <button class="lb-btn lb-prev" aria-label="Previous screenshot">
+          <ChevronLeft />
         </button>
-        <span class="lb-vc-time">0:00</span>
-        <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
-        <span class="lb-vc-dur">0:00</span>
-        <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">
-          <Volume2 class="lb-icon-off" />
-          <VolumeX class="lb-icon-on" />
+        <img class="lb-img" src="" alt="Screenshot" />
+        <video class="lb-video" playsinline />
+        <button class="lb-btn lb-next" aria-label="Next screenshot">
+          <ChevronRight />
         </button>
-      </div>
-      <div class="lb-toolbar">
-        {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
+        <div class="lb-error" style={{ display: 'none' }} role="alert">
+          <p class="lb-error-msg" />
+          <button class="lb-error-retry">Retry</button>
+        </div>
+        <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
+          <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
+        </div>
+        <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
+          {LB_TOUCH_SEEK_SECONDS}s <FastForward />
+        </div>
+        <button class="lb-bigplay" aria-label="Play trailer">
+          <Play />
+        </button>
+        <div class="lb-vctrls" style={{ display: 'none' }}>
+          {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
+          <button class="lb-vc-btn lb-vc-play" aria-label="Play">
+            <Play class="lb-icon-off" />
+            <Pause class="lb-icon-on" />
+          </button>
+          <span class="lb-vc-time">0:00</span>
+          <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
+          <span class="lb-vc-dur">0:00</span>
+          <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">
+            <Volume2 class="lb-icon-off" />
+            <VolumeX class="lb-icon-on" />
+          </button>
+        </div>
+        <div class="lb-toolbar">
+          {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
             control on the thing it changes, and cover the axis the edge ‹ › don't (they step
             media within one game). Both buttons are hidden when there's no list to page
             through — see `_getGamePosition`. */}
-        <div class="lb-caption">
-          <button class="lb-game-prev" aria-label="Previous game">
-            <ChevronUp />
-          </button>
-          <span class="lb-caption-text" />
-          <span class="lb-caption-pos" />
-          <button class="lb-game-next" aria-label="Next game">
-            <ChevronDown />
-          </button>
-        </div>
-        <div class="lb-toolbar-row">
-          <div class="lb-toolbar-left">
-            <button class="lb-fullscreen" aria-label="Enter fullscreen">
-              <Maximize class="lb-icon-off" />
-              <Minimize class="lb-icon-on" />
+          <div class="lb-caption">
+            <button class="lb-game-prev" aria-label="Previous game">
+              <ChevronUp />
+            </button>
+            <span class="lb-caption-text" id="lb-caption-text" />
+            <span class="lb-caption-pos" />
+            <button class="lb-game-next" aria-label="Next game">
+              <ChevronDown />
             </button>
           </div>
-          <div class="lb-counter" aria-live="polite" aria-atomic="true" />
-          <div class="lb-toolbar-right">
-            <button class="lb-zoom" aria-label="Zoom" aria-pressed="false">
-              <ZoomIn />
-            </button>
-            <button class="lb-close" aria-label="Close lightbox">
-              <X />
-            </button>
+          <div class="lb-toolbar-row">
+            <div class="lb-toolbar-left">
+              <button class="lb-fullscreen" aria-label="Enter fullscreen">
+                <Maximize class="lb-icon-off" />
+                <Minimize class="lb-icon-on" />
+              </button>
+            </div>
+            <div class="lb-counter" aria-live="polite" aria-atomic="true" />
+            <div class="lb-toolbar-right">
+              <button class="lb-zoom" aria-label="Zoom" aria-pressed="false">
+                <ZoomIn />
+              </button>
+              <button class="lb-close" aria-label="Close lightbox">
+                <X />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -534,6 +541,13 @@ function LightboxDom() {
 // triggered by the `shots`/`idx`/`gameName` signals above), not in these handlers.
 
 function wireButtons(lb: HTMLElement) {
+  // Esc, or Android's Back: closed the same way as from ×. `close` covers a dialog the browser
+  // closed itself, when it won't let `cancel` be cancelled (no user activation since the last one).
+  lb.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeLightbox();
+  });
+  lb.addEventListener('close', closeLightbox);
   lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
   lb.querySelector('.lb-close')!.addEventListener('click', closeLightbox);
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
@@ -550,6 +564,8 @@ function wireKeyboard(lb: HTMLElement) {
     'keydown',
     (e) => {
       if (!isLightboxOpen()) return;
+      // A dialog over this one (the shortcuts) has the keyboard.
+      if ([...document.querySelectorAll('dialog[open]')].some((d) => d !== lb)) return;
       // Ctrl/⌘/Alt+key is the browser's (reload, find, print); Shift is part of some bindings.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
@@ -1060,16 +1076,11 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   // A deliberate open supersedes any pending "take the media when it lands" latch.
   _awaitingMedia = null;
   lbShotChosen = true;
-  const lb = document.getElementById('screenshot-lightbox')!;
-  lb.classList.add('open');
-  document.body.classList.add('lb-open');
-  if (!isMorphUpdating()) focusLbClose(lb);
+  const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
+  // Focuses the surface (`autofocus`): the shortcuts work from there, and nothing shows a ring.
+  if (!lb.open) lb.showModal();
+  document.body.classList.add('lb-open'); // a modal dialog doesn't stop the page scrolling
   _onLightboxParamChange(newShots[idx()].shotId);
-}
-
-// A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
-function focusLbClose(lb: HTMLElement) {
-  lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
 }
 
 // The panel hero's picture, clicked, morphs into the lightbox's; the backdrop and the chrome fade in around it.
@@ -1082,7 +1093,7 @@ export function openLightboxFrom(from: HTMLImageElement, game: Game, idxOrShotId
     to: () => lb.querySelector<HTMLElement>('.lb-img'),
     ready: (img) => loadedWhen(lb, 'lb--loading', img as HTMLImageElement),
     focus: () => {
-      if (isLightboxOpen() && !lb.contains(document.activeElement)) focusLbClose(lb);
+      if (isLightboxOpen() && !lb.contains(document.activeElement)) lbSurface(lb).focus();
     },
     start: () => {
       lb.classList.add('lb-morph');
@@ -1137,14 +1148,15 @@ export function repointLightboxGame(game: ReadonlyGame) {
 }
 
 export function closeLightbox() {
+  if (!isLightboxOpen()) return; // the `close` event that follows our own close()
   setLbGame(null);
   _awaitingMedia = null;
   clearTimeout(lbVcTimer);
-  const lb = document.getElementById('screenshot-lightbox')!;
+  const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
   stopHls(lbVideoEl);
   detachLbVideo();
+  lb.close();
   lb.classList.remove(
-    'open',
     'lb--loading',
     'lb-idle',
     'lb--paused',
@@ -1158,13 +1170,9 @@ export function closeLightbox() {
   if (isFullscreen()) exitFullscreen();
   _onLightboxParamChange(null);
   popOverlayEntry('lightbox');
-  (_lbPrevFocus as HTMLElement | null)?.focus();
+  if (_lbPrevFocus?.isConnected) (_lbPrevFocus as HTMLElement).focus();
+  else document.querySelector<HTMLElement>('#panel-hero .panel-hero-open')?.focus();
   _lbPrevFocus = null;
-}
-
-// The browser's own Escape exits fullscreen first; the lightbox stays open then.
-export function lightboxHandleEscape() {
-  if (!isFullscreen()) closeLightbox();
 }
 
 function stepLightbox(dir: number, swipe = false) {

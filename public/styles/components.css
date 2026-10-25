@@ -2829,27 +2829,43 @@
   }
 
   /* ── The screenshot and trailer viewer (lightbox.tsx): media on black, its chrome white over it. ── */
+  /* A modal <dialog>, its UA box (capped size, border, padding, background) reset to the viewport. */
   #screenshot-lightbox {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: none;
+    color: inherit;
+  }
+  #screenshot-lightbox::backdrop {
+    background: none;
   }
   /* Fades in; its media then enters by its own lb-anim-* keyframes. */
-  #screenshot-lightbox.open {
-    display: flex;
+  #screenshot-lightbox[open] {
     transition: opacity var(--dur-2) var(--ease-out);
   }
   @starting-style {
-    #screenshot-lightbox.open {
+    #screenshot-lightbox[open] {
       opacity: 0;
     }
   }
   /* The hero's picture morphs in instead (lightbox.tsx's openLightboxFrom), over the backdrop's own fade. */
-  #screenshot-lightbox.open.lb-morph {
+  #screenshot-lightbox[open].lb-morph {
     transition: none;
+  }
+  /* What goes fullscreen: a dialog can't. Focused on open, with no ring: the shortcuts act from it. */
+  .lb-surface {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none;
   }
   ::view-transition-new(lb-backdrop),
   ::view-transition-new(lb-chrome) {

@@ -1138,7 +1138,7 @@ test('C8.5: while presenting, opening a media from the panel presents it instead
   const picture = () => shown.locator('img.pres-media').getAttribute('src');
   expect(await picture()).toContain('header.jpg'); // browsing the panel moves nothing: still the Cover
   await page.getByRole('button', { name: 'Present this media' }).click();
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
   await expect.poll(picture).toContain('Screenshot%203');
 });
 
@@ -1155,21 +1155,34 @@ test('C8 edge: closing the main window closes the presentation', async ({ page }
 
 test('C8 edge: P in the lightbox presents its media and closes the lightbox', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  // A second present() in the same keydown (the panel's own P, once the lightbox closed) would send it the media.
+  await page.addInitScript(() => {
+    const w = window as unknown as { posts: number; postsAtKey: number[] };
+    w.posts = 0;
+    w.postsAtKey = [];
+    const post = BroadcastChannel.prototype.postMessage;
+    BroadcastChannel.prototype.postMessage = function (this: BroadcastChannel, msg: { type?: string }) {
+      if (msg?.type === 'onAir') w.posts++;
+      return post.call(this, msg);
+    };
+    addEventListener('keydown', () => setTimeout(() => w.postsAtKey.push(w.posts)), true); // once dispatched
+  });
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   const lightbox = page.locator('#screenshot-lightbox');
-  await expect(lightbox).toHaveClass(/open/);
+  await expect(lightbox).toHaveAttribute('open');
   let popups = 0;
   page.on('popup', () => popups++);
   const popup = page.waitForEvent('popup', { timeout: 3000 });
   await page.keyboard.press('p');
   const shown = await popup;
-  await expect(lightbox).not.toHaveClass(/open/);
+  await expect(lightbox).not.toHaveAttribute('open');
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
   await expect(page.getByRole('banner').locator('.present-chip')).toContainText('Hades');
   expect(popups).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as { postsAtKey: number[] }).postsAtKey)).toEqual([0]);
 });
 
 test('C8 edge: a trailer that fails to load says so on the presentation', async ({ page }, testInfo) => {
@@ -3453,7 +3466,7 @@ for (const [route, next] of [
       await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
       if (close === 'button') await page.getByRole('button', { name: 'Close lightbox' }).click();
       else await page.goBack();
-      await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/\bopen\b/);
+      await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
       await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
       if (close === 'button') await expect(page).toHaveURL(next.url);
       else await expect(page).toHaveURL(new RegExp(`${route.replace('?', '\\?')}$`));
@@ -4157,7 +4170,7 @@ test('F1 edge: the viewer reopened after closing a playing trailer shows its con
   await page.clock.runFor(3500);
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   const lb = page.locator('#screenshot-lightbox');
-  await expect(lb).toHaveClass(/\bopen\b/);
+  await expect(lb).toHaveAttribute('open');
   expect(await lb.getAttribute('class')).not.toMatch(/lb-idle/); // read once: the idle timer runs again
 });
 
@@ -4287,7 +4300,7 @@ test("F1 edge: Back closes the lightbox, then the game, in a tab past the browse
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   await expect(page).toHaveURL(/&shot=banner/);
   await page.goBack();
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
   await expect(page.locator('#game-panel')).toBeVisible();
   await expect(page).toHaveURL(/\?game=1145360$/);
   await page.goBack();
@@ -4302,7 +4315,7 @@ test('F1 edge: Back closes the lightbox before the game behind it', async ({ pag
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   await expect(page).toHaveURL(/&shot=banner/);
   await page.goBack();
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
   await expect(page.locator('#game-panel')).toBeVisible();
   await expect(page).toHaveURL(/\?game=1145360$/);
 });
@@ -4758,26 +4771,26 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   expect(await takes24pxTap(page.locator('.account-members').getByRole('link', { name: 'Bob ↗' }))).toBe(true);
 });
 
-test('I2 edge: the lightbox shows its focus ring when opened from the keyboard, not from a tap', async ({
+test('I2 edge: the lightbox opens focused on its media, with no ring; Tab brings one to its controls', async ({
   page,
 }, testInfo) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');
   const hero = page.getByRole('button', { name: 'Open in lightbox' });
-  const ringOnClose = () =>
-    page.locator('.lb-close').evaluate((e) => e === document.activeElement && e.matches(':focus-visible'));
-  if (testInfo.project.name === 'phone') {
-    await hero.tap();
-    await expect(page.locator('.lb-close')).toBeFocused();
-    expect(await ringOnClose()).toBe(false);
-    // Opaque, so the panel behind doesn't show through around the media.
-    await expect(page.locator('.lb-backdrop')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
-  } else {
+  const ring = () => page.evaluate(() => document.activeElement!.matches(':focus-visible'));
+  if (testInfo.project.name === 'phone') await hero.tap();
+  else {
     await hero.focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('.lb-close')).toBeFocused();
-    expect(await ringOnClose()).toBe(true);
   }
+  await expect(page.locator('.lb-surface')).toBeFocused();
+  // Opaque, so the panel behind doesn't show through around the media.
+  await expect(page.locator('.lb-backdrop')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+  await expect(page.locator('.lb-surface')).toHaveCSS('outline-style', 'none');
+  if (testInfo.project.name === 'phone') return;
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#screenshot-lightbox button:focus')).toHaveCount(1);
+  expect(await ring()).toBe(true);
 });
 
 test('I2 edge: Tab cycles the lightbox controls on a game with a single item', async ({ page }) => {
@@ -4788,7 +4801,7 @@ test('I2 edge: Tab cycles the lightbox controls on a game with a single item', a
   await page.getByRole('button', { name: 'Open in lightbox' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.lb-img')).not.toHaveClass(/loading/);
-  await expect(page.locator('.lb-close')).toBeFocused();
+  await expect(page.locator('.lb-surface')).toBeFocused();
   const focused = () =>
     page.evaluate(() => {
       const el = document.activeElement as HTMLElement;
@@ -4800,6 +4813,45 @@ test('I2 edge: Tab cycles the lightbox controls on a game with a single item', a
     seen.push(await focused());
   }
   expect(seen).toEqual(['Previous game', 'Next game', 'Enter fullscreen', 'Zoom', 'Close lightbox', 'Previous game']);
+});
+
+test('I2 edge: the lightbox is modal; ? opens the shortcuts over it, and Esc closes the innermost', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  expect(await lb.evaluate((d) => d.matches(':modal'))).toBe(true); // the page behind is inert
+  await page.keyboard.press('?');
+  const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(shortcuts).toBeVisible();
+  await page.keyboard.press('ArrowRight'); // the shortcuts dialog has the keyboard
+  await page.keyboard.press('Escape');
+  await expect(shortcuts).toBeHidden();
+  await expect(lb).toHaveAttribute('open');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('Escape');
+  await expect(lb).not.toHaveAttribute('open');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(page).toHaveURL(/\?game=1145360$/);
+});
+
+test('I2 edge: a lightbox the browser closes itself leaves the address and history as a close does', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await row(page, 'Hades').getByText('Hades').click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page).toHaveURL(/&shot=/);
+  // As the browser does when it won't let `cancel` be cancelled (no user activation since the last).
+  await page.locator('#screenshot-lightbox').evaluate((d) => (d as HTMLDialogElement).close());
+  await expect(page).toHaveURL(/\?game=1145360$/);
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.goBack();
+  await expect(page.locator('#game-panel')).toBeHidden();
+  await expect(page).toHaveURL(/\/lists\/owned$/);
 });
 
 test("I2 edge: the panel's current thumbnail is exposed, not only coloured", async ({ page }) => {
@@ -4945,7 +4997,7 @@ test.describe('with motion on', () => {
     );
     await page.getByRole('button', { name: 'Open in lightbox' }).click();
     expect(await started).toBe(true);
-    await expect(page.locator('.lb-close')).toBeFocused();
+    await expect(page.locator('.lb-surface')).toBeFocused();
     await expect(page.locator('#screenshot-lightbox')).toHaveCSS('opacity', '1');
     await expect(page.locator('.lb-img')).toHaveAttribute('src', /Screenshot%201%3C/);
     await expect(page.locator('.lb-img')).toHaveCSS('opacity', '1');
@@ -5124,7 +5176,7 @@ test('I2 edge: Esc in the lightbox closes only it, drops its shot from the URL, 
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   await expect(page).toHaveURL(/&shot=banner/);
   await page.keyboard.press('Escape');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await expect(page).toHaveURL(/\?game=1145360$/);
   await page.goBack();
@@ -5219,12 +5271,12 @@ test("I2 edge: Enter or Space on the panel's hero opens the lightbox once", asyn
   for (const key of ['Enter', ' ']) {
     await page.getByRole('button', { name: 'Open in lightbox' }).focus();
     await page.keyboard.press(key);
-    await expect(page.locator('.lb-close')).toBeFocused();
+    await expect(page.locator('.lb-surface')).toBeFocused();
     await page.waitForTimeout(200); // past a second activation's close
-    await expect(page.locator('#screenshot-lightbox')).toHaveClass(/open/);
+    await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
     expect(await page.evaluate(() => history.length)).toBe(entries + 1);
     await page.goBack();
-    await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+    await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
     await expect(page.locator('#panel-title')).toHaveText('Hades');
   }
 });

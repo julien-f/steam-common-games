@@ -458,7 +458,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. Esc
   6. rank a pair with keys only
 - **Done when**: focus is always visible and never trapped; Esc closes the innermost thing first.
-- **Edges**: Home's tree, every row's actions behind one ⋯ menu (L1's edge).
+- **Edges**: Home's tree, every row's actions behind one ⋯ menu (L1's edge); the lightbox opens with no focus ring until Tab; Ctrl/⌘/Alt shortcuts stay the browser's.
 
 ### I3 Screen reader
 
@@ -468,9 +468,9 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   2. jump by heading: one h1 naming the page, the sections below it
   3. fill a form; each field says what it's for
   4. open a game; jump through its sections by heading
-  5. open and close the shortcuts dialog, the lightbox, the nav menus and a list's ⋯ menu on Home; focus returns where it was
+  5. open and close the shortcuts dialog, the lightbox (and the shortcuts over it), the nav menus and a list's ⋯ menu on Home; focus returns where it was
 - **Done when**: every page has one h1 and no skipped heading level; every navigation and complementary landmark is named; every control is a native element, or has a role, name and state.
-- **Edges**: a hidden achievement reveals from the keyboard; the lightbox's counters say what they count; copying a link is announced.
+- **Edges**: a hidden achievement reveals from the keyboard; the lightbox's counters say what they count; Esc closes only the innermost dialog; copying a link is announced.
 
 ## Running an instance
 
