@@ -1181,6 +1181,8 @@ export function closeLightbox() {
 }
 
 function stepLightbox(dir: number, swipe = false) {
+  // A lone Cover (media still streaming): no step, so no pick that would cancel the latch.
+  if (shots().length <= 1) return;
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;

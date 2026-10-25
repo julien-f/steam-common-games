@@ -3731,6 +3731,24 @@ test('F1 edge: paging back to a game whose media is still loading lands where it
   await expect(counter).toHaveText('Screenshot 2 of 2');
 });
 
+test('F1 edge: ←/→ on a Cover standing in while the media streams still lets the media replace it', async ({
+  page,
+}) => {
+  let media = false;
+  await asPlayer(page, ALICE);
+  await terrariaMediaOnRefresh(page, () => media);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const counter = page.locator('.lb-counter');
+  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Terraria');
+  await expect(counter).toHaveText('Cover');
+  await page.keyboard.press('ArrowRight'); // nothing to step to: no pick made
+  media = true;
+  await refreshBehindLightbox(page);
+  await expect(counter).toHaveText('Screenshot 1 of 2');
+});
+
 test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {
   // Hollow Knight (screenshots), Hades, Terraria (a trailer).
   await asPlayer(page, ALICE, { recentGames: [367520, 1145360, 105600] });
