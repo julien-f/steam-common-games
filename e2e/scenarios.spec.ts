@@ -3442,7 +3442,7 @@ test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the ga
   await expect(page.locator('.lb-caption-text')).toHaveText('Valheim');
   await expect(page.locator('#panel-title')).toHaveText('Valheim');
   await expect(page).toHaveURL(/\/game\/892970\?shot=banner$/);
-  await expect(page.locator('#screenshot-lightbox')).toContainText('Game 3 of 3');
+  await expect(page.locator('#screenshot-lightbox')).toContainText('game 3 / 3');
   expect(
     await page.evaluate(() => document.getElementById('screenshot-lightbox')!.contains(document.activeElement)),
   ).toBe(true);
@@ -3480,7 +3480,7 @@ test('F1 edge: closing the lightbox leaves the panel on the last item looked at'
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   await page.getByRole('button', { name: 'Next screenshot' }).click();
   await page.getByRole('button', { name: 'Next screenshot' }).click();
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await page.getByRole('button', { name: 'Close lightbox' }).click();
   await expect(page.locator('.panel-film-item[aria-current="true"]')).toHaveAccessibleName('Screenshot 1 of 3');
 });
@@ -3533,7 +3533,7 @@ test('F1 edge: a slow screenshot shows its thumbnail and a spinner until it has 
   await page.keyboard.press('Shift+ArrowRight');
   const lb = page.locator('#screenshot-lightbox');
   const img = lb.locator('.lb-img');
-  await expect(lb.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(lb.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await expect(lb).toHaveClass(/lb--loading/);
   await expect(img).toHaveAttribute('src', /Screenshot%201\.svg\?thumb/);
   await expect(img).toHaveAttribute('src', /Screenshot%201\.svg\?full/);
@@ -3557,18 +3557,23 @@ test("F1 edge: a lightbox Retry that lands after a step doesn't paint over the s
   const img = lb.locator('.lb-img');
   await page.getByRole('button', { name: 'Retry' }).click();
   await page.getByRole('button', { name: 'Next screenshot' }).click();
-  await expect(lb.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(lb.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
   await retryDone;
   await page.waitForTimeout(300); // the stale onload's turn
   await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
 });
 
-test('F1 edge: a screenshot zooms from a visible button, or Z', async ({ page }) => {
+test('F1 edge: a screenshot shown below its size zooms from a visible button, or Z', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const zoom = page.getByRole('button', { name: 'Zoom', exact: true });
   const img = page.locator('#screenshot-lightbox .lb-img');
+  // The fixture screenshots are 1280×720: at full size on a large screen, zooming would only enlarge pixels.
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await expect(zoom).toBeHidden();
+  await page.setViewportSize({ width: 800, height: 600 });
   await zoom.click();
   await expect(zoom).toHaveAttribute('aria-pressed', 'true');
   await expect(img).toHaveAttribute('style', /scale\(2\)/);
@@ -3588,7 +3593,7 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
   await page.clock.runFor(3500);
   await expect(lb).toHaveClass(/lb-idle/);
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   // Read once: a retrying assertion would just wait out the idle timer (the clock keeps running).
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/);
   await expect(page.locator('.lb-counter')).toHaveCSS('opacity', '1');
@@ -3602,7 +3607,7 @@ test('F1 edge: stepping media leaves hidden controls hidden, flashing only the c
 test('F1 edge: after ↓ finds no game to step to, → still slides the next screenshot in sideways', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/wishlist?game=1145360&shot=s1'); // Hades: not on the wishlist, so no game to step to
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
     const w = window as unknown as { lbAnims: string[] };
     w.lbAnims = [];
@@ -3610,7 +3615,7 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
   });
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   const anims = await page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
   expect(anims).toContain('lb-img lb-anim-right');
 });
@@ -3618,7 +3623,7 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
 test('F1 edge: the lightbox leaves Ctrl/⌘/Alt shortcuts to the browser', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await page.evaluate(() => {
     const w = window as unknown as { taken: string[] };
     w.taken = [];
@@ -3629,20 +3634,20 @@ test('F1 edge: the lightbox leaves Ctrl/⌘/Alt shortcuts to the browser', async
   }
   expect(await page.evaluate(() => (window as unknown as { taken: string[] }).taken)).toEqual([]);
   await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
 });
 
 test('F1 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.lb-caption-text')).not.toHaveText('Hades');
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
 });
 
 // Terraria (Hades' ↓ neighbour on /lists/owned) loads without its store metadata, so only its
@@ -3679,14 +3684,14 @@ test("F1 edge: a banner shown while a game's media streams isn't where paging ba
   await asPlayer(page, ALICE);
   await terrariaMediaOnRefresh(page, () => media);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  const counter = page.locator('.lb-counter');
+  const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
-  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await expect(counter).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toHaveText('Screenshot 2 of 3');
+  await expect(counter).toContainText('Screenshot 2 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
-  await expect(counter).toHaveText('Cover');
+  await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowRight'); // nothing else to step to yet
   await page.keyboard.press('ArrowDown');
   await expect(name).not.toHaveText('Terraria');
@@ -3694,7 +3699,7 @@ test("F1 edge: a banner shown while a game's media streams isn't where paging ba
   await expect(name).toHaveText('Terraria');
   media = true;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await expect(counter).toContainText('Screenshot 1 of 2');
 });
 
 test('F1 edge: paging back to a game whose media is still loading lands where it was left once it loads', async ({
@@ -3704,31 +3709,31 @@ test('F1 edge: paging back to a game whose media is still loading lands where it
   await asPlayer(page, ALICE);
   await terrariaMediaOnRefresh(page, () => media);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  const counter = page.locator('.lb-counter');
+  const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
-  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await expect(counter).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
   media = true;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await expect(counter).toContainText('Screenshot 1 of 2');
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await expect(counter).toContainText('Screenshot 2 of 2');
   await page.keyboard.press('ArrowDown');
   await expect(name).not.toHaveText('Terraria');
   await page.keyboard.press('ArrowUp');
-  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await expect(counter).toContainText('Screenshot 2 of 2');
   // Its media goes away (a refresh the store didn't answer), then comes back.
   media = false;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Cover');
+  await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowDown');
   await expect(name).not.toHaveText('Terraria');
   await page.keyboard.press('ArrowUp');
   await expect(name).toHaveText('Terraria');
   media = true;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await expect(counter).toContainText('Screenshot 2 of 2');
 });
 
 test('F1 edge: ←/→ on a Cover standing in while the media streams still lets the media replace it', async ({
@@ -3738,15 +3743,15 @@ test('F1 edge: ←/→ on a Cover standing in while the media streams still lets
   await asPlayer(page, ALICE);
   await terrariaMediaOnRefresh(page, () => media);
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  const counter = page.locator('.lb-counter');
-  await expect(counter).toHaveText('Screenshot 1 of 3');
+  const counter = page.locator('.lb-status');
+  await expect(counter).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.lb-caption-text')).toHaveText('Terraria');
-  await expect(counter).toHaveText('Cover');
+  await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowRight'); // nothing to step to: no pick made
   media = true;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await expect(counter).toContainText('Screenshot 1 of 2');
 });
 
 test('F1 edge: a refresh that shrinks the media on screen still remembers where it was left', async ({ page }) => {
@@ -3760,69 +3765,69 @@ test('F1 edge: a refresh that shrinks the media on screen still remembers where 
   });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s3');
-  const counter = page.locator('.lb-counter');
-  await expect(counter).toHaveText('Screenshot 3 of 3');
+  const counter = page.locator('.lb-status');
+  await expect(counter).toContainText('Screenshot 3 of 3');
   shrunk = true;
   await refreshBehindLightbox(page);
-  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await expect(counter).toContainText('Screenshot 2 of 2');
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.lb-caption-text')).not.toHaveText('Hades');
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
-  await expect(counter).toHaveText('Screenshot 2 of 2');
+  await expect(counter).toContainText('Screenshot 2 of 2');
 });
 
 test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {
   // Hollow Knight (screenshots), Hades, Terraria (a trailer).
   await asPlayer(page, ALICE, { recentGames: [367520, 1145360, 105600] });
   await page.goto('/game/367520?shot=s1');
-  const counter = page.locator('.lb-counter');
+  const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 1 / 3');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Hades');
-  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await expect(counter).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
-  await expect(counter).toHaveText('Screenshot 1 of 2');
+  await expect(counter).toContainText('Screenshot 1 of 2');
   await page.keyboard.press('ArrowLeft');
-  await expect(counter).toHaveText('Trailer 1 of 1');
+  await expect(counter).toContainText('Trailer 1 of 1');
   await page.keyboard.press('ArrowUp');
   await expect(name).toHaveText('Hades');
-  await expect(counter).toHaveText('Trailer 1 of 1');
+  await expect(counter).toContainText('Trailer 1 of 1');
 });
 
 test('F1 edge: paging games from the Cover keeps showing covers', async ({ page }) => {
   let media = false;
   await asPlayer(page, ALICE, { recentGames: [1145360, 105600, 367520] });
   await page.goto('/game/1145360?shot=banner');
-  const counter = page.locator('.lb-counter');
+  const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
-  await expect(counter).toHaveText('Cover');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 1 / 3');
+  await expect(counter).toContainText('Cover');
   for (const next of ['Terraria', 'Hollow Knight']) {
     await page.keyboard.press('ArrowDown');
     await expect(name).toHaveText(next);
-    await expect(counter).toHaveText('Cover');
+    await expect(counter).toContainText('Cover');
   }
   // Onto a game whose media is still loading: its media arriving doesn't move off the Cover.
   await terrariaMediaOnRefresh(page, () => media);
   await page.goto('/lists/owned?game=1145360&shot=banner');
-  await expect(counter).toHaveText('Cover');
+  await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
   media = true;
   await refreshBehindLightbox(page);
   await expect(page.locator('#screenshot-lightbox .lb-next')).toBeEnabled();
-  await expect(counter).toHaveText('Cover');
+  await expect(counter).toContainText('Cover');
 });
 
 test('F1 edge: stepping past the last media or game slides back in from the other side', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 2 of 3');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 2 / 3');
   await page.keyboard.press('End');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 3 of 3');
   const anims = async (step: () => Promise<void>) => {
     await page.locator('#screenshot-lightbox .lb-img').evaluate((img) => {
       const w = window as unknown as { lbAnims: string[] };
@@ -3835,15 +3840,15 @@ test('F1 edge: stepping past the last media or game slides back in from the othe
   expect(
     await anims(async () => {
       await page.keyboard.press('ArrowRight');
-      await expect(page.locator('.lb-counter')).toHaveText('Cover');
+      await expect(page.locator('.lb-status')).toContainText('Cover');
     }),
   ).toContain('lb-img lb-anim-left');
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 3 of 3');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 3 / 3');
   expect(
     await anims(async () => {
       await page.keyboard.press('ArrowDown');
-      await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+      await expect(page.locator('.lb-caption-pos')).toHaveText('game 1 / 3');
     }),
   ).toContain('lb-img lb-anim-top');
 });
@@ -3854,7 +3859,7 @@ test('F1 edge: on a phone, a swipe past the last media or game slides in with th
   test.skip(testInfo.project.name !== 'phone', 'touch only');
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s3');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 3 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 3 of 3');
   const img = page.locator('#screenshot-lightbox .lb-img');
   const cdp = await page.context().newCDPSession(page);
   const swipe = async (points: [number, number][]) => {
@@ -3880,10 +3885,10 @@ test('F1 edge: on a phone, a swipe past the last media or game slides in with th
     [cx - 20, cy],
     [cx - 100, cy],
   ]);
-  await expect(page.locator('.lb-counter')).toHaveText('Cover');
+  await expect(page.locator('.lb-status')).toContainText('Cover');
   expect(await anims()).toContain('lb-img lb-anim-right');
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 3 of 3');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 3 / 3');
   // Up, past the last game: game 1 comes in from the bottom.
   await swipe([
     [cx, cy + 60],
@@ -3891,7 +3896,7 @@ test('F1 edge: on a phone, a swipe past the last media or game slides in with th
     [cx, cy - 20],
     [cx, cy - 100],
   ]);
-  await expect(page.locator('.lb-caption-pos')).toHaveText('Game 1 of 3');
+  await expect(page.locator('.lb-caption-pos')).toHaveText('game 1 / 3');
   expect(await anims()).toContain('lb-img lb-anim-bottom');
 });
 
@@ -3912,7 +3917,7 @@ test('F1 edge: stepping games with hidden controls flashes the game name too', a
   await expect(caption).toHaveCSS('opacity', '1');
   // A media step before the flash ends shows the counter alone again.
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.lb-counter')).toHaveText(/^Screenshot 2 of/);
+  await expect(page.locator('.lb-status')).toContainText(/Screenshot 2 of/);
   // Read once: a retrying assertion would just wait out the flash (the clock keeps running).
   expect(await lb.getAttribute('class')).not.toMatch(/lb--stepped-game/);
   await page.clock.runFor(2000);
@@ -3943,7 +3948,7 @@ test('F1 edge: the mouse brings back only the controls near it', async ({ page }
   await page.mouse.move(1420, 450);
   expect(await shown()).toEqual(['.lb-next']);
   await page.locator('.lb-next').click();
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
 });
 
 test('F1 edge: on a phone, a swipe steps without bringing the controls back, and a tap does', async ({
@@ -3963,7 +3968,7 @@ test('F1 edge: on a phone, a swipe steps without bringing the controls back, and
   for (const x of [260, 200, 120])
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 2 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -4022,25 +4027,31 @@ test('F1 edge: on a phone, the previous/next media buttons sit clear of the medi
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
-  const clear = async (media: string) => {
-    const m = (await page.locator(media).boundingBox())!;
-    for (const name of ['Previous screenshot', 'Next screenshot']) {
-      const b = (await page.getByRole('button', { name }).boundingBox())!;
-      expect(b.y >= m.y + m.height || b.y + b.height <= m.y, `${name} vs ${media}`).toBe(true);
+  const overlap = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  type Box = { x: number; y: number; width: number; height: number };
+  const clear = async (selector: string) => {
+    for (const el of await page.locator(selector).all()) {
+      const m = (await el.boundingBox())!;
+      for (const name of ['Previous screenshot', 'Next screenshot']) {
+        const b = (await page.getByRole('button', { name }).boundingBox())!;
+        expect(overlap(b, m), `${name} vs ${selector}`).toBe(false);
+      }
     }
   };
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await clear('#screenshot-lightbox .lb-img');
   await page.goto('/lists/owned?game=1145360&shot=v1');
   await page.getByRole('button', { name: 'Play trailer' }).click();
-  await clear('#screenshot-lightbox .lb-vctrls');
+  // At the ends of the trailer's control row.
+  await clear('#screenshot-lightbox .lb-vctrls > *');
 });
 
 test("F1 edge: the viewer's toolbar holds only fullscreen, zoom and close", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   // The address bar already holds the media's link (`?shot=`), so there is no copy button.
-  const buttons = page.locator('.lb-toolbar-left button, .lb-toolbar-right button');
+  const buttons = page.locator('.lb-toolbar-right button');
   await expect(buttons.first()).toBeVisible();
   expect(await buttons.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))).toEqual([
     'Enter fullscreen',
@@ -4049,19 +4060,14 @@ test("F1 edge: the viewer's toolbar holds only fullscreen, zoom and close", asyn
   ]);
 });
 
-test('F1 edge: on desktop, a trailer sits between the toolbar and its controls, not under them', async ({
-  page,
-}, testInfo) => {
+test('F1 edge: a trailer fills the window, fullscreen or not, its controls over it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop layout');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
   await page.getByRole('button', { name: 'Play trailer' }).click();
   const video = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
-  const toolbar = (await page.locator('.lb-toolbar').boundingBox())!;
-  const controls = (await page.locator('.lb-vctrls').boundingBox())!;
-  expect(video.y).toBeGreaterThanOrEqual(toolbar.y + toolbar.height);
-  expect(video.y + video.height).toBeLessThanOrEqual(controls.y);
+  expect(video).toEqual({ x: 0, y: 0, width: 1440, height: 900 });
 });
 
 test('I2 edge: Space on a focused lightbox button presses that button, not play/pause', async ({ page }, testInfo) => {
@@ -4136,7 +4142,7 @@ test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", as
         return [Math.round(r.x), Math.round(r.y)];
       }),
     );
-  await expect(page.locator('.lb-caption-pos')).toHaveText(/^Game \d+ of 6$/);
+  await expect(page.locator('.lb-caption-pos')).toHaveText(/^game \d+ \/ 6$/);
   const first = await boxes();
   const names = new Set<string>();
   for (let i = 0; i < 6; i++) {
@@ -4153,7 +4159,7 @@ test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", as
     ['End', 'Screenshot 24 of 24'],
   ]) {
     await page.keyboard.press(key);
-    await expect(page.locator('.lb-counter')).toHaveText(label);
+    await expect(page.locator('.lb-status')).toContainText(label);
     expect(await boxes()).toEqual(first);
   }
 });
@@ -4167,14 +4173,19 @@ test('F1 edge: nothing of the page shows around the media', async ({ page }) => 
 test("F1 edge: the lightbox's counters say what they count", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
-  await expect(page.locator('.lb-caption-pos')).toHaveText(/^Game \d+ of 6$/);
-  // Each kind is numbered on its own: the banner, then trailers, then screenshots.
-  await expect(page.locator('.lb-counter')).toHaveText('Trailer 1 of 1');
+  // Two fractions side by side: the game's one says so.
+  await expect(page.locator('.lb-caption-pos')).toHaveText(/^game \d+ \/ 6$/);
+  await expect(page.locator('.lb-counter')).toHaveText('2 / 5');
+  // Read out in full, the game named once: each kind numbered on its own (the banner, trailers, screenshots).
+  const status = page.locator('#screenshot-lightbox [role="status"]');
+  await expect(status).toHaveText(/^Hades, game \d+ of 6, Trailer 1 of 1$/);
   await page.getByRole('button', { name: 'Next screenshot' }).click();
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(status).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-counter')).toHaveText('3 / 5');
   await page.getByRole('button', { name: 'Previous screenshot' }).click();
   await page.getByRole('button', { name: 'Previous screenshot' }).click();
-  await expect(page.locator('.lb-counter')).toHaveText('Cover');
+  await expect(status).toHaveText('Cover');
+  await expect(page.getByRole('dialog', { name: 'Hades media viewer' })).toBeVisible();
 });
 
 test('F1 edge: a paused trailer offers a large play button', async ({ page }) => {
@@ -4245,7 +4256,7 @@ test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls 
   for (const x of [260, 200, 120])
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
 });
 
@@ -4253,13 +4264,13 @@ test('F1 edge: arrows seek a trailer only while it plays, and step past it other
   await fakePlayback(page);
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
-  const counter = page.locator('.lb-counter');
+  const counter = page.locator('.lb-status');
   await page.getByRole('button', { name: 'Play trailer' }).click();
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toHaveText('Trailer 1 of 1');
+  await expect(counter).toContainText('Trailer 1 of 1');
   await page.locator('.lb-vc-play').click(); // pause
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toHaveText('Screenshot 1 of 3');
+  await expect(counter).toContainText('Screenshot 1 of 3');
 });
 
 test('F1 edge: a trailer pauses when the page is hidden, and stays paused', async ({ page }) => {
@@ -4866,7 +4877,15 @@ test('I2 edge: Tab cycles the lightbox controls on a game with a single item', a
     await page.keyboard.press('Tab');
     seen.push(await focused());
   }
-  expect(seen).toEqual(['Previous game', 'Next game', 'Enter fullscreen', 'Zoom', 'Close lightbox', 'Previous game']);
+  // No Zoom: the cover is shown at its full size.
+  expect(seen).toEqual([
+    'Previous game',
+    'Next game',
+    'Enter fullscreen',
+    'Close lightbox',
+    'Previous game',
+    'Next game',
+  ]);
 });
 
 test('I2 edge: a focused lightbox control stays visible while the controls idle out', async ({ page }, testInfo) => {
@@ -4889,7 +4908,7 @@ test('I2 edge: the lightbox is modal; ? opens the shortcuts over it, and Esc clo
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const lb = page.locator('#screenshot-lightbox');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   expect(await lb.evaluate((d) => d.matches(':modal'))).toBe(true); // the page behind is inert
   await page.keyboard.press('?');
   const shortcuts = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
@@ -4898,7 +4917,7 @@ test('I2 edge: the lightbox is modal; ? opens the shortcuts over it, and Esc clo
   await page.keyboard.press('Escape');
   await expect(shortcuts).toBeHidden();
   await expect(lb).toHaveAttribute('open');
-  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('Escape');
   await expect(lb).not.toHaveAttribute('open');
   await expect(page.locator('#panel-title')).toHaveText('Hades');

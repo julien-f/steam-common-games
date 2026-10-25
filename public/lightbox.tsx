@@ -254,10 +254,15 @@ function lockLbLandscape() {
 
 // ── Load errors (image/video) ──────────────────────────────────────────────
 
+function setLbLoading(lb: HTMLElement, on: boolean) {
+  lb.classList.toggle('lb--loading', on);
+  lbSurface(lb).ariaBusy = String(on);
+}
+
 function showLbError(msg: string) {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  lb.classList.remove('lb--loading');
+  setLbLoading(lb, false);
   const err = lb.querySelector<HTMLElement>('.lb-error')!;
   err.querySelector<HTMLElement>('.lb-error-msg')!.textContent = msg;
   err.style.display = 'flex';
@@ -293,18 +298,19 @@ function loadLbImage(src: string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const token = ++lbImgToken;
-  lb.classList.add('lb--loading');
+  setLbLoading(lb, true);
   const full = new Image();
   full.onload = () => {
     if (token !== lbImgToken) return;
     img.src = src;
     img.style.opacity = '1';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
+    syncLbZoomBtn(lb);
   };
   full.onerror = () => {
     if (token !== lbImgToken) return;
     img.style.opacity = '0';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
     showLbError("Couldn't load this image.");
   };
   full.src = src;
@@ -329,6 +335,7 @@ function applyLbTransform() {
     img.style.transform = `scale(${lbZoom}) translate(${lbPanX / lbZoom}px, ${lbPanY / lbZoom}px)`;
     img.style.cursor = 'grab';
   }
+  syncLbZoomBtn(img.closest('#screenshot-lightbox')!);
 }
 
 function resetLbZoom() {
@@ -352,6 +359,13 @@ function lbZoomTowardPoint(clientX: number, clientY: number) {
 function toggleLbZoomAt(clientX: number, clientY: number) {
   if (lbZoom > 1) resetLbZoom();
   else lbZoomTowardPoint(clientX, clientY);
+}
+
+// Shown only where zooming reveals more: a still drawn below its natural size.
+function syncLbZoomBtn(lb: HTMLElement) {
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const shrunk = lbShowingImage() && img.naturalWidth > img.offsetWidth + 1;
+  lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shrunk || lbZoom > 1 ? '' : 'none';
 }
 
 // The visible way to what double-click, double-tap and pinch do: 2x on the image's centre, or back.
@@ -466,25 +480,25 @@ function LightboxDom() {
           media viewer
         </span>
         <div class="lb-backdrop" />
-        <button class="lb-btn lb-prev" aria-label="Previous screenshot">
+        <button class="lb-btn lb-glass lb-prev" aria-label="Previous screenshot">
           <ChevronLeft />
         </button>
         <img class="lb-img" src="" alt="Screenshot" />
         <video class="lb-video" playsinline />
-        <button class="lb-btn lb-next" aria-label="Next screenshot">
+        <button class="lb-btn lb-glass lb-next" aria-label="Next screenshot">
           <ChevronRight />
         </button>
-        <div class="lb-error" style={{ display: 'none' }} role="alert">
+        <div class="lb-error lb-glass" style={{ display: 'none' }} role="alert">
           <p class="lb-error-msg" />
           <button class="lb-error-retry">Retry</button>
         </div>
-        <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
+        <div class="lb-seek-flash lb-glass lb-seek-flash-left" aria-hidden="true">
           <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
         </div>
-        <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
+        <div class="lb-seek-flash lb-glass lb-seek-flash-right" aria-hidden="true">
           {LB_TOUCH_SEEK_SECONDS}s <FastForward />
         </div>
-        <button class="lb-bigplay" aria-label="Play trailer">
+        <button class="lb-bigplay lb-glass" aria-label="Play trailer">
           <Play />
         </button>
         <div class="lb-vctrls" style={{ display: 'none' }}>
@@ -502,38 +516,33 @@ function LightboxDom() {
           </button>
         </div>
         <div class="lb-toolbar">
-          {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
-            control on the thing it changes, and cover the axis the edge ‹ › don't (they step
-            media within one game). Both buttons are hidden when there's no list to page
-            through — see `_getGamePosition`. */}
-          <div class="lb-caption">
+          {/* The list stepper, on the thing it changes; ↑/↓ first, so they stay put whatever the name's length. */}
+          <div class="lb-caption lb-glass">
             <button class="lb-game-prev" aria-label="Previous game">
               <ChevronUp />
             </button>
-            <span class="lb-caption-text" id="lb-caption-text" />
-            <span class="lb-caption-pos" />
             <button class="lb-game-next" aria-label="Next game">
               <ChevronDown />
             </button>
+            <span class="lb-caption-text" id="lb-caption-text" />
+            <span class="lb-caption-pos" />
           </div>
-          <div class="lb-toolbar-row">
-            <div class="lb-toolbar-left">
-              <button class="lb-fullscreen" aria-label="Enter fullscreen">
-                <Maximize class="lb-icon-off" />
-                <Minimize class="lb-icon-on" />
-              </button>
-            </div>
-            <div class="lb-counter" aria-live="polite" aria-atomic="true" />
-            <div class="lb-toolbar-right">
-              <button class="lb-zoom" aria-label="Zoom" aria-pressed="false">
-                <ZoomIn />
-              </button>
-              <button class="lb-close" aria-label="Close lightbox">
-                <X />
-              </button>
-            </div>
+          {/* Its full wording ("Screenshot 3 of 12") is the status line's, below. */}
+          <div class="lb-counter lb-glass" aria-hidden="true" />
+          <div class="lb-toolbar-right">
+            <button class="lb-fullscreen lb-glass" aria-label="Enter fullscreen">
+              <Maximize class="lb-icon-off" />
+              <Minimize class="lb-icon-on" />
+            </button>
+            <button class="lb-zoom lb-glass" aria-label="Zoom" aria-pressed="false">
+              <ZoomIn />
+            </button>
+            <button class="lb-close lb-glass" aria-label="Close lightbox">
+              <X />
+            </button>
           </div>
         </div>
+        <p class="lb-status visually-hidden" role="status" />
       </div>
     </dialog>
   );
@@ -1062,6 +1071,7 @@ function mountLightboxDom(): () => void {
   wireMouseHandlers(lb);
   wireTouchHandlers(lb);
   wireVideoControls(lb);
+  window.addEventListener('resize', () => isLightboxOpen() && syncLbZoomBtn(lb), { signal: _lbSignal });
   return dispose;
 }
 
@@ -1164,16 +1174,11 @@ export function closeLightbox() {
   stopHls(lbVideoEl);
   detachLbVideo();
   lb.close();
-  lb.classList.remove(
-    'lb--loading',
-    'lb-idle',
-    'lb--paused',
-    'lb--unstarted',
-    'lb--stepped',
-    'lb--stepped-game',
-    'lb-pointer',
-  );
+  setLbLoading(lb, false);
+  lb.classList.remove('lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb--stepped-game', 'lb-pointer');
   lbRenderedAppid = undefined;
+  clearTimeout(lbStatusTimer);
+  lb.querySelector('.lb-status')!.textContent = '';
   document.body.classList.remove('lb-open');
   if (isFullscreen()) exitFullscreen();
   _onLightboxParamChange(null);
@@ -1220,16 +1225,27 @@ function gotoLightbox(target: number) {
 // counter says nothing about. Split out because it's the one part reading the host's list
 // position: that read must stay tracked for the position to follow a list still streaming in,
 // and must not drag a full image reload along with it each time. Two text writes, no media.
+// One status line, debounced so holding → doesn't queue every step; it names the game only when it changes.
+let lbStatusTimer: ReturnType<typeof setTimeout> | undefined;
+let lbStatusGame = '';
+function announceLb(lb: HTMLElement, game: string, media: string) {
+  if (game) lbStatusGame = game;
+  clearTimeout(lbStatusTimer);
+  lbStatusTimer = setTimeout(() => {
+    lb.querySelector('.lb-status')!.textContent = lbStatusGame + media;
+    lbStatusGame = '';
+  }, 300);
+}
+
 function renderLbCaption() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   const name = gameName();
   const pos = _getGamePosition();
   const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
-  // as a pair and neither is mistaken for part of the title beside it.
+  // "game", or it couldn't be told from the media counter beside it.
   const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
-  posEl.textContent = pos ? `Game ${pos.index + 1} of ${pos.total}` : '';
+  posEl.textContent = pos ? `game ${pos.index + 1} / ${pos.total}` : '';
   posEl.style.display = pos ? '' : 'none';
   caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
   caption.style.display = name || pos ? '' : 'none';
@@ -1263,7 +1279,8 @@ function renderLightbox() {
   lbLastAxis = 'x';
   resetLbZoom();
   const appid = lbGame()?.appid;
-  flashLbCounter(lb, appid !== lbRenderedAppid);
+  const gameChanged = appid !== lbRenderedAppid;
+  flashLbCounter(lb, gameChanged);
   lbRenderedAppid = appid;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
@@ -1277,10 +1294,9 @@ function renderLightbox() {
   const pos = untrack(() => _getGamePosition());
   const label =
     `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
-  lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shot.type === 'video' ? 'none' : '';
   if (shot.type === 'video') {
     img.style.display = 'none';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
     attachLbVideo();
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
@@ -1329,7 +1345,15 @@ function renderLightbox() {
     loadLbImage(shot.main!);
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent = mediaLabel(list, i);
+  syncLbZoomBtn(lb);
+  const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
+  counter.textContent = `${i + 1} / ${list.length}`;
+  counter.style.display = list.length > 1 ? '' : 'none';
+  announceLb(
+    lb,
+    gameChanged && name ? `${name}, ${pos ? `game ${pos.index + 1} of ${pos.total}, ` : ''}` : '',
+    mediaLabel(list, i),
+  );
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,
