@@ -548,6 +548,8 @@ function wireKeyboard(lb: HTMLElement) {
     'keydown',
     (e) => {
       if (!isLightboxOpen()) return;
+      // Ctrl/⌘/Alt+key is the browser's (reload, find, print); Shift is part of some bindings.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
 
       // Focus trap
@@ -603,8 +605,8 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         stepGameFromLightbox(_onGameRandom);
       }
-      // Presents it instead: the presentation window stands in for the lightbox. Ctrl/⌘+P prints.
-      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Presents it instead: the presentation window stands in for the lightbox.
+      if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         // panelKeyboard.ts's P would present again once the lightbox is closed.
         e.stopImmediatePropagation();

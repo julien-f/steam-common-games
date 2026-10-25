@@ -3602,6 +3602,23 @@ test('F1 edge: after ↓ finds no game to step to, → still slides the next scr
   expect(anims).toContain('lb-img lb-anim-right');
 });
 
+test('F1 edge: the lightbox leaves Ctrl/⌘/Alt shortcuts to the browser', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+  await page.evaluate(() => {
+    const w = window as unknown as { taken: string[] };
+    w.taken = [];
+    addEventListener('keydown', (e) => e.defaultPrevented && w.taken.push(e.key));
+  });
+  for (const key of ['Control+r', 'Control+f', 'Meta+ArrowRight', 'Alt+ArrowDown', 'Control+z']) {
+    await page.keyboard.press(key);
+  }
+  expect(await page.evaluate(() => (window as unknown as { taken: string[] }).taken)).toEqual([]);
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(page.locator('.lb-counter')).toHaveText('Screenshot 1 of 3');
+});
+
 test('F1 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
