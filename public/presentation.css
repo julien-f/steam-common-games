@@ -1,0 +1,68 @@
+/* The presentation window (present.html): media on black, read from across a room. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #e6ebf2;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Cantarell,
+    'Noto Sans',
+    sans-serif;
+  overflow: hidden;
+}
+
+.pres {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+  cursor: none;
+}
+.pres--awake {
+  cursor: default;
+}
+
+.pres-media {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pres-media[hidden] {
+  display: none;
+}
+
+/* The game's name, on a change or a mouse move, then gone with the cursor. */
+.pres-caption {
+  position: absolute;
+  left: 4vw;
+  bottom: 4vh;
+  margin: 0;
+  padding: 0.3em 0.7em;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.6);
+  font-size: clamp(20px, 3vw, 48px);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 400ms;
+}
+.pres--awake .pres-caption {
+  opacity: 1;
+}
+
+/* Over the poster or the black, until something else is presented. */
+.pres-error {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 0.3em 0.7em;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.6);
+  font-size: clamp(20px, 3vw, 48px);
+  font-weight: 600;
+}

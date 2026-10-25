@@ -153,6 +153,20 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Done when**: how alike players are is a count of top tags they share, never an uncalibrated score; each suggestion says who played it, how long, and whether the player owns it.
 - **Edges**: a player without a profile (says why); no shared favourites ("none yet"); **Intersect** or **Subtract** (the profiles need whole libraries).
 
+### C8 Present games on a second screen while I browse
+
+- **Who / goal**: the host of a game night shows trailers and screenshots on a second screen to the people in the room, while freely browsing the app on their own; the second screen changes only when they present something.
+- **Steps**:
+  1. open a game's panel
+  2. **P** (or the panel's cast button): the presentation window opens on the panel's media
+  3. drag it to the second screen, click it for fullscreen
+  4. browse other games and lists; the presentation doesn't move
+  5. open a media from the panel: it's presented instead of opening the lightbox
+  6. present another game
+  7. stop presenting from the nav bar's ×
+- **Done when**: the second screen changed only when something was presented and stayed fullscreen through it; the nav bar names the game presented; nothing's left after stopping.
+- **Edges**: Ctrl+P (the browser's print); pop-ups blocked; the presentation window reloaded, closed or crashed (the nav bar forgets it); the main window reloaded (it remembers) or closed (the presentation closes); P right after reloading the main window (no second window); a second tab of the app (doesn't drive this window); Esc on the presentation; a trailer that fails (says so); P in the lightbox (presents it, closes the lightbox); a phone (no Present button).
+
 ## Lists
 
 ### L1 Build a manual list

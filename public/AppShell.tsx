@@ -25,6 +25,7 @@ import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
 import { AccountChip } from './AccountChip.tsx';
+import { PresentationChip } from './PresentationChip.tsx';
 import { initAuth } from './authStore.ts';
 import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
@@ -312,6 +313,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             <SearchClearButton />
             <div id="app-search-results" class="game-search-results" hidden />
           </search>
+          <PresentationChip />
           <AccountChip />
           <div class="site-nav-prefs site-nav-popover">
             <button

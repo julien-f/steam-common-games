@@ -33,6 +33,7 @@ const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['↑', '↓'], label: 'Previous / next game in the list' },
       { keys: ['←', '→'], label: 'Previous / next media' },
       { keys: ['Enter'], label: 'Open the focused table row, or the focused image in the lightbox' },
+      { keys: ['P'], label: 'Present this media on a second screen' },
     ],
   },
   {
@@ -58,6 +59,7 @@ const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['Z'], label: 'Zoom the screenshot in / out' },
       { keys: ['Space'], label: 'Play / pause video' },
       { keys: ['M'], label: 'Mute / unmute video' },
+      { keys: ['P'], label: 'Present this media on a second screen' },
       { keys: ['Esc'], label: 'Close lightbox' },
     ],
   },

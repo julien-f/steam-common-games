@@ -113,7 +113,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `loadProgress.ts` — the details stream's progress bar and time left.
 - `priceLoading.ts` — the `POST /api/prices` call and the row-field mapping/fallbacks around it.
 - `panel.tsx` / `panelData.ts` / `panelNav.ts` / `panelHistory.ts` / `panelKeyboard.ts` / `ownerList.ts` — the side panel and its per-game data, prev/next nav, DLC trail rule, keyboard handler, and the pure half of the "Owned by" card.
-- `lightbox.tsx` / `mediaItems.ts` / `lightboxSwipe.ts` — screenshot/video lightbox, its ordered media list, and its swipe thresholds/decision.
+- `lightbox.tsx` / `mediaItems.ts` / `lightboxSwipe.ts` / `hlsPlayer.ts` — screenshot/video lightbox, its ordered media list, its swipe thresholds/decision, and trailer playback (shared with the presentation window).
+- `presentation.ts` / `presentationProtocol.ts` / `PresentationChip.tsx` / `PresentationView.tsx` — presenting on a second screen: the main window's side and the nav chip, their messages, and the presentation window itself (see [The presentation window](#the-presentation-window)).
 - `overlayHistory.ts` — the history entry each open overlay pushes (see the side panel).
 - `viewTransition.ts` / `artTint.ts` — the shared-element morphs into the panel and the lightbox; the panel ground's tint from the game's art.
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
@@ -363,6 +364,19 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
 - Every game step goes through `stepGameFromLightbox`, which puts focus back inside the overlay — the host's step opens the panel behind it, and `panelOpen` focuses the panel's hero, out of the focus trap.
 
 `mediaItems.ts` builds the ordered media list and resolves a shot id to an index; the hero uses `meta.banner` (Steam's `header_image`, resolved server-side) once metadata loads, guessing the conventional CDN path only as a placeholder — that guess 404s for games on newer asset pipelines.
+
+## The presentation window
+
+A second window (`present.html`, its own Vite entry: `PresentationView.tsx`): a lightbox on another screen, showing the one media the main window last presented ([features.md](../user/features.md#presenting-on-a-second-screen)). It has no control but fullscreen.
+
+- **Its own entry, not a route**: the SPA shell would bring the nav, the panel and `overlayHistory.ts`'s popstate listener; `PresentationView.tsx` imports neither `panel.tsx` nor `lightbox.tsx`, only `hlsPlayer.ts` and `presentationProtocol.ts`.
+- **Its DOM is never rebuilt** (one `<img>`, one `<video>`, hidden in turn): the browser drops fullscreen when the fullscreen element leaves the document.
+- **It stands in for the lightbox** while presenting: the hero's open presents its media instead, so no trailer plays in both windows. P and the panel's cast button present the hero's media (`presentHero`).
+- **The main window owns what's presented** (`presented()`, read by the nav chip): set on `present`, before the window even answers, so a second P can't `window.open` it again. `present` also sends to the window `window.open` returned while it's open, even after main forgot it (missed beats): reopening it by name would reload it out of fullscreen.
+- **One `BroadcastChannel`, tagged with the main window's id** (`?main=` on its URL, kept in `sessionStorage` so a reload keeps driving the same window): another tab's window ignores it. Stop starts a new id, so a closing window's last `bye` and heartbeat go unheard. A duplicated tab copies `sessionStorage`, so both tabs drive the same window, which still closes with the tab that opened it.
+  - Main → window: `onAir` (one `buildMediaItems` item, a plain object: store rows are proxies, which `postMessage` can't clone), `close` (it closes itself; Stop also closes it through `window.open`'s handle, which reaches a window still loading but not one opened before a main-window reload), `main` (back after a reload; it answers with its state at once, or a P before its next heartbeat would `window.open` it again, reloading it out of fullscreen).
+  - Window → main: `hello` (main re-sends what's presented, so a reloaded window resumes), `state` every 5 s as a heartbeat echoing what it shows (so a reloaded main window learns it), `bye` (forgotten after 2 s without a `hello`: a reload says both, in that order). Main drops it after 3 missed beats, judged only while main is visible (a hidden tab's timers are throttled); `bye` alone misses a crash. It closes itself on a heartbeat once its opener is gone (Chromium nulls `opener`, others report it `closed`; a reload of main keeps it) — unverified: whether Chrome's Memory Saver discarding the main tab counts as gone.
+- **Sound**: browsers refuse an unmuted autoplay before a first click or key in that window (the main window's doesn't count), so a trailer starts muted until `navigator.userActivation.hasBeenActive`; the click toggling fullscreen unmutes it.
 
 ## URL & sharing
 

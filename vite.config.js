@@ -1,7 +1,7 @@
 'use strict';
 
-// Builds public/'s single HTML entry (the SPA shell — see public/App.tsx/AppShell.tsx)
-// into dist/ — a real bundled/hashed production build in place of the hand-rolled import-map
+// Builds public/'s HTML entries (the SPA shell — see public/App.tsx/AppShell.tsx — and present.html,
+// the presentation window's own page) into dist/ — a real bundled/hashed production build in place of the hand-rolled import-map
 // + /vendor/* static-route resolution this app used before the frontend moved to
 // TypeScript/Vite (both retired once nothing resolved through them anymore — see server.js's
 // own STATIC_DIR comment). Used to be four separate HTML entry points (one full page reload
@@ -88,8 +88,11 @@ module.exports = defineConfig({
   build: {
     outDir: '../dist',
     emptyOutDir: true,
-    // Only chunk over the 500 kB default is hls.js, lazy-imported by lightbox.tsx and never
+    // Only chunk over the 500 kB default is hls.js, lazy-imported by hlsPlayer.ts and never
     // in the initial load; 600 keeps a warning on every other chunk (the largest, data-table, is ~120 kB).
     chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      input: { main: path.join(__dirname, 'public/index.html'), present: path.join(__dirname, 'public/present.html') },
+    },
   },
 });
