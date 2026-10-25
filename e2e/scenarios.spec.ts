@@ -4828,6 +4828,20 @@ test('I2 edge: Tab cycles the lightbox controls on a game with a single item', a
   expect(seen).toEqual(['Previous game', 'Next game', 'Enter fullscreen', 'Zoom', 'Close lightbox', 'Previous game']);
 });
 
+test('I2 edge: a focused lightbox control stays visible while the controls idle out', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.lb-surface')).toBeFocused();
+  await page.keyboard.press('Tab');
+  const focused = page.locator('#screenshot-lightbox button:focus-visible');
+  await expect(focused).toHaveCount(1);
+  await page.clock.runFor(4000);
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb-idle/);
+  await expect(focused).toHaveCSS('opacity', '1');
+});
+
 test('I2 edge: the lightbox is modal; ? opens the shortcuts over it, and Esc closes the innermost', async ({
   page,
 }) => {

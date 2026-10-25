@@ -415,7 +415,11 @@ function schedHideLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   clearTimeout(lbVcTimer);
-  lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
+  lbVcTimer = setTimeout(() => {
+    // A keyboard user's focused control stays in sight (WCAG 2.4.7); checked again later.
+    if (lb.querySelector('button:focus-visible, input:focus-visible')) schedHideLbChrome();
+    else lb.classList.add('lb-idle');
+  }, 3000);
 }
 
 // With the chrome idle, a step flashes only the counter, plus the game's name on a game step.
