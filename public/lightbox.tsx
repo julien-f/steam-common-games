@@ -62,8 +62,7 @@ let lbZoom = 1,
   lbPanY = 0,
   lbLastDir = 0,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
-  lbCounterTimer: ReturnType<typeof setTimeout> | undefined,
-  lbPointerTimer: ReturnType<typeof setTimeout> | undefined;
+  lbCounterTimer: ReturnType<typeof setTimeout> | undefined;
 // Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
@@ -106,6 +105,11 @@ const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
 // A tap on a video's side third waits out a possible second tap (a seek) before playing or pausing.
 let lbVideoTapTimer: ReturnType<typeof setTimeout> | undefined;
+
+// The viewer drives it by keyboard: no chrome then, only brief feedback (`osdLb`); a pointer or a touch ends it.
+let lbByKey = false;
+let lbChromeTapTimer: ReturnType<typeof setTimeout> | undefined;
+const LB_HINT_KEY = 'steam.isonoe.net:lightbox-hint-seen';
 
 // No-ops until initLightbox sets them; nothing can open the lightbox before that.
 let _onLightboxParamChange: (shotId: string | null) => void = () => {};
@@ -151,6 +155,11 @@ export function initLightbox({
   _lbTeardown?.();
   const abort = new AbortController();
   _lbSignal = abort.signal;
+  document.addEventListener('keydown', (e) => e.key !== 'Tab' && (lbByKey = true), {
+    capture: true,
+    signal: _lbSignal,
+  });
+  document.addEventListener('pointerdown', () => (lbByKey = false), { capture: true, signal: _lbSignal });
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('fullscreenchange', lockLbLandscape, { signal: _lbSignal });
@@ -377,14 +386,11 @@ function toggleLbZoom() {
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
 
-const LB_POINTER_ZONE = 120; // px from an edge within which the mouse brings back that edge's chrome
 const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
 
 function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
   if (!vid) return;
   vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + deltaSeconds));
-  showLbChrome();
-  schedHideLbChrome();
 }
 
 // Transient "⏪10s" / "10s⏩" flash shown on a touch double-tap seek. Each
@@ -428,24 +434,78 @@ function showLbChrome() {
   clearTimeout(lbVcTimer);
 }
 
+function hideLbChrome() {
+  clearTimeout(lbVcTimer);
+  document.getElementById('screenshot-lightbox')?.classList.add('lb-idle');
+}
+
 function schedHideLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   clearTimeout(lbVcTimer);
   lbVcTimer = setTimeout(() => {
-    // A keyboard user's focused control stays in sight (WCAG 2.4.7); checked again later.
-    if (lb.querySelector('button:focus-visible, input:focus-visible')) schedHideLbChrome();
+    // A keyboard user's focused control stays in sight (WCAG 2.4.7), as does one under a mouse (touch leaves
+    // `:hover` stuck on the last tapped); checked again later.
+    const held = matchMedia('(hover: hover)').matches ? ':is(:focus-visible, :hover)' : ':focus-visible';
+    if (lb.querySelector(`:is(button, input)${held}`)) schedHideLbChrome();
     else lb.classList.add('lb-idle');
   }, 3000);
 }
 
+// Shows the chrome for a while — unless the viewer is on the keyboard, which only gets `osdLb`'s feedback.
+function revealLbChrome() {
+  if (lbByKey) return;
+  showLbChrome();
+  schedHideLbChrome();
+}
+
+// A keyboard action's feedback, in place of the chrome: play/pause/mute as an icon, a seek as the time and a line.
+function osdLb(kind: 'play' | 'pause' | 'mute' | 'unmute' | 'seek') {
+  const lb = document.getElementById('screenshot-lightbox');
+  const osd = lb?.querySelector<LbFlashEl>('.lb-osd');
+  if (!osd) return;
+  osd.dataset.kind = kind;
+  if (kind === 'seek') {
+    const vid = lbVideoEl;
+    osd.querySelector('.lb-osd-time')!.textContent = `${fmtTime(vid.currentTime)} / ${fmtTime(vid.duration || 0)}`;
+    osd.style.setProperty('--lb-osd-progress', String(vid.duration ? vid.currentTime / vid.duration : 0));
+  }
+  osd.classList.add('lb-osd--show');
+  clearTimeout(osd._flashTimer);
+  osd._flashTimer = setTimeout(() => osd.classList.remove('lb-osd--show'), 1000);
+}
+
 // With the chrome idle, a step flashes only the counter, plus the game's name on a game step.
 function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
-  if (!lb.classList.contains('lb-idle')) return;
+  if (!lb.classList.contains('lb-idle') || lbRenderedAppid === undefined) return; // a step, not the open
   lb.classList.add('lb--stepped');
   lb.classList.toggle('lb--stepped-game', gameChanged);
   clearTimeout(lbCounterTimer);
   lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped', 'lb--stepped-game'), 1500);
+}
+
+// ── First-open hint ────────────────────────────────────────────────────────
+
+// The one hint at what the hidden controls do, on this device's first open; any action, or 4 s, ends it.
+function showLbHint(lb: HTMLElement) {
+  try {
+    if (localStorage.getItem(LB_HINT_KEY)) return;
+    localStorage.setItem(LB_HINT_KEY, '1');
+  } catch {
+    return; // storage refused: better no hint than one on every open
+  }
+  const hint = lb.querySelector<HTMLElement>('.lb-hint')!;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const games = untrack(() => _getGamePosition()) ? (touch ? 'swipe ↕ games · ' : '↑↓ games · ') : '';
+  hint.textContent = games + (touch ? 'swipe ↔ media' : '←→ media');
+  hint.classList.add('lb-hint--show');
+  const end = () => {
+    hint.classList.remove('lb-hint--show');
+    abort.abort();
+  };
+  const abort = new AbortController();
+  for (const type of ['keydown', 'pointerdown']) lb.addEventListener(type, end, { signal: abort.signal });
+  setTimeout(end, 4000);
 }
 
 // ── Focus helpers ──────────────────────────────────────────────────────────
@@ -543,6 +603,15 @@ function LightboxDom() {
           </div>
         </div>
         <p class="lb-status visually-hidden" role="status" />
+        <div class="lb-osd lb-glass" aria-hidden="true">
+          <Play class="lb-osd-play" />
+          <Pause class="lb-osd-pause" />
+          <VolumeX class="lb-osd-mute" />
+          <Volume2 class="lb-osd-unmute" />
+          <span class="lb-osd-time" />
+          <span class="lb-osd-bar" />
+        </div>
+        <p class="lb-hint lb-glass" aria-hidden="true" />
       </div>
     </dialog>
   );
@@ -585,6 +654,8 @@ function wireKeyboard(lb: HTMLElement) {
       // Ctrl/⌘/Alt+key is the browser's (reload, find, print); Shift is part of some bindings.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
+      // The keyboard gets no chrome; Tab, moving focus onto it, does.
+      if (e.key !== 'Tab' && e.key !== 'Shift') hideLbChrome();
 
       // Focus trap
       if (e.key === 'Tab') {
@@ -620,6 +691,7 @@ function wireKeyboard(lb: HTMLElement) {
         // behavior would otherwise consume a bare arrow key to nudge its value.
         if (vid && !vid.paused && !e.shiftKey) {
           seekVideo(vid, dir * LB_SEEK_SECONDS);
+          osdLb('seek');
         } else {
           stepLightbox(dir);
         }
@@ -656,10 +728,12 @@ function wireKeyboard(lb: HTMLElement) {
         // A focused button takes Space as its own press.
         if (e.key === ' ' && !onScrub && !(e.target as HTMLElement).closest('button')) {
           e.preventDefault();
+          osdLb(vid.paused ? 'play' : 'pause');
           vid.paused ? vid.play().catch(() => {}) : vid.pause();
         }
         if (e.key === 'm' || e.key === 'M') {
           vid.muted = !vid.muted;
+          osdLb(vid.muted ? 'mute' : 'unmute');
         }
       }
     },
@@ -875,6 +949,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
           lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
           if (showingImg) {
+            clearTimeout(lbChromeTapTimer);
             // Or the browser follows up with a dblclick, whose handler would toggle the zoom back.
             e.preventDefault();
             toggleLbZoomAt(endX, endY);
@@ -956,15 +1031,13 @@ function wireVideoControls(lb: HTMLElement) {
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
     if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
-    showLbChrome();
-    schedHideLbChrome();
+    revealLbChrome();
   });
   vid2.addEventListener('ended', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
     syncLbPaused();
-    showLbChrome();
-    schedHideLbChrome();
+    revealLbChrome();
   });
   vid2.addEventListener('volumechange', () => {
     muteBtn.classList.toggle('lb-on', vid2.muted);
@@ -1006,21 +1079,14 @@ function wireVideoControls(lb: HTMLElement) {
     } else toggle();
   });
 
-  // Once the chrome has idled out, the mouse brings back only the part it nears — the toolbar
-  // at the top, an arrow at its edge, a trailer's controls at the bottom — and the cursor.
-  const pointerZones = ['lb-pointer', 'lb-near-top', 'lb-near-bottom', 'lb-near-left', 'lb-near-right'];
+  // Any mouse move brings it all back (as video players do); leaving the window hides it at once.
   lb.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
-    lb.classList.add('lb-pointer');
-    lb.classList.toggle('lb-near-top', e.clientY < LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-bottom', e.clientY > innerHeight - LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-left', e.clientX < LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-right', e.clientX > innerWidth - LB_POINTER_ZONE);
-    clearTimeout(lbPointerTimer);
-    lbPointerTimer = setTimeout(() => lb.classList.remove(...pointerZones), 3000);
+    lbByKey = false;
+    revealLbChrome();
   });
-  lb.addEventListener('mouseleave', () => lb.classList.remove(...pointerZones));
-  // A tap brings the chrome back; a swipe steps media without it.
+  lb.addEventListener('mouseleave', () => isLightboxOpen() && hideLbChrome()); // not the close's own
+  // A tap toggles the chrome (on a trailer, only brings it back: its own tap plays or pauses); a swipe steps media without it.
   let tapRevealedChrome = false;
   let tapX = 0,
     tapY = 0;
@@ -1038,8 +1104,11 @@ function wireVideoControls(lb: HTMLElement) {
     (e) => {
       const t = e.changedTouches[0];
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
-      showLbChrome();
-      schedHideLbChrome();
+      if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
+      if (lbShowingVideo() || tapRevealedChrome) return revealLbChrome();
+      // A still's tap waits out a possible second one (a zoom), which cancels it.
+      clearTimeout(lbChromeTapTimer);
+      lbChromeTapTimer = setTimeout(hideLbChrome, LB_DOUBLE_TAP_MS);
     },
     { passive: true },
   );
@@ -1096,7 +1165,13 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   lbShotChosen = true;
   const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
   // Focuses the surface (`autofocus`): the shortcuts work from there, and nothing shows a ring.
-  if (!lb.open) lb.showModal();
+  if (!lb.open) {
+    lb.showModal();
+    if (lbByKey)
+      hideLbChrome(); // opened from the keyboard: nothing on the media
+    else revealLbChrome();
+    showLbHint(lb);
+  }
   document.body.classList.add('lb-open'); // a modal dialog doesn't stop the page scrolling
   _onLightboxParamChange(newShots[idx()].shotId);
 }
@@ -1175,7 +1250,7 @@ export function closeLightbox() {
   detachLbVideo();
   lb.close();
   setLbLoading(lb, false);
-  lb.classList.remove('lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb--stepped-game', 'lb-pointer');
+  lb.classList.remove('lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb--stepped-game');
   lbRenderedAppid = undefined;
   clearTimeout(lbStatusTimer);
   lb.querySelector('.lb-status')!.textContent = '';

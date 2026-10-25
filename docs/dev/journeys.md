@@ -458,7 +458,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. Esc
   6. rank a pair with keys only
 - **Done when**: focus is always visible and never trapped; Esc closes the innermost thing first.
-- **Edges**: Home's tree, every row's actions behind one ⋯ menu (L1's edge); the lightbox opens with no focus ring until Tab; Ctrl/⌘/Alt shortcuts stay the browser's.
+- **Edges**: Home's tree, every row's actions behind one ⋯ menu (L1's edge); the lightbox opens with no focus ring until Tab and shows no controls while driven by keyboard, only a brief counter after each step; Ctrl/⌘/Alt shortcuts stay the browser's.
 
 ### I3 Screen reader
 

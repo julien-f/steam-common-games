@@ -6,7 +6,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 - One way to do each thing; a second path is a shortcut to the same action, not a variant. A control that states a fact also acts on it (the Updated tile refreshes) instead of a separate button doing so.
 - Every state the user can reach, they can leave: an active filter, sort, group, shared view or selection is visible and undone in one action.
-- No hidden affordances: every keyboard shortcut, swipe and drag has a visible equivalent.
+- No hidden affordances: every keyboard shortcut, swipe and drag has a visible equivalent. The lightbox is the exception, for the media's sake: its controls show for a mouse or a touch and stay off for the keyboard, the `?` dialog lists its keys, and its first open shows a one-time hint.
 - Defaults that work without settings; a new preference is the last resort, not a way to avoid deciding.
 - The user's own setup is never changed behind their back: a shared link or another account shows its view without overwriting theirs, until they choose to keep it.
 

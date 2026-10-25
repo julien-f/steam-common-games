@@ -2939,7 +2939,6 @@
     inset-inline: 0;
     z-index: -1;
     pointer-events: none;
-    transition: opacity var(--dur-3) var(--ease-out);
   }
   .lb-toolbar::before {
     top: 0;
@@ -2962,36 +2961,118 @@
     align-items: center;
     gap: 8px;
     padding: 24px 16px 16px;
-    transition: opacity var(--dur-3) var(--ease-out);
   }
-  /* Idle state (video playing, unattended): hide all chrome + the cursor */
-  /* The toolbar's parts rather than the toolbar, so a step can show the counter (and a game step the caption) alone. */
-  #screenshot-lightbox.lb-idle .lb-vctrls,
-  #screenshot-lightbox.lb-idle .lb-btn,
+  /* Idle (unattended, or keyboard-driven): chrome and cursor hidden, by part so a step can flash the counter alone.
+     In fast, out slower, each part drifting a few pixels toward its edge. */
+  .lb-vctrls,
+  .lb-btn,
+  .lb-toolbar::before,
+  .lb-caption,
+  .lb-toolbar-right,
+  .lb-counter {
+    transition:
+      opacity var(--dur-1) var(--ease-out),
+      translate var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  #screenshot-lightbox.lb-idle :is(.lb-vctrls, .lb-btn, .lb-toolbar-right),
   #screenshot-lightbox.lb-idle .lb-toolbar::before,
   #screenshot-lightbox.lb-idle:not(.lb--stepped-game) .lb-caption,
-  #screenshot-lightbox.lb-idle .lb-toolbar-right,
   #screenshot-lightbox.lb-idle:not(.lb--stepped) .lb-counter {
     opacity: 0;
     pointer-events: none;
+    transition:
+      opacity var(--dur-3) var(--ease-out),
+      translate var(--dur-3) var(--ease-out);
   }
-  #screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-right, .lb-counter, .lb-toolbar::before),
-  #screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
-  #screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
-  #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
-    opacity: 1;
+  #screenshot-lightbox.lb-idle .lb-toolbar-right,
+  #screenshot-lightbox.lb-idle .lb-toolbar::before,
+  #screenshot-lightbox.lb-idle:not(.lb--stepped-game) .lb-caption,
+  #screenshot-lightbox.lb-idle:not(.lb--stepped) .lb-counter {
+    translate: 0 -4px;
   }
-  #screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-right),
-  #screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
-  #screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
-  #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
-    pointer-events: auto;
+  #screenshot-lightbox.lb-idle .lb-vctrls {
+    translate: 0 4px;
   }
-  #screenshot-lightbox.lb-idle:not(.lb-pointer),
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-video,
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-img,
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-backdrop {
+  #screenshot-lightbox.lb-idle .lb-prev {
+    translate: -4px 0;
+  }
+  #screenshot-lightbox.lb-idle .lb-next {
+    translate: 4px 0;
+  }
+  #screenshot-lightbox.lb-idle,
+  #screenshot-lightbox.lb-idle :is(.lb-video, .lb-img, .lb-backdrop) {
     cursor: none;
+  }
+
+  /* A keyboard action's feedback in place of the chrome (lightbox.tsx's osdLb): the icon its
+     kind names, or a seek's time over a thin line. */
+  .lb-osd {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    translate: -50% -50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    border-radius: var(--radius-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-ui);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease-out);
+  }
+  .lb-osd--show {
+    opacity: 1;
+    transition-duration: var(--dur-1);
+  }
+  .lb-osd .lucide {
+    width: 32px;
+    height: 32px;
+  }
+  .lb-osd:not([data-kind='play']) .lb-osd-play,
+  .lb-osd:not([data-kind='pause']) .lb-osd-pause,
+  .lb-osd:not([data-kind='mute']) .lb-osd-mute,
+  .lb-osd:not([data-kind='unmute']) .lb-osd-unmute,
+  .lb-osd:not([data-kind='seek']) :is(.lb-osd-time, .lb-osd-bar) {
+    display: none;
+  }
+  .lb-osd-bar {
+    width: 160px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(
+      to right,
+      var(--accent) calc(var(--lb-osd-progress, 0) * 100%),
+      rgb(255 255 255 / 0.3) 0
+    );
+  }
+  .lb-osd :is(.lb-osd-play, .lb-osd-pause) {
+    fill: currentColor;
+  }
+
+  /* The first open's one hint at the hidden controls (lightbox.tsx's showLbHint). */
+  .lb-hint {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    z-index: 2;
+    translate: -50% 0;
+    margin: 0;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: var(--fs-ui);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-3) var(--ease-out);
+  }
+  .lb-hint--show {
+    opacity: 1;
   }
 
   /* Round glass buttons: the toolbar's, the trailer's, ‹ ›. 44px under a coarse pointer, below. */
@@ -3009,9 +3090,6 @@
     justify-content: center;
     cursor: pointer;
     font-size: var(--fs-figure);
-    transition:
-      background-color var(--dur-1) var(--ease-out),
-      opacity var(--dur-3) var(--ease-out);
   }
   .lb-vc-btn {
     font-size: 22px;
@@ -3101,7 +3179,6 @@
   .lb-toolbar-right,
   .lb-counter {
     pointer-events: auto; /* a click on them doesn't fall through to the backdrop and close */
-    transition: opacity var(--dur-3) var(--ease-out);
   }
   .lb-caption,
   .lb-counter {

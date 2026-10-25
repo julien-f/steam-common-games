@@ -3414,6 +3414,17 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await expect(img).not.toHaveAttribute('style', /scale/);
 });
 
+// A key hides the lightbox's controls; moving the mouse, as one reaching for them does (a tap on a phone), brings them back.
+async function reachForControls(page: Page) {
+  if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
+    // Forced: whatever covers the media (a loading banner's error card) takes the tap the same way.
+    await page.locator('#screenshot-lightbox').locator('.lb-img:visible, .lb-video').first().tap({ force: true });
+    return;
+  }
+  await page.mouse.move(700, 440);
+  await page.mouse.move(720, 450);
+}
+
 // The fixture trailer has no stream: play()/pause() only flip `paused` and fire their events.
 async function fakePlayback(page: Page) {
   await page.addInitScript(() => {
@@ -3464,8 +3475,10 @@ for (const [route, next] of [
       await page.getByRole('button', { name: 'Open in lightbox' }).click();
       await page.keyboard.press(close === 'button' ? 'ArrowDown' : 'ArrowUp');
       await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
-      if (close === 'button') await page.getByRole('button', { name: 'Close lightbox' }).click();
-      else await page.goBack();
+      if (close === 'button') {
+        await reachForControls(page);
+        await page.getByRole('button', { name: 'Close lightbox' }).click();
+      } else await page.goBack();
       await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
       await expect(page.locator('#panel-title')).toHaveText(close === 'button' ? next.name : 'Hades');
       if (close === 'button') await expect(page).toHaveURL(next.url);
@@ -3581,6 +3594,7 @@ test('F1 edge: a screenshot shown below its size zooms from a visible button, or
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');
   await expect(img).not.toHaveAttribute('style', /scale/);
   // Nothing to zoom on a trailer.
+  await reachForControls(page);
   await page.getByRole('button', { name: 'Previous screenshot' }).click();
   await expect(zoom).toBeHidden();
 });
@@ -3924,7 +3938,7 @@ test('F1 edge: stepping games with hidden controls flashes the game name too', a
   await expect(caption).toHaveCSS('opacity', '0');
 });
 
-test('F1 edge: the mouse brings back only the controls near it', async ({ page }, testInfo) => {
+test('F1 edge: any mouse move brings back all the controls, and a key hides them again', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'mouse only');
   await page.clock.install();
   await asPlayer(page, ALICE);
@@ -3932,23 +3946,63 @@ test('F1 edge: the mouse brings back only the controls near it', async ({ page }
   const lb = page.locator('#screenshot-lightbox');
   await page.clock.runFor(3500);
   await expect(lb).toHaveClass(/lb-idle/);
-  // Read once, after the fade: a retrying assertion would just wait out the idle timer. The
-  // toolbar's right group stands for the close button, as opacity isn't inherited.
-  const shown = async () => {
-    await page.waitForTimeout(400);
-    return page.evaluate(() =>
-      ['.lb-toolbar-right', '.lb-next'].filter((sel) => getComputedStyle(document.querySelector(sel)!).opacity === '1'),
-    );
-  };
+  await page.mouse.move(700, 440);
   await page.mouse.move(720, 450);
-  expect(await shown()).toEqual([]);
+  await expect(lb).not.toHaveClass(/lb-idle/);
   await expect(page.locator('.lb-backdrop')).toHaveCSS('cursor', 'zoom-out');
-  await page.mouse.move(720, 20);
-  expect(await shown()).toEqual(['.lb-toolbar-right']);
-  await page.mouse.move(1420, 450);
-  expect(await shown()).toEqual(['.lb-next']);
-  await page.locator('.lb-next').click();
+  await page.clock.runFor(3500);
+  await expect(lb).toHaveClass(/lb-idle/);
+  // One under the mouse stays.
+  await page.mouse.move(700, 440);
+  await page.locator('.lb-next').hover();
+  await page.clock.runFor(3500);
+  await expect(lb).not.toHaveClass(/lb-idle/);
+  await page.keyboard.press('ArrowRight');
+  await expect(lb).toHaveClass(/lb-idle/);
   await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+});
+
+test('I2 edge: opened from the keyboard, the lightbox shows only the media; a key shows only its feedback', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await page.getByRole('button', { name: 'Open in lightbox' }).focus();
+  await page.keyboard.press('Enter');
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).toHaveAttribute('open');
+  await expect(lb).toHaveClass(/lb-idle/);
+  await expect(page.locator('.lb-caption')).toHaveCSS('opacity', '0');
+  await page.keyboard.press('ArrowRight'); // the trailer
+  await expect(page.locator('.lb-status')).toContainText('Trailer 1 of 1');
+  await page.keyboard.press(' ');
+  await expect(page.locator('.lb-osd')).toHaveAttribute('data-kind', 'play');
+  await expect(page.locator('.lb-osd')).toHaveClass(/lb-osd--show/);
+  await page.keyboard.press(' ');
+  await expect(page.locator('.lb-osd')).toHaveAttribute('data-kind', 'pause');
+  await expect(lb).toHaveClass(/lb-idle/); // the pause shows the large play button, not the controls
+  await page.keyboard.press('m');
+  await expect(page.locator('.lb-osd')).toHaveAttribute('data-kind', 'mute');
+});
+
+test('F1 edge: the first open shows a hint at the hidden controls, once', async ({ page }, testInfo) => {
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(rows(page)).toHaveCount(6); // the list's there: ↑↓ have games to step to
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  const hint = page.locator('.lb-hint');
+  await expect(hint).toHaveClass(/lb-hint--show/);
+  await expect(hint).toHaveText(
+    testInfo.project.name === 'phone' ? 'swipe ↕ games · swipe ↔ media' : '↑↓ games · ←→ media',
+  );
+  await page.clock.runFor(4500);
+  await expect(hint).not.toHaveClass(/lb-hint--show/);
+  await page.goto('/lists/owned?game=1145360&shot=s2');
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  await expect(hint).not.toHaveClass(/lb-hint--show/);
 });
 
 test('F1 edge: on a phone, a swipe steps without bringing the controls back, and a tap does', async ({
@@ -4137,9 +4191,10 @@ test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", as
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const boxes = () =>
     page.evaluate(() =>
+      // Layout offsets: a key hides the controls, drifting them a few pixels as they go.
       ['.lb-game-prev', '.lb-game-next'].map((sel) => {
-        const r = document.querySelector(`#screenshot-lightbox ${sel}`)!.getBoundingClientRect();
-        return [Math.round(r.x), Math.round(r.y)];
+        const el = document.querySelector<HTMLElement>(`#screenshot-lightbox ${sel}`)!;
+        return [el.offsetLeft, el.offsetTop];
       }),
     );
   await expect(page.locator('.lb-caption-pos')).toHaveText(/^game \d+ \/ 6$/);
@@ -4219,6 +4274,7 @@ test("F1 edge: a paused trailer's controls idle out, leaving its large play butt
   await page.goto('/lists/owned?game=1145360&shot=v1');
   await page.getByRole('button', { name: 'Play trailer' }).click();
   await page.locator('.lb-vc-play').click(); // pause
+  await page.mouse.move(720, 300); // off the button: a control under the mouse stays in sight
   const lb = page.locator('#screenshot-lightbox');
   await page.clock.runFor(3500);
   await expect(lb).toHaveClass(/lb-idle/);
@@ -4268,6 +4324,7 @@ test('F1 edge: arrows seek a trailer only while it plays, and step past it other
   await page.getByRole('button', { name: 'Play trailer' }).click();
   await page.keyboard.press('ArrowRight');
   await expect(counter).toContainText('Trailer 1 of 1');
+  await reachForControls(page);
   await page.locator('.lb-vc-play').click(); // pause
   await page.keyboard.press('ArrowRight');
   await expect(counter).toContainText('Screenshot 1 of 3');
