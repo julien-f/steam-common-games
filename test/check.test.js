@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { runAll, runRow, steps, touchesUi } = require('../scripts/check');
+const { runAll, runRow, staleDep, steps, touchesUi } = require('../scripts/check');
 
 test('runAll: every step runs, in order, with its pass/fail and output', async () => {
   const node = process.execPath;
@@ -51,4 +51,20 @@ test('touchesUi: frontend, e2e and their configs count; backend, docs and script
   assert.strictEqual(touchesUi(['docs/dev/data.md', 'lib/steam.js', 'scripts/e2e.js']), false);
   assert.strictEqual(touchesUi(['docs/dev/data.md', 'public/panel.tsx']), true);
   assert.strictEqual(touchesUi(['vite.config.js']), true);
+});
+
+test("staleDep: the first locked package node_modules lacks or holds at another version; a platform's optional one doesn't count", () => {
+  const lock = {
+    '': { name: 'playshelf' },
+    'node_modules/a': { version: '1.0.0' },
+    'node_modules/b': { version: '2.0.0' },
+    'node_modules/@esbuild/win32-x64': { version: '0.1.0', optional: true },
+  };
+  const installed = { 'node_modules/a': { version: '1.0.0' }, 'node_modules/b': { version: '2.0.0' } };
+  assert.strictEqual(staleDep(lock, installed), null);
+  assert.strictEqual(staleDep(lock, { 'node_modules/a': { version: '1.0.0' } }), 'b (missing)');
+  assert.strictEqual(
+    staleDep(lock, { ...installed, 'node_modules/a': { version: '0.9.0' } }),
+    'a (0.9.0, locked 1.0.0)',
+  );
 });

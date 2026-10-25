@@ -59,6 +59,18 @@ function runAll(steps) {
   );
 }
 
+// The first package `lock` (package-lock.json's `packages`) pins that `installed` (npm's node_modules/.package-lock.json)
+// lacks or holds at another version, or null: a checkout behind its lockfile fails builds with misleading errors.
+function staleDep(lock, installed) {
+  for (const [path, { version, optional }] of Object.entries(lock)) {
+    if (!path || optional) continue;
+    const name = path.replace(/^.*node_modules\//, '');
+    const got = installed[path]?.version;
+    if (got !== version) return got ? `${name} (${got}, locked ${version})` : `${name} (missing)`;
+  }
+  return null;
+}
+
 // A run's metrics row: a commit's (the pre-commit hook) or a full one's, each step's seconds and the failed ones.
 function runRow(staged, results) {
   return {
@@ -78,6 +90,18 @@ async function main() {
     staged === undefined
       ? []
       : execFileSync('git', ['diff', '--cached', '--name-only', staged], { encoding: 'utf8' }).split('\n');
+  let installed = {};
+  try {
+    installed = require('../node_modules/.package-lock.json').packages;
+  } catch {
+    // No node_modules: everything is missing.
+  }
+  const stale = staleDep(require('../package-lock.json').packages, installed);
+  if (stale) {
+    record('checks', { run: staged === undefined ? 'full' : 'commit', seconds: {}, failed: ['deps'] });
+    console.log(`✗ node_modules is behind package-lock.json: ${stale}. Run npm ci.`);
+    process.exit(1);
+  }
   const results = await runAll(steps(staged, files).map(([name, args]) => [name, npm, ['run', '-s', ...args]]));
   record('checks', runRow(staged, results));
   for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name} (${(r.ms / 1000).toFixed(1)} s)`);
@@ -87,4 +111,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { runAll, runRow, steps, touchesUi };
+module.exports = { runAll, runRow, staleDep, steps, touchesUi };

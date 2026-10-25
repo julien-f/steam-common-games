@@ -104,10 +104,10 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the header button sits past the phone's right edge (grouping widens the table; CI's fonts add a few pixels more than local ones). `click()` scrolls `.dt-table-wrap` to reach it, that scroll event fires after the menu opened, and data-table closes a menu on any scroll outside it.
 - **Fix**: `await menu.scrollIntoViewIfNeeded()`, then wait a frame (`page.evaluate(() => new Promise(requestAnimationFrame))`) before the click. To reproduce locally, narrow the viewport until the button straddles the edge (e.g. 370 px).
 
-## Merging a dependency bump fails the hook's typecheck in the main checkout
+## A merge fails the hook in the main checkout, though the branch passed
 
-- **Symptom**: the merge commit's pre-commit hook fails with `error TS2353: Object literal may only specify known properties, and '<option>' does not exist in type 'ColumnDef<…>'` (and e2e fails), though the branch passed.
-- **Cause**: the branch's worktree ran `npm install`; the main checkout's `node_modules` still holds the old version.
+- **Symptom**: `scripts/check.js` (the hooks, `npm run check`) stops with `✗ node_modules is behind package-lock.json: <package> (…). Run npm ci.` Before that check existed, the same cause showed as `error TS2353: … does not exist in type 'ColumnDef<…>'` or `Rolldown failed to resolve import "lucide-solid/icons/blend"`.
+- **Cause**: worktrees run their own `npm ci`; the main checkout's `node_modules` stays at whatever it last installed, behind the lockfile.
 - **Fix**: `npm ci` in the main checkout, then commit the merge again (it stays staged).
 
 ## A worktree agent's branch lacks the latest commits
