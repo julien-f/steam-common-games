@@ -4231,6 +4231,36 @@ test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves 
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
 });
 
+test('F1 edge: on a phone, a double-tap seek leaves the trailer playing', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).tap();
+  await page.clock.runFor(3500); // controls idled out: the first tap only brings them back
+  await expect(page.locator('#screenshot-lightbox')).toHaveClass(/lb-idle/);
+  const box = (await page.locator('.lb-video').boundingBox())!;
+  const point = { x: box.x + box.width * 0.85, y: box.y + box.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  const tap = async (times: number) => {
+    for (let i = 0; i < times; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
+  };
+  await tap(2);
+  await expect(page.locator('.lb-seek-flash-right')).toHaveClass(/lb-seek-flash--show/);
+  await page.clock.runFor(1000);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  await tap(1); // controls shown: a lone tap still pauses, once no second tap came
+  await page.clock.runFor(1000);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
+  await tap(2);
+  await page.clock.runFor(1000);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
+});
+
 test('F1 edge: Back closes the open game, then leaves the list', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/about');

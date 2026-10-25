@@ -101,6 +101,8 @@ type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 const LB_SEEK_SECONDS = 5;
 const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
+// A tap on a video's side third waits out a possible second tap (a seek) before playing or pausing.
+let lbVideoTapTimer: ReturnType<typeof setTimeout> | undefined;
 
 // No-ops until initLightbox sets them; nothing can open the lightbox before that.
 let _onLightboxParamChange: (shotId: string | null) => void = () => {};
@@ -850,6 +852,10 @@ function wireTouchHandlers(lb: HTMLElement) {
             const rect = lb.getBoundingClientRect();
             const frac = (endX - rect.left) / rect.width;
             const vid = lbVideoEl;
+            if (frac < 1 / 3 || frac > 2 / 3) {
+              clearTimeout(lbVideoTapTimer);
+              e.preventDefault(); // no click: it would play or pause
+            }
             if (frac < 1 / 3) {
               seekVideo(vid, -LB_TOUCH_SEEK_SECONDS);
               flashSeek('left');
@@ -956,10 +962,15 @@ function wireVideoControls(lb: HTMLElement) {
     vid2.muted = !vid2.muted;
   });
 
-  vid2.addEventListener('click', () => {
+  vid2.addEventListener('click', (e) => {
     // A tap on a trailer whose controls had idled out only brings them back, as phone players do.
     if (tapRevealedChrome) return;
-    vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
+    const toggle = () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause());
+    const rect = lb.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    if ((e as PointerEvent).pointerType === 'touch' && (frac < 1 / 3 || frac > 2 / 3)) {
+      lbVideoTapTimer = setTimeout(toggle, LB_DOUBLE_TAP_MS);
+    } else toggle();
   });
 
   // Once the chrome has idled out, the mouse brings back only the part it nears — the toolbar
