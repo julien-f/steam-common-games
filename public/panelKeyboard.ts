@@ -1,7 +1,7 @@
 // The app-wide keyboard shortcuts around the game detail side panel, bound once by AppShell.
 // `pickRandom`/`stepGame` delegate to the mounted route, which knows whether it has a list to page.
 import { isLightboxOpen, lightboxHandleEscape } from './lightbox.tsx';
-import { isPanelOpen, panelClose, panelStepHero } from './panel.tsx';
+import { isPanelOpen, panelClose, panelStepHero, presentHero } from './panel.tsx';
 import { isTextEntry } from './utils.ts';
 
 interface PanelKeyboardOptions {
@@ -48,6 +48,11 @@ export function bindPanelKeyboardShortcuts(opts: PanelKeyboardOptions): void {
       return;
     }
     if (!isPanelOpen()) return;
+    if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      presentHero();
+      return;
+    }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       if (panelStepHero(e.key === 'ArrowRight' ? 1 : -1, { wrap: true })) e.preventDefault();
       return;

@@ -1,4 +1,7 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
+import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
+import { present } from './presentation.ts';
+import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem, ShotKind } from './mediaItems.ts';
@@ -68,8 +71,6 @@ let lbImgToken = 0;
 // buttons, a vertical swipe). Reset with `lbLastDir` on every render.
 let lbLastAxis: SwipeAxis = 'x';
 
-type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsToken?: number };
-
 // The <video> is kept *out* of the DOM unless a video is actually on screen, and held by
 // reference instead. It used to sit there from page load, which made every page of this app
 // look like a video page to the rest of the browser: media-key routing, Picture-in-Picture
@@ -80,7 +81,7 @@ type LbVideo = HTMLVideoElement & { _hls?: { destroy: () => void } | null; _hlsT
 // dispatched. Detached, none of that sees it; attached, such an extension is armed exactly while
 // a trailer is playing, which is when its owner wants it. Held by reference rather than
 // re-queried because `wireVideoControls` binds to it once at mount, while it is detached.
-let lbVideoEl!: LbVideo;
+let lbVideoEl!: HlsVideo;
 let lbVideoAnchor!: Element;
 function attachLbVideo() {
   if (!lbVideoEl.isConnected) lbVideoAnchor.before(lbVideoEl);
@@ -249,64 +250,6 @@ function lockLbLandscape() {
   o?.lock?.('landscape').catch(() => {});
 }
 
-// ── Video playback (HLS) ───────────────────────────────────────────────────
-
-// hls.js is ~130KB gzipped — dwarfing the rest of this app's own JS combined — for a library
-// only Safari's *own* native HLS support (the canPlayType branch below) doesn't need at all,
-// and which most panel opens never touch regardless of browser (screenshots, not video, are
-// the common case). Loaded via a dynamic import the first time a non-Safari browser actually
-// needs to play a video, instead of a static import that shipped it to every page load
-// unconditionally. Memoized so a second video only pays the (already-resolved) promise, not a
-// second network fetch; also let's the adjacent-shot prefetch below warm this same promise
-// ahead of the user actually reaching a video shot, same idea as its existing manifest prefetch.
-let _hlsModulePromise: Promise<any> | null = null;
-function loadHlsModule(): Promise<any> {
-  return (_hlsModulePromise ??= import('hls.js').then((m) => m.default));
-}
-
-async function playHls(videoEl: LbVideo, src: string | null | undefined) {
-  if (!src) return;
-  hideLbError();
-  if (videoEl._hls) {
-    videoEl._hls.destroy();
-    videoEl._hls = null;
-  }
-  if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-    // Assigned as a property (not addEventListener) since videoEl is reused
-    // across shots — a property assignment overwrites rather than stacking.
-    videoEl.onerror = () => showLbError("Couldn't load this video.");
-    videoEl.src = src;
-    videoEl.play().catch(() => {});
-    return;
-  }
-  // videoEl is reused across shots, and loading hls.js is async — guard against a stale
-  // load resolving after the user already stepped to a different shot (stopHls bumps this
-  // same token) or reopened this same videoEl with a newer playHls call in the meantime.
-  const token = (videoEl._hlsToken = (videoEl._hlsToken || 0) + 1);
-  const Hls = await loadHlsModule();
-  if (videoEl._hlsToken !== token) return;
-  if (!Hls.isSupported()) return;
-  const hls = new Hls({ autoStartLoad: true, startLevel: -1 });
-  hls.on(Hls.Events.ERROR, (_event: unknown, data: { fatal?: boolean }) => {
-    if (data?.fatal) showLbError("Couldn't load this video.");
-  });
-  hls.loadSource(src);
-  hls.attachMedia(videoEl);
-  hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
-  videoEl._hls = hls;
-}
-
-function stopHls(videoEl: LbVideo | null) {
-  if (!videoEl) return;
-  videoEl.pause();
-  videoEl._hlsToken = (videoEl._hlsToken || 0) + 1; // invalidate any in-flight playHls() load
-  if (videoEl._hls) {
-    videoEl._hls.destroy();
-    videoEl._hls = null;
-  }
-  videoEl.removeAttribute('src');
-}
-
 // ── Load errors (image/video) ──────────────────────────────────────────────
 
 function showLbError(msg: string) {
@@ -316,6 +259,10 @@ function showLbError(msg: string) {
   const err = lb.querySelector<HTMLElement>('.lb-error')!;
   err.querySelector<HTMLElement>('.lb-error-msg')!.textContent = msg;
   err.style.display = 'flex';
+}
+
+function showLbVideoError() {
+  showLbError("Couldn't load this video.");
 }
 
 function hideLbError() {
@@ -331,7 +278,7 @@ function retryCurrentShot() {
   if (!shot) return;
   if (shot.type === 'video') {
     const vid = lbVideoEl;
-    playHls(vid, shot.hls);
+    playHls(vid, shot.hls, showLbVideoError);
   } else {
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
@@ -655,6 +602,17 @@ function wireKeyboard(lb: HTMLElement) {
       if (!onScrub && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
         stepGameFromLightbox(_onGameRandom);
+      }
+      // Presents it instead: the presentation window stands in for the lightbox. Ctrl/⌘+P prints.
+      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        // panelKeyboard.ts's P would present again once the lightbox is closed.
+        e.stopImmediatePropagation();
+        const game = lbGame();
+        const shot = shots()[idx()];
+        if (game && shot) present(game, shot.shotId);
+        closeLightbox();
+        return;
       }
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
       if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
@@ -1059,7 +1017,7 @@ function syncLbPaused() {
 function mountLightboxDom(): () => void {
   const dispose = render(() => <LightboxDom />, document.body);
   const lb = document.getElementById('screenshot-lightbox')!;
-  lbVideoEl = lb.querySelector<LbVideo>('.lb-video')!;
+  lbVideoEl = lb.querySelector<HlsVideo>('.lb-video')!;
   lbVideoAnchor = lb.querySelector('.lb-next')!; // re-inserted here, keeping the original order
   detachLbVideo(); // a closed lightbox shows nothing, so it holds no media element
   wireButtons(lb);
@@ -1303,7 +1261,7 @@ function renderLightbox() {
     vid.setAttribute('aria-label', label);
     vc.style.display = '';
     resetLbVc(vc);
-    playHls(vid, shot.hls);
+    playHls(vid, shot.hls, showLbVideoError);
     syncLbPaused();
     schedHideLbChrome();
   } else {

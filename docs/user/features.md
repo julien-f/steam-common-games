@@ -137,8 +137,18 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 - **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
 - **R** jumps to a random game, **Home / End** to the first or last media, **Esc** closes.
-- **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it.
+- **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it; **P** presents it instead, closing the lightbox ([below](#presenting-on-a-second-screen)).
 - On touch, swipe sideways for media and up or down for games; a double-tap on a video's left or right third seeks 10 s.
+
+### Presenting on a second screen
+
+A lightbox on another screen, for showing trailers and screenshots to the people in the room while you keep browsing on yours.
+
+- **P** (or the cast button among the panel's links) presents the media the panel shows, opening the presentation window first. Drag it to the other screen; a click (or **F**) there toggles fullscreen, its only control. Browsers play sound only after a first click in that window, so a trailer presented before it starts muted and gets its sound with that click.
+- While presenting, opening a media from the panel (a click on its picture, or **Enter**) presents it instead of opening the lightbox. Browsing the panel's media changes nothing on the other screen.
+- A screenshot stays up and a trailer plays once, until you present something else. One that fails to load says so there.
+- The nav bar names the game presented, and its × stops presenting; closing the tab that presents closes it too.
+- Only the tab that started presenting drives the window. Desktop only: no Present button on a phone.
 
 ![A game's detail panel: media strip, weighted rating and Metacritic score, How Long To Beat estimate, ProtonDB tier, best price with record-low badges, tags, who owns it, and collapsible HLTB/news/achievements/DLC sections](../images/game-panel.png)
 

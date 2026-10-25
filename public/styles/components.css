@@ -331,6 +331,50 @@
       display: flex;
     }
   }
+  /* What the presentation window shows (PresentationChip.tsx), and × to stop; desktop only, as the Present button. */
+  .present-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: var(--control-h);
+    padding: 0 4px 0 10px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-3);
+  }
+  .present-chip-icon {
+    flex: none;
+    color: var(--accent);
+  }
+  .present-chip-name {
+    max-width: 180px;
+    overflow: hidden;
+    padding: 0 4px;
+    color: var(--text);
+    font-size: var(--fs-ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .present-chip-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--radius-2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .present-chip-btn:hover {
+    background: var(--line);
+  }
+  @media (max-width: 768px) {
+    .present-chip {
+      display: none;
+    }
+  }
 
   .app-footer {
     color: var(--muted);
@@ -1649,6 +1693,21 @@
   .panel-hero-btn:focus-visible {
     outline-offset: -4px;
   }
+  .panel-hero-open--present {
+    cursor: pointer;
+  }
+  /* While presenting, the hero's click presents: said on the picture, not only in its label. */
+  .panel-hero-present {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    padding: 4px;
+    border-radius: var(--radius-2);
+    background: rgb(0 0 0 / 0.6);
+    color: #fff;
+    font-size: 22px;
+  }
   .panel-hero-img {
     display: block;
     width: 100%;
@@ -1891,6 +1950,12 @@
   }
   .panel-refresh-icon.is-refreshing {
     animation: spin 0.75s linear infinite;
+  }
+  /* The presentation window is a second window on a second screen: a desktop's. */
+  @media (max-width: 768px) {
+    .panel-present-btn {
+      display: none;
+    }
   }
   @keyframes spin {
     to {

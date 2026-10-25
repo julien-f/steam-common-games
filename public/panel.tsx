@@ -67,6 +67,7 @@ import { createSignal, createEffect, createMemo, createResource, createRoot, For
 import { Dynamic, render } from 'solid-js/web';
 import { A, useLocation } from '@solidjs/router';
 import { creatorListPath, type CreatorRole } from './creatorData.ts';
+import { present, presented } from './presentation.ts';
 import ArrowUpDown from 'lucide-solid/icons/arrow-up-down';
 import Check from 'lucide-solid/icons/check';
 import ChevronLeft from 'lucide-solid/icons/chevron-left';
@@ -82,6 +83,7 @@ import RefreshCw from 'lucide-solid/icons/refresh-cw';
 import ShoppingCart from 'lucide-solid/icons/shopping-cart';
 import Star from 'lucide-solid/icons/star';
 import Timer from 'lucide-solid/icons/timer';
+import Cast from 'lucide-solid/icons/cast';
 import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import Wrench from 'lucide-solid/icons/wrench';
 import X from 'lucide-solid/icons/x';
@@ -159,6 +161,8 @@ export interface PanelOptions {
 let panelOptions: PanelOptions;
 const [panelGame, setPanelGame] = createSignal<ReadonlyGame | null>(null);
 const [heroIdx, setHeroIdx] = createSignal(0);
+// The hero's index within a game's `length` media: a stale one from a longer list would overrun it.
+const clampedHeroIdx = (length: number) => Math.max(0, Math.min(heroIdx(), length - 1));
 let panelPrevFocus: HTMLElement | null = null;
 const [panelRefreshing, setPanelRefreshing] = createSignal(false); // true while the host's onRefresh() is in flight
 const [moreLinksOpen, setMoreLinksOpen] = createSignal(false); // whether the header's "⋯" overflow menu (Workshop/Website) is open
@@ -681,6 +685,13 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
   }
   if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-open') as HTMLElement | null)?.focus();
   return true;
+}
+
+// P and the Present button: the hero's current media goes to the presentation window.
+export function presentHero(): void {
+  const g = panelGame();
+  const items = getPanelItems();
+  if (g && items.length) present(g, items[clampedHeroIdx(items.length)].shotId);
 }
 
 export function panelOpen(game: ReadonlyGame) {
@@ -1883,9 +1894,14 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   const [brokenSrc, setBrokenSrc] = createSignal<string>();
   const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
   // A pointer click on a loaded picture morphs it into the lightbox's; a key or a video opens at once.
+  // While presenting, the presentation window stands in for the lightbox.
   const openCurrent = (e: MouseEvent & { currentTarget: HTMLElement }) => {
     const g = panelGame();
     if (!g) return;
+    if (presented()) {
+      present(g, current().shotId);
+      return;
+    }
     const img = e.currentTarget.querySelector<HTMLImageElement>('.panel-hero-img');
     if (e.detail > 0 && img && current().type === 'image' && !loading() && brokenSrc() !== src())
       openLightboxFrom(img, g, idx());
@@ -1901,7 +1917,15 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
       class={`panel-hero-main${current().type === 'video' ? ' is-video' : ''}${loading() ? ' panel-hero-main--loading' : ''}`}
       style={loading() && standIn() !== src() ? { 'background-image': `url("${standIn()}")` } : undefined}
     >
-      <button class="panel-hero-open" aria-label="Open in lightbox" onClick={openCurrent}>
+      <button
+        class="panel-hero-open"
+        classList={{ 'panel-hero-open--present': !!presented() }}
+        aria-label={presented() ? 'Present this media' : 'Open in lightbox'}
+        onClick={openCurrent}
+      >
+        <Show when={presented()}>
+          <Cast class="panel-hero-present" aria-hidden="true" />
+        </Show>
         <img
           class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
           src={src()}
@@ -1940,7 +1964,7 @@ function PanelHero(): JSX.Element {
   // the field through the store row is what makes the hero pick that up; it used to need a
   // `revision()` read here for the same reason, back when the row was a plain object.
   const items = getPanelItems;
-  const idx = () => Math.max(0, Math.min(heroIdx(), items().length - 1));
+  const idx = () => clampedHeroIdx(items().length);
   const hasMany = () => items().length > 1;
   let filmstripEl: HTMLUListElement | undefined;
 
@@ -2337,6 +2361,21 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
   );
 }
 
+// Presents the hero's media (presentation.ts), opening the presentation window first if needed.
+function PresentButton(): JSX.Element {
+  return (
+    <button
+      type="button"
+      class="panel-icon-link panel-present-btn"
+      title="Present (P)"
+      aria-label="Present (P)"
+      onClick={presentHero}
+    >
+      <Cast />
+    </button>
+  );
+}
+
 // How old this game's details are, and the ↻ that fixes it, as one control — the same shape the
 // list heroes' Updated tile has (ListHero.tsx's refreshTileValue). The age used to be readable
 // only inside this button's `title`, which a touch device never shows at all: the panel was the
@@ -2614,6 +2653,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
               <CircleDollarSign />
             </a>
             <MoreLinks game={g} />
+            <PresentButton />
             <span class="panel-icon-divider" role="separator" aria-hidden="true" />
             <button
               type="button"

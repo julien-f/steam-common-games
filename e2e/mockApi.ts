@@ -12,6 +12,7 @@
 //   untiered       the Co-op Pack lists every game in its first tier, the pricier one empty (as ITAD sends some)
 //   resolve-failed the Co-op Pack's Portal 2 fails to resolve to Steam (its package lookup errored)
 //   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades, Terraria and Hollow Knight have media)
+//   broken-trailer trailers point at a manifest that answers 501, so playback fails
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 //   creator-capped a developer's/publisher's list is Steam's first page of 523 games
 //   tagless        no game has Steam tags
@@ -81,12 +82,16 @@ const mediaUrl = (label: string, slow: boolean, variant = '') =>
     : `data:image/svg+xml,${encodeURIComponent(svg(label))}`;
 // `hls: null`, as Steam sends for a trailer with no H.264 stream: the player and its controls
 // show, nothing plays (Playwright's Chromium has no H.264 decoder anyway).
-const media = (appid: number, slow: boolean) => {
+const media = (appid: number, slow: boolean, brokenTrailer: boolean) => {
   const m = MEDIA[appid];
   if (!m) return { movies: [], screenshots: [] };
   const range = (length: number) => Array.from({ length }, (_, i) => i + 1);
   return {
-    movies: range(m.movies).map((id) => ({ id, thumbnail: mediaUrl(`${m.label}Trailer`, slow), hls: null })),
+    movies: range(m.movies).map((id) => ({
+      id,
+      thumbnail: mediaUrl(`${m.label}Trailer`, slow),
+      hls: brokenTrailer ? '/api/mock-media/missing.m3u8' : null,
+    })),
     screenshots: range(m.screenshots).map((id) => ({
       id,
       thumbnail: mediaUrl(`${m.label}Screenshot ${id}`, slow, 'thumb'),
@@ -109,7 +114,7 @@ const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Stud
 // Out of rating order, so sorting by Tag match visibly reorders a co-op filter.
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
-function details(appid: number, slowMedia = false) {
+function details(appid: number, slowMedia = false, brokenTrailer = false) {
   const fetched = {
     appid,
     fetchedAt: NOW,
@@ -146,7 +151,7 @@ function details(appid: number, slowMedia = false) {
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_184x69.jpg`,
       thumb: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
       banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
-      ...media(appid, slowMedia),
+      ...media(appid, slowMedia, brokenTrailer),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
       // So the panel's More links menu has an entry.
@@ -281,22 +286,23 @@ export function respond(
   if (limited && (path === '/api/prices' || path.startsWith('/api/achievements/')))
     return json({ error: LIMITED }, 429);
   const slowMedia = states.has('slow-media');
+  const brokenTrailer = states.has('broken-trailer');
   const detailsFor = (appid: number) =>
     limited
-      ? { ...details(appid, slowMedia), rating: null, hltb: null, failed: ['rating', 'hltb'] }
+      ? { ...details(appid, slowMedia, brokenTrailer), rating: null, hltb: null, failed: ['rating', 'hltb'] }
       : states.has('upstream-down')
         ? {
-            ...details(appid, slowMedia),
+            ...details(appid, slowMedia, brokenTrailer),
             rating: null,
             hltb: null,
             protondb: null,
             failed: ['rating', 'hltb', 'protondb'],
           }
         : states.has('store-down')
-          ? { ...details(appid, slowMedia), meta: null, failed: ['meta'] }
+          ? { ...details(appid, slowMedia, brokenTrailer), meta: null, failed: ['meta'] }
           : states.has('tagless')
-            ? { ...details(appid, slowMedia), tags: [], tagWeights: {} }
-            : details(appid, slowMedia);
+            ? { ...details(appid, slowMedia, brokenTrailer), tags: [], tagWeights: {} }
+            : details(appid, slowMedia, brokenTrailer);
   const mediaPath = path.match(/^\/api\/mock-media\/(.+)\.svg$/);
   if (mediaPath)
     return {

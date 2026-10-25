@@ -1,6 +1,7 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
+import { HEARTBEAT_MS } from '../public/presentationProtocol.ts';
 import { asPlayer, shot } from './state.ts';
 import {
   ALICE,
@@ -1064,6 +1065,126 @@ test('C7 edge: a player with too few games played says so', async ({ page }) => 
   await page.goto('/lists/compare?u=alice&u=dave');
   const players = await openPlayers(page);
   await expect(playerLine(players, 'Alice')).toContainText('too few games played here for a profile');
+});
+
+// The presentation window, which P opens.
+async function startPresenting(page: Page) {
+  const popup = page.waitForEvent('popup');
+  await page.keyboard.press('p');
+  return popup;
+}
+
+test('C8.1-4,6-7: the presentation window shows only what is presented, stays fullscreen, and stops from the nav', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  const chip = page.getByRole('banner').locator('.present-chip');
+  await expect(chip).toContainText('Hades');
+  await shown.keyboard.press('f');
+  await expect.poll(() => shown.evaluate(() => !!document.fullscreenElement)).toBe(true);
+
+  await page.getByPlaceholder('Look up any game…').fill('Portal 2');
+  await page.locator('.game-search-result', { hasText: 'Portal 2' }).first().click();
+  await expect(page.locator('#panel-title')).toHaveText('Portal 2');
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+
+  await page.getByRole('button', { name: 'Present (P)' }).click();
+  await expect(shown.locator('.pres-caption')).toHaveText('Portal 2');
+  await expect(chip).toContainText('Portal 2');
+  expect(await shown.evaluate(() => !!document.fullscreenElement)).toBe(true);
+
+  const closed = shown.waitForEvent('close');
+  await chip.getByRole('button', { name: 'Stop presenting' }).click();
+  await closed;
+  await expect(chip).toBeHidden();
+});
+
+test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const chip = page.getByRole('banner').locator('.present-chip');
+  await page.keyboard.press('Control+p');
+  expect(await chip.count()).toBe(0); // a snapshot: P would have shown it while handling the key
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+});
+
+test('C8 edge: closing the presentation window drops the nav chip', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades'); // mounted: its pagehide says bye
+  const chip = page.getByRole('banner').locator('.present-chip');
+  await expect(chip).toContainText('Hades');
+  await shown.close();
+  await expect(chip).toBeHidden(); // the 2 s bye grace, within expect's 5 s; heartbeats alone take 20 s
+});
+
+test('C8.5: while presenting, opening a media from the panel presents it instead of the lightbox', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
+  const picture = () => shown.locator('img.pres-media').getAttribute('src');
+  expect(await picture()).toContain('header.jpg'); // browsing the panel moves nothing: still the Cover
+  await page.getByRole('button', { name: 'Present this media' }).click();
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/open/);
+  await expect.poll(picture).toContain('Screenshot%203');
+});
+
+test('C8 edge: closing the main window closes the presentation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  const closed = shown.waitForEvent('close', { timeout: HEARTBEAT_MS + 3000 });
+  await page.close();
+  await closed;
+});
+
+test('C8 edge: P in the lightbox presents its media and closes the lightbox', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).toHaveClass(/open/);
+  let popups = 0;
+  page.on('popup', () => popups++);
+  const popup = page.waitForEvent('popup', { timeout: 3000 });
+  await page.keyboard.press('p');
+  const shown = await popup;
+  await expect(lightbox).not.toHaveClass(/open/);
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
+  await expect(page.getByRole('banner').locator('.present-chip')).toContainText('Hades');
+  expect(popups).toBe(1);
+});
+
+test('C8 edge: a trailer that fails to load says so on the presentation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['broken-trailer'] });
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const error = shown.getByRole('alert');
+  await expect(error).toHaveText("Couldn't load this video.");
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  await page.keyboard.press('p');
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+  await expect(error).toBeHidden();
 });
 
 test('C1.4: compare three players — one table grouped from "all" to "only one"', async ({ page }) => {
