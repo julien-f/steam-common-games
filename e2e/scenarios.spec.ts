@@ -1551,7 +1551,7 @@ test('C8.6: while presenting, a media opened from the panel opens the lightbox o
   await expect(page.locator('.panel-hero-present')).toHaveText('On TV');
 });
 
-test("C8 edge: steps faster than the TV's settle send it only the item they stop on, and Esc sends it at once", async ({
+test('C8 edge: a burst of steps sends the TV its first at once and then only where it stops; Esc sends that at once', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
@@ -1560,12 +1560,13 @@ test("C8 edge: steps faster than the TV's settle send it only the item they stop
   await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
   const shown = await startPresenting(page);
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
-  await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft']);
+  await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft', 'ArrowLeft']);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']); // the first, at once
   await page.waitForTimeout(500);
-  expect(await sentShots(shown)).toEqual(['s3', 's1']);
-  await stepsAtOnce(page, ['ArrowRight']);
+  expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
+  await stepsAtOnce(page, ['ArrowRight', 'ArrowRight']);
   await page.keyboard.press('Escape'); // well within the settle
-  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's1', 's2']);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1', 's1', 's2']);
 });
 
 test('C8 edge: game steps in the linked lightbox put each game on the TV once its media is in', async ({
@@ -1879,9 +1880,9 @@ test('C8 edge: hidden behind a fullscreen TV, the main window sends a key held t
   );
   for (let i = 0; i < 3; i++) await shown.keyboard.down('ArrowLeft');
   await shown.keyboard.up('ArrowLeft');
-  await expect.poll(() => sentShots(shown)).toEqual(['s3', 'v1']);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']); // the first at once, then on release
   await shown.waitForTimeout(300);
-  expect(await sentShots(shown)).toEqual(['s3', 'v1']);
+  expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
 });
 
 test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now on the TV', async ({

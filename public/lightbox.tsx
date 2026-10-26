@@ -90,10 +90,12 @@ let lbScrubTarget: number | null = null;
 let lbScrubUntil = 0;
 let lbScrubTimer: ReturnType<typeof setTimeout> | undefined;
 let lbTvNeedsClick = false;
-// The present waiting out the settle (`LB_SETTLE_*`), and whether the next one goes at once (just linked).
+// The present waiting out the settle (`LB_SETTLE_*`), whether the next one goes at once (just linked), and
+// until when steps are a burst: its first goes at once, the rest wait for where it stops.
 let lbTvTimer: ReturnType<typeof setTimeout> | undefined;
 let lbTvSend: (() => void) | null = null;
 let lbTvLinked = false;
+let lbTvBurstUntil = 0;
 // Stop presenting came from the lightbox's own pill: said as a stop, not as a lost window.
 let lbStopped = false;
 const LB_SETTLE_MEDIA_MS = 200;
@@ -2029,8 +2031,8 @@ createRoot(() => {
     gameName();
     if (list.length) renderLightbox();
   });
-  // Steers the TV: the item the lightbox rests on is presented once, after the settle (at once on
-  // linking); not while a game's media is still streaming in (the latch above picks what it lands on).
+  // Steers the TV: a step is presented at once, then a burst's later steps only where it stops (after the
+  // settle); not while a game's media is still streaming in (the latch above picks what it lands on).
   createEffect(() => {
     const now = linked();
     const fresh = now && !lbTvLinked;
@@ -2048,8 +2050,11 @@ createRoot(() => {
       const item = shots()[idx()];
       if (g && item) present(g, item.shotId, undefined, { silent: true });
     };
-    if (fresh) flushLbTv();
-    else lbTvTimer = setTimeout(flushLbTv, on?.appid === game.appid ? LB_SETTLE_MEDIA_MS : LB_SETTLE_GAME_MS);
+    const settle = on?.appid === game.appid ? LB_SETTLE_MEDIA_MS : LB_SETTLE_GAME_MS;
+    const burst = Date.now() < lbTvBurstUntil;
+    lbTvBurstUntil = Date.now() + settle;
+    if (fresh || !burst) flushLbTv();
+    else lbTvTimer = setTimeout(flushLbTv, settle);
   });
   createEffect(() => {
     playback();
