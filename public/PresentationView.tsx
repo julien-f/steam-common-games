@@ -59,6 +59,7 @@ function PresentationView() {
         ended: video.ended,
         failed: failed(),
         needsClick,
+        buffering: !video.hidden && loading(),
       },
     });
 
@@ -161,6 +162,10 @@ function PresentationView() {
       return;
     }
     if (video.hidden) return;
+    if (typeof c === 'object') {
+      const t = 'seekBy' in c ? video.currentTime + c.seekBy : c.seekTo;
+      video.currentTime = Math.max(0, Math.min(t, video.duration || t));
+    }
     if (c === 'play') video.play().catch(() => {});
     if (c === 'pause') video.pause();
     if (c === 'replay') {
@@ -202,7 +207,11 @@ function PresentationView() {
       // P again on what's up: the caption says what it is; only an ended trailer starts over.
       if (same && failed())
         show(msg.onAir); // P again on what failed: another try
-      else if (same && !video.hidden && video.ended) video.play().catch(() => {});
+      else if (same && !video.hidden && msg.onAir.startAt != null) {
+        // A lightbox handover on the trailer already up: the room follows the host's playhead.
+        video.currentTime = msg.onAir.startAt;
+        void (msg.onAir.paused ? video.pause() : video.play().catch(() => {}));
+      } else if (same && !video.hidden && video.ended) video.play().catch(() => {});
       else if (!same) {
         const gameChanged = shown?.appid !== msg.onAir.appid;
         setOnAir(msg.onAir);
@@ -303,15 +312,16 @@ function PresentationView() {
       closing = true;
     };
     document.addEventListener('keydown', onKey);
-    for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange'])
+    // Stalled: the spinner (after a moment, by its own CSS delay).
+    video.addEventListener('waiting', () => setLoading(true));
+    for (const type of ['playing', 'pause', 'emptied']) video.addEventListener(type, () => setLoading(false));
+    // At once, unlike the time (below): the host's lightbox mirrors them.
+    for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange', 'seeked', 'waiting', 'playing'])
       video.addEventListener(type, reportPlayback);
     video.addEventListener('ended', () => {
       claimMediaKeys();
       showCaption(CAPTION_GAME_MS); // so the room knows what they just watched
     });
-    // Stalled: the spinner (after a moment, by its own CSS delay).
-    video.addEventListener('waiting', () => setLoading(true));
-    for (const type of ['playing', 'pause', 'emptied']) video.addEventListener(type, () => setLoading(false));
     document.addEventListener('fullscreenchange', keepScreenOn);
     // The chip's progress line: once a second is plenty.
     video.addEventListener('timeupdate', () => {

@@ -16,8 +16,9 @@ export interface OnAir {
   startAt?: number;
   paused?: boolean;
 }
-// The host's remote control (the nav chip).
-export type Control = 'play' | 'pause' | 'replay' | 'mute' | 'unmute' | 'retry';
+// The host's remote control (the nav chip). `seekBy` is applied to the TV's own position, so presses add up.
+export type Control =
+  'play' | 'pause' | 'replay' | 'mute' | 'unmute' | 'retry' | { seekBy: number } | { seekTo: number };
 // What the window reports of it. `needsClick`: an unmute it refused — Chrome pauses a video unmuted
 // before the window's own first click, so sound waits for one there.
 export interface Playback {
@@ -28,6 +29,7 @@ export interface Playback {
   ended: boolean;
   failed: boolean;
   needsClick: boolean;
+  buffering: boolean;
 }
 
 // `bye`: the main window is going (closed, or reloading: then `main` follows).

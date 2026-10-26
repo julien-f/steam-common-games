@@ -1,8 +1,8 @@
 // docs/dev/journeys.md's journeys, end to end against mocked data (mockApi.ts).
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
-import { HEARTBEAT_MS } from '../public/presentationProtocol.ts';
-import { hookPresentation } from './presentationHooks.ts';
+import { HEARTBEAT_MS, PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
+import { hookPresentation, type PresTest } from './presentationHooks.ts';
 import { asPlayer, shot } from './state.ts';
 import {
   ALICE,
@@ -1075,6 +1075,26 @@ async function startPresenting(page: Page) {
   return popup;
 }
 
+// Says something to the TV as the main window would (for what no control sends yet).
+async function tellTv(page: Page, body: Record<string, unknown>) {
+  await page.evaluate(
+    ([name, body]) => {
+      const main = sessionStorage.getItem('playshelf-presentation-main');
+      const channel = new BroadcastChannel(name as string);
+      channel.postMessage({ main, ...(body as object) });
+      channel.close();
+    },
+    [PRESENTATION_CHANNEL, body] as const,
+  );
+}
+
+// What the TV last reported of its trailer.
+async function lastPlayback(shown: Page) {
+  return shown.evaluate(
+    () => (window as unknown as { presTest: PresTest }).presTest.heard.findLast((m) => m.type === 'playback')?.playback,
+  );
+}
+
 test('C8.1-4,7-8: the presentation window shows only what is presented, stays fullscreen, and stops from the nav', async ({
   page,
 }, testInfo) => {
@@ -1141,7 +1161,7 @@ test('C8 edge: the TV survives a reload of the main window, and an occluded TV i
   await shown.waitForTimeout(3500);
   expect(shown.isClosed()).toBe(false);
   // Without the TV's handle (lost in the reload), main goes by its beats: an occluded TV beats about once a minute.
-  await shown.evaluate(() => (window as unknown as { presTest: { hide(): void } }).presTest.hide());
+  await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.hide());
   await page.clock.runFor(60_000);
   await expect(chip).toContainText('Hades');
   await page.clock.runFor(120_000); // past 2.5 min of silence: gone after all
@@ -1676,6 +1696,46 @@ test('C8 edge: P on a lightbox trailer carries on where it was on the TV', async
   const video = shown.locator('video.pres-media');
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(42);
   expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+});
+
+test('C8 edge: the TV seeks where it is told and reports seeks and stalls at once', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const video = shown.locator('video.pres-media');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await video.evaluate((v: HTMLVideoElement) => (v.currentTime = 30));
+  // Presses add up on the TV's own position, not on a report main may not have yet.
+  await tellTv(page, { type: 'control', control: { seekBy: 10 } });
+  await tellTv(page, { type: 'control', control: { seekBy: 10 } });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(50);
+  await tellTv(page, { type: 'control', control: { seekTo: 5 } });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(5);
+  // Within the 1 s the time reports wait: the seek's own report.
+  await expect.poll(() => lastPlayback(shown)).toMatchObject({ t: 5 });
+  await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.stall());
+  await expect.poll(() => lastPlayback(shown)).toMatchObject({ buffering: true });
+  await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.resume());
+  await expect.poll(() => lastPlayback(shown)).toMatchObject({ buffering: false });
+});
+
+test('C8 edge: a handover on the trailer already on the TV moves it there', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const video = shown.locator('video.pres-media');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  const onAir = await shown.evaluate(
+    () => (window as unknown as { presTest: PresTest }).presTest.heard.findLast((m) => m.type === 'state')!.onAir,
+  );
+  await tellTv(page, { type: 'onAir', onAir: { ...(onAir as object), startAt: 42, paused: true } });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => [v.currentTime, v.paused])).toEqual([42, true]);
 });
 
 test("C8 edge: a screenshot whose thumbnail is broken but picture loads isn't called broken", async ({
