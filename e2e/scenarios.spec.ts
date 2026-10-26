@@ -81,6 +81,17 @@ test('A1 edge: an Explore card opens its list from anywhere on the card', async 
   await expect(page).toHaveURL(/\/lists\/wishlist$/);
 });
 
+test('A1 edge: the Explore cards fill even rows, three wide past phone width', async ({ page }, testInfo) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const cards = page.locator('.explore-card');
+  await expect(cards).toHaveCount(6);
+  const tops = await cards.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  const perRow = testInfo.project.name === 'phone' ? 1 : 3;
+  const rowSizes = [...new Set(tops)].map((top) => tops.filter((t) => t === top).length);
+  expect(rowSizes).toEqual(Array(6 / perRow).fill(perRow));
+});
+
 test('A1 edge: native controls render dark, like the page around them', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator(':root')).toHaveCSS('color-scheme', 'dark');

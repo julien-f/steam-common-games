@@ -4145,7 +4145,8 @@
   }
   .explore-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    /* Six cards: an auto-fill grid wrapped them 5 + 1. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
   }
   .explore-card {

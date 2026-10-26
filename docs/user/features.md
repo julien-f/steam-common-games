@@ -55,7 +55,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
   - The play style and story games each need 8 played games (an hour or more). **Why these?** opens the evidence in place: under each tag, the played games counting most toward it with their hours; in the story tile, each story game's hours against its main story (the 5 most played that reached it, then those that fell short); and a folded **How it's counted**. Every game opens its panel.
 - **Filtering by Steam tag** (the Tags column, or a tag in a game's panel) ranks the matches by **Tag match**: how strongly players tagged each game with them, from 100% (its top tag) down. With several tags it's their average, or on the filter's **All** mode the weakest one, so a game must carry them all. Filter Tag match (e.g. 50% and up) to keep only the games where the tag really matters. Clearing the tag filter restores the previous sort and drops that Tag match filter. In the game's panel, a gauge under each Steam tag shows that same strength.
 
-![The home page: the current account's card, the Explore cards (Owned, Wishlist, Compare, Bundles, Recently Looked Up), and your own folder tree of lists](../images/home-lists.png)
+![The home page: the current account's card, the Explore cards (Owned, Wishlist, Compare, Bundles, PC Game Pass, Recently Looked Up), and your own folder tree of lists](../images/home-lists.png)
 
 ### Combining lists
 
