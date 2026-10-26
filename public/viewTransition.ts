@@ -25,7 +25,8 @@ export function canMorph(): boolean {
   return (
     'startViewTransition' in document &&
     !matchMedia('(prefers-reduced-motion: reduce)').matches &&
-    !document.querySelector(':popover-open, dialog[open]')
+    // The lightbox's own dialog aside: it morphs open and closed (the snapshots paint above it).
+    !document.querySelector(':popover-open, dialog[open]:not(#screenshot-lightbox)')
   );
 }
 

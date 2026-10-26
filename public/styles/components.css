@@ -2845,13 +2845,23 @@
   #screenshot-lightbox::backdrop {
     background: none;
   }
-  /* Fades in; its media then enters by its own lb-anim-* keyframes. */
+  /* Fades in, its media growing from just under its size; fades out on close (kept rendered meanwhile). */
+  #screenshot-lightbox {
+    opacity: 0;
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      display var(--dur-2) allow-discrete,
+      overlay var(--dur-2) allow-discrete;
+  }
   #screenshot-lightbox[open] {
-    transition: opacity var(--dur-2) var(--ease-out);
+    opacity: 1;
   }
   @starting-style {
     #screenshot-lightbox[open] {
       opacity: 0;
+    }
+    #screenshot-lightbox[open]:not(.lb-morph) :is(.lb-img, .lb-video) {
+      scale: 0.96;
     }
   }
   /* The hero's picture morphs in instead (lightbox.tsx's openLightboxFrom), over the backdrop's own fade. */
@@ -2907,7 +2917,9 @@
     height: auto;
     object-fit: contain;
     display: block;
-    transition: opacity var(--dur-2) var(--ease-out);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      scale var(--dur-2) var(--ease-out);
     transform-origin: center center;
     user-select: none;
   }
@@ -2918,6 +2930,31 @@
     object-fit: contain;
     display: block;
     cursor: pointer;
+    transition: scale var(--dur-2) var(--ease-out);
+  }
+  /* The item stepped from, fading out where it was (lightbox.tsx's fadeOutLbItem). */
+  .lb-ghost {
+    position: absolute;
+    height: auto;
+    pointer-events: none;
+    animation: lb-fade-out var(--dur-3) var(--ease-out) forwards;
+  }
+  @keyframes lb-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  /* The neighbour a horizontal swipe drags in, a screen's width beside the item. */
+  .lb-peek {
+    position: absolute;
+    max-width: 100dvw;
+    max-height: 100dvh;
+    object-fit: contain;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .lb-peek--on {
+    visibility: visible;
   }
 
   /* Glass: dark enough behind full-white text for 4.7:1 over a pure-white picture (WCAG AA); don't lighten it. */
@@ -3293,70 +3330,57 @@
     margin-left: auto;
   }
 
-  @keyframes lb-enter-right {
+  /* The new item slides in from the side it was stepped toward (from where a swipe's peek was), fading in. */
+  @keyframes lb-enter-x {
     from {
-      transform: translateX(40px);
+      translate: var(--lb-enter-from) 0;
+      opacity: var(--lb-enter-opacity, 0);
+    }
+  }
+  @keyframes lb-enter-y {
+    from {
+      translate: 0 var(--lb-enter-from);
       opacity: 0;
     }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
   }
-  @keyframes lb-enter-left {
-    from {
-      transform: translateX(-40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
+  :is(.lb-img, .lb-video):is(.lb-anim-right, .lb-anim-left) {
+    animation: lb-enter-x var(--dur-3) var(--ease-out);
   }
-  /* The vertical pair: a game step (↑/↓ or a vertical swipe), not a media one. */
-  @keyframes lb-enter-bottom {
-    from {
-      transform: translateY(40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  :is(.lb-img, .lb-video):is(.lb-anim-bottom, .lb-anim-top) {
+    animation: lb-enter-y var(--dur-3) var(--ease-out);
   }
-  @keyframes lb-enter-top {
-    from {
-      transform: translateY(-40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  :is(.lb-anim-right, .lb-anim-bottom):not([style*='--lb-enter-from']) {
+    --lb-enter-from: 24px;
   }
-  .lb-img.lb-anim-right {
-    animation: lb-enter-right var(--dur-2) var(--ease-out) forwards;
+  :is(.lb-anim-left, .lb-anim-top):not([style*='--lb-enter-from']) {
+    --lb-enter-from: -24px;
   }
-  .lb-img.lb-anim-left {
-    animation: lb-enter-left var(--dur-2) var(--ease-out) forwards;
+  /* Carried on from a swipe: already in sight under the finger, so no fade. */
+  [style*='--lb-enter-from'] {
+    --lb-enter-opacity: 1;
   }
-  .lb-img.lb-anim-bottom {
-    animation: lb-enter-bottom var(--dur-2) var(--ease-out) forwards;
-  }
-  .lb-img.lb-anim-top {
-    animation: lb-enter-top var(--dur-2) var(--ease-out) forwards;
-  }
+  /* After a moment only, so a cached picture never flashes it: a thin ring on a glass disc. */
   #screenshot-lightbox:is(.lb--loading, .lb--buffering) .lb-surface::after {
     content: '';
     position: absolute;
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgb(255 255 255 / 0.2);
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgb(255 255 255 / 0.25);
     border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 0.75s linear infinite;
+    box-shadow: 0 0 0 8px rgb(0 0 0 / 0.55);
+    background: rgb(0 0 0 / 0.55);
+    opacity: 0;
+    animation:
+      spin 0.75s linear infinite,
+      lb-appear var(--dur-1) 400ms forwards;
     z-index: 2;
     pointer-events: none;
+  }
+  @keyframes lb-appear {
+    to {
+      opacity: 1;
+    }
   }
   .lb-error {
     position: absolute;
@@ -3370,6 +3394,11 @@
     text-align: center;
     padding: 20px 24px;
     border-radius: var(--radius-3);
+  }
+  .lb-error-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--warn);
   }
   .lb-error-msg {
     margin: 0;

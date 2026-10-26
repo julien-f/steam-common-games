@@ -1,6 +1,6 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
-import { present } from './presentation.ts';
+import { present, presented } from './presentation.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
@@ -23,6 +23,7 @@ import Minimize from 'lucide-solid/icons/minimize';
 import Pause from 'lucide-solid/icons/pause';
 import Play from 'lucide-solid/icons/play';
 import Rewind from 'lucide-solid/icons/rewind';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import Volume2 from 'lucide-solid/icons/volume-2';
 import VolumeX from 'lucide-solid/icons/volume-x';
@@ -112,6 +113,9 @@ const LB_HINT_KEY = 'steam.isonoe.net:lightbox-hint-seen';
 // The viewer's own mute choice, kept across trailers and visits (a browser's refused sound isn't one).
 const LB_MUTED_KEY = 'steam.isonoe.net:lightbox-muted';
 let lbBufferTimer: ReturnType<typeof setTimeout> | undefined;
+// Where a committed swipe left the item and its incoming neighbour, so the step carries on from there.
+let lbSwipeLeft: DOMRect | null = null;
+let lbSwipeEnterFrom: number | null = null;
 
 // No-ops until initLightbox sets them; nothing can open the lightbox before that.
 let _onLightboxParamChange: (shotId: string | null) => void = () => {};
@@ -578,11 +582,14 @@ function LightboxDom() {
           <ChevronLeft />
         </button>
         <img class="lb-img" src="" alt="Screenshot" />
+        {/* The neighbour a horizontal swipe drags in beside the item. */}
+        <img class="lb-peek" alt="" aria-hidden="true" />
         <video class="lb-video" playsinline />
         <button class="lb-btn lb-glass lb-next" aria-label="Next screenshot">
           <ChevronRight />
         </button>
         <div class="lb-error lb-glass" style={{ display: 'none' }} role="alert">
+          <TriangleAlert class="lb-error-icon" />
           <p class="lb-error-msg" />
           <button class="lb-error-retry">Retry</button>
         </div>
@@ -892,6 +899,21 @@ function setLbDrag(el: HTMLElement, x: number, y: number) {
   el.style.transform = `translate(${x}px, ${y}px)`;
 }
 
+// The neighbour following the finger in from the side it's dragged toward, a screen's width away.
+function setLbPeek(x: number) {
+  const peek = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-peek')!;
+  const list = shots();
+  const next = list[(idx() + (x < 0 ? 1 : -1) + list.length) % list.length];
+  const src = next.type === 'video' ? next.thumb : next.thumb || next.main!;
+  if (peek.getAttribute('src') !== src) peek.src = src;
+  peek.style.transform = `translateX(${x + (x < 0 ? innerWidth : -innerWidth)}px)`;
+  peek.classList.add('lb-peek--on');
+}
+
+function clearLbPeek() {
+  document.querySelector('#screenshot-lightbox .lb-peek')!.classList.remove('lb-peek--on');
+}
+
 // `animate`: a swipe that didn't commit eases back. A committed one clears instantly instead —
 // `renderLightbox`'s own enter animation takes the element over from there.
 function clearLbDrag(el: HTMLElement, animate: boolean) {
@@ -1008,6 +1030,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         const free = dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList || dy > 0; // down closes
         const slack = free ? 1 : LB_SWIPE_RESISTANCE;
         setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
+        if (dragAxis === 'x' && dragMediaCount > 1) setLbPeek(dx);
         e.preventDefault();
       }
     },
@@ -1035,6 +1058,11 @@ function wireTouchHandlers(lb: HTMLElement) {
         });
         dragAxis = null;
         const el = lbMediaEl();
+        if (action === 'media-prev' || action === 'media-next') {
+          lbSwipeLeft = el?.getBoundingClientRect() ?? null;
+          lbSwipeEnterFrom = dx + (dx < 0 ? innerWidth : -innerWidth);
+        }
+        clearLbPeek();
         if (el) clearLbDrag(el, !action);
         if (action === 'close') closeLightbox();
         else if (action === 'media-prev' || action === 'media-next')
@@ -1101,6 +1129,7 @@ function wireTouchHandlers(lb: HTMLElement) {
       touchPanning = false;
       if (dragAxis) {
         dragAxis = null;
+        clearLbPeek();
         const el = lbMediaEl();
         if (el) clearLbDrag(el, true);
       }
@@ -1361,8 +1390,34 @@ export function repointLightboxGame(game: ReadonlyGame) {
   _onLightboxParamChange(next[target].shotId);
 }
 
+// Shrinks a still back into the panel hero's picture when it's on screen; else the dialog fades (CSS).
 export function closeLightbox() {
   if (!isLightboxOpen()) return; // the `close` event that follows our own close()
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const hero = document.querySelector<HTMLImageElement>('#panel-hero .panel-hero-img');
+  const heroShown = hero?.checkVisibility() && hero.getBoundingClientRect().bottom > 0;
+  if (!lbShowingImage() || !heroShown || presented()) return closeLightboxNow();
+  const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
+  morph({
+    from: img,
+    update: closeLightboxNow,
+    to: () => hero,
+    ready: (to) => (to as HTMLImageElement).decode(),
+    focus: () => {},
+    start: () => {
+      backdrop.style.viewTransitionName = 'lb-backdrop';
+      lb.style.viewTransitionName = 'lb-chrome';
+    },
+    finish: () => {
+      backdrop.style.viewTransitionName = '';
+      lb.style.viewTransitionName = '';
+    },
+  });
+}
+
+function closeLightboxNow() {
+  if (!isLightboxOpen()) return;
   setLbGame(null);
   _awaitingMedia = null;
   clearTimeout(lbVcTimer);
@@ -1469,6 +1524,35 @@ function renderLbCaption() {
 // adjacent shots) or a side effect (network fetches, timers) — the same imperative style the
 // original file used, now just re-triggered by a Solid effect instead of being called
 // manually after mutating plain module variables.
+// The item stepped from fades out where it was (where a swipe left it) while the new one enters.
+function fadeOutLbItem(lb: HTMLElement) {
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const rect = lbSwipeLeft ?? img.getBoundingClientRect();
+  lbSwipeLeft = null;
+  if (!lbShowingImage() || img.style.opacity === '0' || !img.src || !rect.width) return;
+  const ghost = img.cloneNode() as HTMLImageElement;
+  ghost.className = 'lb-ghost';
+  ghost.removeAttribute('style');
+  Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
+  ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+  lbSurface(lb).append(ghost);
+}
+
+// Named for the side the new item comes in from, the one stepped toward: the next media from the
+// right, the next game from the bottom; after a swipe, from where its peek was under the finger.
+function enterLbItem(el: HTMLElement, base: string, dir: number, axis: SwipeAxis) {
+  el.style.removeProperty('--lb-enter-from');
+  if (dir === 0) {
+    el.className = base;
+    return;
+  }
+  if (lbSwipeEnterFrom !== null) el.style.setProperty('--lb-enter-from', `${lbSwipeEnterFrom}px`);
+  lbSwipeEnterFrom = null;
+  const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : dir > 0 ? 'right' : 'left';
+  el.className = `${base} lb-anim-${from}`;
+  el.addEventListener('animationend', () => (el.className = base), { once: true });
+}
+
 function renderLightbox() {
   const list = shots();
   const i = idx();
@@ -1485,6 +1569,7 @@ function renderLightbox() {
   resetLbZoom();
   const appid = lbGame()?.appid;
   const gameChanged = appid !== lbRenderedAppid;
+  if (dir !== 0) fadeOutLbItem(lb);
   flashLbCounter(lb, gameChanged);
   lbRenderedAppid = appid;
   hideLbError();
@@ -1505,6 +1590,7 @@ function renderLightbox() {
     attachLbVideo();
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
+    enterLbItem(vid, 'lb-video', dir, axis);
     vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
     vid.muted = lbMutedChoice();
     syncLbMuteBtn(lb);
@@ -1524,21 +1610,7 @@ function renderLightbox() {
     img.alt = label;
     img.onload = null;
     img.onerror = null;
-    if (dir !== 0) {
-      // Named for the side the new shot comes in from, which is the one swiped toward: the
-      // next media enters from the right, the next game from the bottom.
-      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : dir > 0 ? 'right' : 'left';
-      img.className = `lb-img lb-anim-${from}`;
-      img.addEventListener(
-        'animationend',
-        () => {
-          img.className = 'lb-img';
-        },
-        { once: true },
-      );
-    } else {
-      img.className = 'lb-img';
-    }
+    enterLbItem(img, 'lb-img', dir, axis);
     // Show a degraded placeholder (the thumbnail, already loaded/cached from
     // the hero carousel) instead of leaving the *previous* shot on screen
     // while the full-size image loads. The banner shot has no separate

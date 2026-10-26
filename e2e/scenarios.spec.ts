@@ -4523,6 +4523,25 @@ test('F1 edge: on a phone, a double-tap seek leaves the trailer playing', async 
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
+test('F1 edge: on a phone, a sideways swipe drags the next media in beside the one leaving', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  const peek = page.locator('.lb-peek');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y: 420 }] });
+  for (let x = 280; x >= 200; x -= 20)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: 420 }] });
+  await expect(peek).toBeVisible();
+  await expect(peek).toHaveAttribute('src', /Screenshot%202/);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(peek).toBeHidden();
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+});
+
 test('F1 edge: on a phone, a pinch zooms around the point between the fingers', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');
   await asPlayer(page, ALICE);
@@ -5238,6 +5257,25 @@ test("I2 edge: the panel's ground takes a trace of the game's art, and stays neu
   );
 });
 
+test('F1 edge: under reduced motion the lightbox opens and closes without morphing', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('.panel-hero-img')).not.toHaveClass(/loading/);
+  await page.evaluate(() => {
+    const w = window as unknown as { transitions: number };
+    w.transitions = 0;
+    const start = document.startViewTransition.bind(document);
+    document.startViewTransition = (cb) => (w.transitions++, start(cb));
+  });
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-status')).toContainText('Trailer 1 of 1');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+  expect(await page.evaluate(() => (window as unknown as { transitions: number }).transitions)).toBe(0);
+});
+
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
 
@@ -5315,6 +5353,35 @@ test.describe('with motion on', () => {
     await page.goBack();
     await expect(page.locator('#screenshot-lightbox')).toBeHidden();
     await expect(page.locator('#panel-title')).toHaveText('Hades');
+  });
+
+  test('F1 edge: closing the lightbox shrinks its picture back into the panel; a step fades the old one out', async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+    await expect(page.locator('.panel-hero-img')).not.toHaveClass(/loading/);
+    await page.getByRole('button', { name: 'Open in lightbox' }).click();
+    await expect(page.locator('#screenshot-lightbox')).toHaveCSS('opacity', '1');
+    await expect(page.locator('.lb-img')).not.toHaveClass(/lb-anim/);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('.lb-ghost')).toHaveCount(1);
+    await expect(page.locator('.lb-img')).toHaveClass(/lb-anim-right/);
+    await expect(page.locator('.lb-ghost')).toHaveCount(0); // gone once faded
+    await expect(page.locator('.lb-img')).not.toHaveClass(/lb-anim/);
+    await page.evaluate(() => {
+      const w = window as unknown as { transitions: number };
+      w.transitions = 0;
+      const start = document.startViewTransition.bind(document);
+      document.startViewTransition = (cb) => (w.transitions++, start(cb));
+    });
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => (window as unknown as { transitions: number }).transitions)).toBe(1);
+    await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+    await expect(page.locator('.panel-hero-img')).toHaveAttribute('src', /Screenshot%202/);
+    await expect(page.locator('[style*="view-transition-name"]')).toHaveCount(0);
+    await expect(page.locator('.panel-hero-open')).toBeFocused();
   });
 
   test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
