@@ -370,11 +370,6 @@
   .present-chip-btn:hover {
     background: var(--line);
   }
-  @media (max-width: 768px) {
-    .present-chip {
-      display: none;
-    }
-  }
 
   .app-footer {
     color: var(--muted);
@@ -1951,8 +1946,9 @@
   .panel-refresh-icon.is-refreshing {
     animation: spin 0.75s linear infinite;
   }
-  /* The presentation window is a second window on a second screen: a desktop's. */
-  @media (max-width: 768px) {
+  /* The presentation window is a second window on a second screen: a desktop's, at any width (a
+     window snapped to half the screen still presents). The chip, which stops it, never hides. */
+  @media not (any-pointer: fine) {
     .panel-present-btn {
       display: none;
     }

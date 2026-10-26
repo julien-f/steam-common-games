@@ -1104,6 +1104,23 @@ test('C8.1-4,6-7: the presentation window shows only what is presented, stays fu
   await expect(chip).toBeHidden();
 });
 
+test('C8 edge: a desktop window narrowed while presenting keeps Present and the chip that stops it', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.setViewportSize({ width: 700, height: 800 });
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(page.getByRole('button', { name: 'Present (P)' })).toBeVisible();
+  const shown = await startPresenting(page);
+  await page.keyboard.press('Escape'); // this narrow, the panel covers the nav, as everywhere in the app
+  const chip = page.getByRole('banner').locator('.present-chip');
+  await expect(chip).toBeVisible();
+  const closed = shown.waitForEvent('close');
+  await chip.getByRole('button', { name: 'Stop presenting' }).click();
+  await closed;
+});
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');
