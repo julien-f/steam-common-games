@@ -297,8 +297,10 @@ function lbPausedNow() {
 }
 
 function toggleLbMute() {
-  if (lbTvTrailer()) control(playback()?.muted ? 'unmute' : 'mute');
-  else setLbMuted(!lbVideoEl.muted);
+  const pb = playback();
+  if (!lbTvTrailer()) setLbMuted(!lbVideoEl.muted);
+  else if (pb?.needsClick) noteLb(document.getElementById('screenshot-lightbox')!, 'Click the TV for sound');
+  else control(pb?.muted ? 'unmute' : 'mute');
 }
 
 function drawLbTvTime() {
@@ -337,16 +339,19 @@ function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
   lb.classList.toggle('lb--automuted', !!pb?.needsClick);
   const playBtn = lb.querySelector('.lb-vc-play')!;
   playBtn.classList.toggle('lb-on', !paused);
-  playBtn.setAttribute('aria-label', paused ? 'Play on TV' : 'Pause on TV');
+  playBtn.setAttribute('aria-label', paused ? 'Play on the TV' : 'Pause the TV');
   const bigPlay = lb.querySelector('.lb-bigplay')!;
   bigPlay.classList.toggle('lb-on', !paused);
   bigPlay.setAttribute(
     'aria-label',
-    pb?.ended ? 'Replay on TV' : paused ? 'Play trailer on TV' : 'Pause trailer on TV',
+    pb?.ended ? 'Replay on the TV' : paused ? 'Play trailer on the TV' : 'Pause the trailer on the TV',
   );
   const muteBtn = lb.querySelector('.lb-vc-mute')!;
   muteBtn.classList.toggle('lb-on', !!pb?.muted);
-  muteBtn.setAttribute('aria-label', pb?.needsClick ? 'Click the TV for sound' : pb?.muted ? 'Unmute TV' : 'Mute TV');
+  // Waiting for a click on the TV, unmuting here can do nothing (`toggleLbMute` says so).
+  muteBtn.setAttribute('aria-label', pb?.muted || pb?.needsClick ? 'Unmute the TV' : 'Mute the TV');
+  muteBtn.setAttribute('aria-disabled', String(!!pb?.needsClick));
+  muteBtn.setAttribute('title', pb?.needsClick ? 'Click the TV for sound' : '');
   if (pb) lbTvClock = { t: pb.t, dur: pb.dur, at: performance.now(), playing: !paused && !pb.buffering };
   // The TV's report of the seek the scrubber asked for ends its hold.
   if (lbScrubTarget !== null && pb && Math.abs(pb.t - lbScrubTarget) < 1) lbScrubUntil = 0;
@@ -650,6 +655,9 @@ function resetLbVcLabels(lb: HTMLElement) {
   lb.querySelector('.lb-vc-play')!.setAttribute('aria-label', 'Play');
   lb.querySelector('.lb-bigplay')!.setAttribute('aria-label', 'Play trailer');
   lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek');
+  const mute = lb.querySelector('.lb-vc-mute')!;
+  mute.removeAttribute('aria-disabled');
+  mute.removeAttribute('title');
   syncLbMuteBtn(lb);
 }
 
@@ -886,7 +894,7 @@ function LightboxDom() {
             {/* Steering the TV, or private; its × stops presenting (the nav chip is under this modal). */}
             <Show when={presented()}>
               <div class="lb-tv lb-glass" classList={{ 'lb-tv--private': !linked() }}>
-                <button class="lb-tv-toggle" aria-pressed={linked()} aria-keyshortcuts="P" onClick={toggleTv}>
+                <button class="lb-tv-toggle" aria-keyshortcuts="P" onClick={toggleTv}>
                   <Cast aria-hidden="true" />
                   {linked() ? 'On TV' : 'Private · P to show'}
                 </button>
@@ -1945,7 +1953,7 @@ function renderLightbox() {
       setLbLoading(lb, false);
       vc.style.display = '';
       resetLbVc(vc);
-      lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek on TV');
+      lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek on the TV');
       schedHideLbChrome();
     } else {
       // Show a degraded placeholder (the thumbnail, already loaded/cached from

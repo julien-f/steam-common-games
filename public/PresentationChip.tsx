@@ -8,6 +8,7 @@ import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import Volume2 from 'lucide-solid/icons/volume-2';
 import VolumeX from 'lucide-solid/icons/volume-x';
 import X from 'lucide-solid/icons/x';
+import { announce } from './announce.ts';
 import { control, playback, presented, stopPresenting } from './presentation.ts';
 
 export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
@@ -17,7 +18,9 @@ export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
   const paused = () => playback()?.paused ?? false;
   const muted = () => !!playback()?.muted;
   const playPause = () => control(ended() ? 'replay' : paused() ? 'play' : 'pause');
-  const muteToggle = () => control(muted() ? 'unmute' : 'mute');
+  // Waiting for a click on the TV, unmuting here can do nothing: it says so instead.
+  const needsClick = () => !!playback()?.needsClick;
+  const muteToggle = () => (needsClick() ? announce('Click the TV for sound') : control(muted() ? 'unmute' : 'mute'));
   // Space and M on the focused chip itself, as on a player; its buttons keep their own Space.
   const onKey = (e: KeyboardEvent & { currentTarget: HTMLElement }) => {
     if (e.target !== e.currentTarget || !isVideo() || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -34,6 +37,7 @@ export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
           class="present-chip"
           role="group"
           aria-label={`Presenting ${onAir().name}, ${onAir().spoken}`}
+          aria-keyshortcuts="Space K M"
           tabindex="0"
           onKeyDown={onKey}
         >
@@ -68,8 +72,9 @@ export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
             <button
               type="button"
               class="present-chip-btn"
-              aria-label={playback()?.needsClick ? 'Click the TV for sound' : muted() ? 'Unmute the TV' : 'Mute the TV'}
-              title={playback()?.needsClick ? 'Click the TV for sound' : muted() ? 'Unmute' : 'Mute'}
+              aria-label={muted() || needsClick() ? 'Unmute the TV' : 'Mute the TV'}
+              aria-disabled={needsClick()}
+              title={needsClick() ? 'Click the TV for sound' : muted() ? 'Unmute' : 'Mute'}
               onClick={muteToggle}
             >
               <Show when={muted()} fallback={<Volume2 />}>
@@ -90,7 +95,7 @@ export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
             <span
               class="present-chip-progress"
               aria-hidden="true"
-              style={{ width: `${(100 * (playback()?.t ?? 0)) / (playback()?.dur || 1)}%` }}
+              style={{ '--present-progress': `${(100 * (playback()?.t ?? 0)) / (playback()?.dur || 1)}%` }}
             />
           </Show>
         </div>

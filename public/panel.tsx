@@ -1924,13 +1924,13 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
       <button
         class="panel-hero-open"
         classList={{ 'panel-hero-open--present': toTv() }}
-        aria-label={toTv() ? 'Present this media' : 'Open in lightbox'}
+        aria-label={isOnTv() ? 'On TV: open in the lightbox' : toTv() ? 'Present this media' : 'Open in lightbox'}
         onClick={openCurrent}
       >
         {/* Said on the picture, not only in its label: a click presents it, or it's what the TV shows. */}
         <Show when={presented()}>
           <span class="panel-hero-present lb-glass" aria-hidden="true">
-            <Show when={isOnTv()} fallback={<Cast />}>
+            <Show when={isOnTv()} fallback={!privateMode() && <Cast />}>
               <span class="panel-hero-present-dot" />
             </Show>
             {isOnTv() ? 'On TV' : privateMode() ? 'Open' : 'Present'}
@@ -2385,7 +2385,6 @@ function PresentButton(): JSX.Element {
       classList={{ 'panel-present-btn--on': heroOnTv() }}
       title={heroOnTv() ? 'On TV' : 'Present on second screen (P)'}
       aria-label={heroOnTv() ? 'On TV' : 'Present on second screen'}
-      aria-pressed={heroOnTv()}
       aria-keyshortcuts="P"
       onClick={presentHero}
     >

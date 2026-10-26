@@ -341,7 +341,6 @@
     min-width: 0;
     height: var(--control-h);
     padding: 0 3px 0 6px;
-    overflow: hidden;
     border: 1px solid var(--accent);
     border-radius: var(--radius-3);
     background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -418,13 +417,15 @@
     width: 16px;
     height: 16px;
   }
+  /* Along the chip's inside bottom edge, its corners rounded with it (the chip itself clips nothing: focus rings). */
   .present-chip-progress {
     position: absolute;
-    left: 0;
-    bottom: 0;
+    inset: auto 0 0;
     height: 2px;
-    background: var(--accent);
+    border-radius: 0 0 calc(var(--radius-3) - 1px) calc(var(--radius-3) - 1px);
+    background: linear-gradient(to right, var(--accent) var(--present-progress), transparent 0);
     pointer-events: none;
+    forced-color-adjust: none; /* forced colours would repaint its fill away */
   }
   /* Narrower, it never hides (it stops the TV): the item first, then the picture, then a shorter name. */
   @media (max-width: 1100px) {
@@ -3749,7 +3750,7 @@
     .lb-tv-toggle .lucide {
       color: CanvasText;
     }
-    .lb-tv-toggle[aria-pressed='true'] {
+    .lb-tv:not(.lb-tv--private) .lb-tv-toggle {
       outline: 2px solid Highlight;
       outline-offset: -2px;
     }

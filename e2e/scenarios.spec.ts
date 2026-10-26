@@ -1228,7 +1228,11 @@ test('C8.5: the nav chip plays, pauses, mutes and replays the TV, and shows how 
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
   // Unmuted before a click there, Chrome would pause it: the TV waits, and the chip says why.
   await chip.getByRole('button', { name: 'Unmute the TV' }).click();
-  await expect(chip.getByRole('button', { name: 'Click the TV for sound' })).toBeVisible();
+  const waiting = chip.getByRole('button', { name: 'Unmute the TV' });
+  await expect(waiting).toHaveAttribute('aria-disabled', 'true');
+  await expect(waiting).toHaveAttribute('title', 'Click the TV for sound');
+  await waiting.dispatchEvent('click'); // says why, sends nothing (Playwright won't press an aria-disabled button)
+  await expect(page.locator('[role="status"]', { hasText: 'Click the TV for sound' })).toBeAttached();
   expect(await tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
   await shown.locator('.pres').click();
   await expect(chip.getByRole('button', { name: 'Mute the TV' })).toBeVisible();
@@ -1352,11 +1356,11 @@ test('C8 edge: the panel says which of its media is on the TV', async ({ page },
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await startPresenting(page);
-  const onTv = page.getByRole('button', { name: 'On TV' });
-  await expect(onTv).toHaveAttribute('aria-pressed', 'true');
+  const onTv = page.getByRole('button', { name: 'On TV', exact: true });
+  await expect(onTv).toHaveClass(/panel-present-btn--on/);
   await expect(page.locator('.panel-hero-present')).toHaveText('On TV');
   await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click(); // another item, not presented
-  await expect(page.getByRole('button', { name: 'Present on second screen' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Present on second screen' })).not.toHaveClass(/panel-present-btn--on/);
   await expect(page.locator('.panel-hero-present')).toHaveText('Present');
 });
 
@@ -1597,7 +1601,7 @@ test('C8.6: while presenting, a media opened from the panel opens the lightbox o
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox).toHaveAttribute('open');
   await expect.poll(picture).toContain('Screenshot%203');
-  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
   await expect(lightbox.locator('.lb-status')).toHaveText(
     'Linked to the TV. On TV: Hades, game 1 of 1, Screenshot 3 of 3',
   );
@@ -1677,7 +1681,6 @@ test('C8 edge: P in the linked lightbox keeps what follows private, sticking unt
   await page.keyboard.press('p');
   const pill = lightbox.locator('.lb-tv-toggle');
   await expect(pill).toHaveAccessibleName('Private · P to show');
-  await expect(pill).toHaveAttribute('aria-pressed', 'false');
   await expect(lightbox.locator('.lb-status')).toHaveText('Private, the TV keeps Hades');
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('Escape');
@@ -1775,18 +1778,19 @@ test("C8 edge: a linked trailer's controls drive the TV, showing one state at a 
   await expect(lightbox.locator('.lb-tvplaying')).toHaveText('Playing on TV');
 
   await reachForControls(page);
-  await lightbox.getByRole('button', { name: 'Pause on TV' }).click();
+  await lightbox.getByRole('button', { name: 'Pause the TV' }).click();
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await expect.poll(overlays).toEqual(['.lb-bigplay']);
-  await lightbox.getByRole('button', { name: 'Play trailer on TV' }).click();
+  await lightbox.getByRole('button', { name: 'Play trailer on the TV' }).click();
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
 
   await reachForControls(page);
-  await lightbox.getByRole('button', { name: 'Mute TV' }).click();
+  await lightbox.getByRole('button', { name: 'Mute the TV' }).click();
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
   // Unmuted before a click there, the TV waits for one, and the lightbox says so.
-  await lightbox.getByRole('button', { name: 'Unmute TV' }).click();
-  await expect(lightbox.getByRole('button', { name: 'Click the TV for sound' }).first()).toBeVisible();
+  await lightbox.getByRole('button', { name: 'Unmute the TV' }).click();
+  await expect(lightbox.locator('.lb-vc-mute')).toHaveAttribute('aria-disabled', 'true');
+  await expect(lightbox.locator('.lb-unmute')).toHaveText('Click the TV for sound');
   await expect(lightbox.locator('.lb-status')).toContainText('Click the TV for sound');
 
   // Seeking: Shift+→ and L add up on the TV's own position.
@@ -1795,7 +1799,7 @@ test("C8 edge: a linked trailer's controls drive the TV, showing one state at a 
   await page.keyboard.press('Shift+ArrowRight');
   await page.keyboard.press('l');
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(45);
-  const scrub = lightbox.getByRole('slider', { name: 'Seek on TV' });
+  const scrub = lightbox.getByRole('slider', { name: 'Seek on the TV' });
   await scrub.focus();
   await page.keyboard.press('Home');
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(0);
@@ -1812,7 +1816,7 @@ test("C8 edge: a linked trailer's controls drive the TV, showing one state at a 
     v.dispatchEvent(new Event('ended'));
   });
   await expect.poll(overlays).toEqual(['.lb-bigplay']);
-  await lightbox.getByRole('button', { name: 'Replay on TV' }).click();
+  await lightbox.getByRole('button', { name: 'Replay on the TV' }).click();
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => [v.currentTime, v.paused])).toEqual([0, false]);
 });
 
@@ -1893,7 +1897,7 @@ test("C8 edge: the chip opens what's on the TV in the lightbox, steering it from
   await expect(page).toHaveURL(/\/$/);
   await page.getByRole('button', { name: "Open what's on the TV" }).click();
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
-  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
   await page.waitForTimeout(500);
   expect(await sentShots(shown)).toEqual(['s1']);
   await page.keyboard.press('ArrowDown');
@@ -1990,7 +1994,7 @@ test("C8 edge: a linked trailer's scrubber seeks the TV once when let go; a canc
   const tv = shown.locator('video.pres-media');
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
   await reachForControls(page);
-  const scrub = lightbox.getByRole('slider', { name: 'Seek on TV' });
+  const scrub = lightbox.getByRole('slider', { name: 'Seek on the TV' });
   const box = (await scrub.boundingBox())!;
   const seeks = () =>
     shown.evaluate(
@@ -2041,7 +2045,7 @@ test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now 
   const shown = await popup;
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
   await expect(lightbox).toHaveAttribute('open');
-  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
   await expect(page.getByRole('banner').locator('.present-chip')).toContainText('Hades');
   expect(popups).toBe(1);
   expect(await page.evaluate(() => (window as unknown as { postsAtKey: number[] }).postsAtKey)).toEqual([0]);
