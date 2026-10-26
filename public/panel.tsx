@@ -1899,6 +1899,7 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   const [loadedSrc, setLoadedSrc] = createSignal<string>();
   const [brokenSrc, setBrokenSrc] = createSignal<string>();
   const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
+  const isOnScreen = createMemo(() => onScreen(current().shotId));
   // A pointer click on a loaded picture morphs it into the lightbox's; a key or a video opens at once.
   // While presenting, the presentation window stands in for the lightbox.
   const openCurrent = (e: MouseEvent & { currentTarget: HTMLElement }) => {
@@ -1932,10 +1933,10 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
         {/* Said on the picture, not only in its label: a click presents it, or it's what the TV shows. */}
         <Show when={presented()}>
           <span class="panel-hero-present lb-glass" aria-hidden="true">
-            <Show when={onScreen(current().shotId)} fallback={<Cast />}>
+            <Show when={isOnScreen()} fallback={<Cast />}>
               <span class="panel-hero-present-dot" />
             </Show>
-            {onScreen(current().shotId) ? 'On screen' : 'Present'}
+            {isOnScreen() ? 'On screen' : 'Present'}
           </span>
         </Show>
         <img
@@ -2376,10 +2377,10 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
 // Presents the hero's media (presentation.ts), opening the presentation window first if needed.
 // Pressed, in the accent, while the hero's media is what's on the second screen.
 function PresentButton(): JSX.Element {
-  const heroOnScreen = () => {
+  const heroOnScreen = createMemo(() => {
     const items = getPanelItems();
     return onScreen(items[clampedHeroIdx(items.length)]?.shotId);
-  };
+  });
   return (
     <button
       type="button"

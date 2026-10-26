@@ -1221,6 +1221,23 @@ test('C8 edge: Space and M on the focused chip pause and mute the TV, without sc
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
 });
 
+test('C8 edge: P on what failed on the TV tries it again', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['slow-media'] });
+  let broken = true;
+  await page
+    .context()
+    .route('**/api/mock-media/**?full', (route) => (broken ? route.fulfill({ status: 500 }) : route.fallback()));
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page);
+  await expect(shown.getByRole('alert')).toBeVisible();
+  broken = false;
+  await page.keyboard.press('p');
+  await expect(shown.getByRole('alert')).toHaveCount(0);
+});
+
 test('C8 edge: a picture the TV failed to load shows on the chip, which retries it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await mockApi(page, { states: ['slow-media'] }); // media from /api/mock-media, so one can fail

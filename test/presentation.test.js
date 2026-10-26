@@ -266,11 +266,17 @@ async function presentWithMockedClock(t) {
   await flush();
 }
 
-test("with the window's handle, its silence doesn't matter, only its closing", async (t) => {
+test("with the window's handle, its closing forgets it at once", async (t) => {
   await presentWithMockedClock(t);
-  t.mock.timers.tick(60000);
-  assert.equal(p.presented().appid, 10);
   openResult.closed = true;
+  t.mock.timers.tick(5000);
+  assert.equal(p.presented(), null);
+});
+
+test('with the handle too, a window gone silent (a crashed TV stays open) is forgotten after three beats', async (t) => {
+  await presentWithMockedClock(t);
+  t.mock.timers.tick(15000);
+  assert.equal(p.presented().appid, 10);
   t.mock.timers.tick(5000);
   assert.equal(p.presented(), null);
 });

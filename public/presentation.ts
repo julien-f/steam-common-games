@@ -24,6 +24,9 @@ let channel: BroadcastChannel | null = null;
 let win: Window | null = null;
 let lastSeen = 0;
 let lastHidden = false;
+// A lightbox trailer's playhead for the window's first sight of it (sent, or answered on its hello),
+// never kept in `presented()`: a reload or a retry would replay it.
+let handover: Pick<OnAir, 'startAt' | 'paused'> | undefined;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let byeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -44,7 +47,8 @@ function post(msg: ToPresentation) {
 function seen() {
   lastSeen = Date.now();
   heartbeatTimer ??= setInterval(() => {
-    if (win) return void (win.closed && lost());
+    if (win?.closed) return lost();
+    // Beats too, handle or not: a crashed TV ("Aw, Snap") stays open but goes silent.
     const silence = lastHidden ? HIDDEN_SILENCE_MS : HEARTBEAT_MS * MISSED_BEATS;
     // Judged only while this window is visible: a hidden tab's own timers are throttled and would misjudge.
     if (document.visibilityState === 'visible' && Date.now() - lastSeen > silence) lost();
@@ -59,6 +63,8 @@ function lost() {
 
 function forget() {
   clearTimeout(byeTimer);
+  lastHidden = false;
+  handover = undefined;
   setPresented(null);
   setPlayback(null);
   clearInterval(heartbeatTimer);
@@ -79,7 +85,9 @@ function onMessage(e: MessageEvent<FromPresentation>) {
   if (msg.type === 'playback') setPlayback(msg.playback);
   const current = presented();
   // A reloaded window asks again; a reloaded main window learns what's shown from the window's state.
-  if (msg.type === 'hello' && current) post({ main: mainId, type: 'onAir', onAir: current });
+  if (msg.type === 'hello') setPlayback(null); // a reloaded window: its report follows
+  if (msg.type === 'hello' && current) post({ main: mainId, type: 'onAir', onAir: { ...current, ...handover } });
+  if (msg.type === 'hello') handover = undefined;
   if (msg.type === 'state' && !current && msg.onAir) setPresented(msg.onAir);
 }
 
@@ -102,20 +110,25 @@ addEventListener('pageshow', (e) => e.persisted && mainId && post({ main: mainId
 
 // Shows one media of `game` in the presentation window, opening it first if needed (it then asks for
 // the media on hello). A plain object: store rows are proxies, which postMessage can't clone.
-export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAir, 'startAt' | 'paused'>): void {
+export function present(game: ReadonlyGame, shotId: string, from?: Pick<OnAir, 'startAt' | 'paused'>): void {
   const items = buildMediaItems(game.appid, game.details?.meta);
   const i = items.findIndex((s) => s.shotId === shotId);
   if (i < 0) return;
   const wasPresenting = presented() != null;
   const spoken = mediaLabel(items, i);
   const name = game.name || `App ${game.appid}`;
-  const onAir = { appid: game.appid, name, item: items[i], label: spoken.replace(' of ', ' / '), spoken, ...handover };
+  const onAir = { appid: game.appid, name, item: items[i], label: spoken.replace(' of ', ' / '), spoken };
+  handover = from;
   if (presented()?.item.shotId !== shotId || presented()?.appid !== game.appid) setPlayback(null);
   announce(`Presenting ${name}, ${spoken}`);
   setPresented(onAir);
   seen();
   // An open window main forgot (missed beats) is sent to, not reopened: that would reload it out of fullscreen.
-  if (win ? !win.closed : wasPresenting) return post({ main: mainId!, type: 'onAir', onAir });
+  if (win ? !win.closed : wasPresenting) {
+    post({ main: mainId!, type: 'onAir', onAir: { ...onAir, ...handover } });
+    handover = undefined;
+    return;
+  }
   const id = storedId() ?? crypto.randomUUID();
   try {
     sessionStorage.setItem(ID_KEY, id);

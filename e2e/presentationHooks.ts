@@ -42,6 +42,7 @@ function install(hooks: PresentationHooks) {
       },
       set(this: HTMLMediaElement, src: string) {
         this.dataset.src = src; // never loaded: nothing to fail
+        if (src) queueMicrotask(() => this.dispatchEvent(new Event('loadedmetadata')));
       },
     });
     const playing = new WeakSet<HTMLMediaElement>();

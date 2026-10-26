@@ -106,6 +106,7 @@ function PresentationView() {
     session.setActionHandler('pause', name ? () => video.pause() : null);
   }
 
+  let showAbort: AbortController | undefined;
   function show({ name, item, spoken, startAt, paused }: OnAir) {
     setFailed(false);
     fadeOut();
@@ -124,8 +125,14 @@ function PresentationView() {
       // With sound when the browser allows it; muted, and saying so, when it wants a click here first.
       video.muted = false;
       setSilenced(false);
-      if (startAt) video.currentTime = startAt;
-      if (paused) video.addEventListener('play', () => video.pause(), { once: true });
+      // A lightbox handover: loading the stream resets the position, so it's set once loaded; listeners
+      // tied to this show only (a trailer that never starts mustn't pause the next one).
+      showAbort?.abort();
+      showAbort = new AbortController();
+      const signal = showAbort.signal;
+      if (startAt)
+        video.addEventListener('loadedmetadata', () => (video.currentTime = startAt), { once: true, signal });
+      if (paused) video.addEventListener('play', () => video.pause(), { once: true, signal });
       playHls(video, item.hls, fail, () => setSilenced(true));
     } else {
       stopHls(video);
@@ -145,7 +152,11 @@ function PresentationView() {
   }
 
   function obey(c: Control) {
-    if (c === 'retry') return show(onAir()!);
+    if (c === 'retry') {
+      const shown = onAir();
+      if (shown) show(shown); // nothing yet: a window just reloaded, before its onAir
+      return;
+    }
     if (video.hidden) return;
     if (c === 'play') video.play().catch(() => {});
     if (c === 'pause') video.pause();
@@ -174,7 +185,8 @@ function PresentationView() {
       setTimeout(() => window.close(), FADE_MS);
     }
     if (msg.type === 'control') obey(msg.control);
-    if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 3000);
+    // 10 s: a slow reload of the main window must have time to say `main` again.
+    if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 10_000);
     // The main window is back from a reload: tell it at once, before it opens a second window.
     if (msg.type === 'main') {
       clearTimeout(mainGone);
@@ -184,7 +196,9 @@ function PresentationView() {
       const shown = onAir();
       const same = shown?.appid === msg.onAir.appid && shown.item.shotId === msg.onAir.item.shotId;
       // P again on what's up: the caption says what it is; only an ended trailer starts over.
-      if (same && !video.hidden && video.ended) video.play().catch(() => {});
+      if (same && failed())
+        show(msg.onAir); // P again on what failed: another try
+      else if (same && !video.hidden && video.ended) video.play().catch(() => {});
       else if (!same) {
         const gameChanged = shown?.appid !== msg.onAir.appid;
         setOnAir(msg.onAir);
@@ -214,6 +228,7 @@ function PresentationView() {
       setActivated(true);
       if (!document.fullscreenElement) toggleFullscreen();
     }
+    reportPlayback(); // needsClick cleared: the chip's mute is a mute again
   }
   // Placing it on the TV (Chromium): the card's button. Granted already, one click puts it there in
   // fullscreen; a first grant outlasts that click's activation, so the button then asks for another.
@@ -277,7 +292,7 @@ function PresentationView() {
         e.preventDefault();
         void (video.paused ? video.play().catch(() => {}) : video.pause());
       }
-      if (e.key === 'm' || e.key === 'M') video.muted = !video.muted;
+      if (e.key === 'm' || e.key === 'M') obey(video.muted ? 'unmute' : 'mute');
     };
     const bye = () => {
       post({ type: 'bye' });
