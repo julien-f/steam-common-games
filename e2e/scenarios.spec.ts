@@ -2,6 +2,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { HEARTBEAT_MS } from '../public/presentationProtocol.ts';
+import { hookPresentation } from './presentationHooks.ts';
 import { asPlayer, shot } from './state.ts';
 import {
   ALICE,
@@ -1189,18 +1190,11 @@ test('C8 edge: a trailer presented before a click there says a click gives it so
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { neverActivated: true });
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
-  // As a window nobody has clicked yet (Playwright's popups report one activated), presented again.
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
-  await shown.evaluate(() =>
-    Object.defineProperty(Navigator.prototype, 'userActivation', {
-      get: () => ({ hasBeenActive: false, isActive: false }),
-    }),
-  );
-  await page.keyboard.press('p');
   const sound = shown.getByText('Click for sound');
   await expect(sound).toBeVisible();
   await expect(sound).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.55)'); // the lightbox's glass
