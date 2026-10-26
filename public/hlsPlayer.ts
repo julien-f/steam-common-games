@@ -12,10 +12,16 @@ export function loadHlsModule(): Promise<any> {
 // `onMutedFallback`: when the browser refuses autoplay with sound, play muted and say so (the lightbox's
 // Unmute pill); without it a refused autoplay just doesn't start.
 function start(videoEl: HlsVideo, onMutedFallback?: () => void) {
+  // A refusal landing after a step off the trailer (stopHls bumps the token) is no longer this trailer's.
+  const token = videoEl._hlsToken;
+  const current = () => videoEl._hlsToken === token;
   videoEl.play().catch((e: unknown) => {
-    if (!onMutedFallback || videoEl.muted || (e as Error)?.name !== 'NotAllowedError') return;
+    if (!onMutedFallback || videoEl.muted || (e as Error)?.name !== 'NotAllowedError' || !current()) return;
     videoEl.muted = true;
-    videoEl.play().then(onMutedFallback, () => {});
+    videoEl.play().then(
+      () => current() && onMutedFallback(),
+      () => {},
+    );
   });
 }
 

@@ -63,7 +63,7 @@ function PresentationView() {
       setSilenced(false);
       video.hidden = true;
       img.hidden = false;
-      img.onerror = fail;
+      img.onerror = null; // a broken thumbnail isn't the picture failing: `full` says that
       // The thumbnail stands in until the full picture has loaded.
       img.src = item.thumb;
       setLoading(true);

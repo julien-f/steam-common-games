@@ -1223,6 +1223,20 @@ test('C8 edge: a trailer presented before a click there says a click gives it so
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
 });
 
+test("C8 edge: a screenshot whose thumbnail is broken but picture loads isn't called broken", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['slow-media'] }); // media served from /api/mock-media, so a thumbnail can fail alone
+  await page.context().route('**/api/mock-media/**?thumb', (route) => route.fulfill({ status: 404 }));
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page);
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('full');
+  await expect(shown.getByRole('alert')).toHaveCount(0);
+});
+
 test('C8 edge: a trailer that fails to load says so on the presentation', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await mockApi(page, { states: ['broken-trailer'] });
@@ -3457,6 +3471,36 @@ test('M3 edge: without element fullscreen (an iPhone), only a trailer offers it,
   await reachForControls(page);
   await fullscreen.click();
   expect(await page.evaluate(() => (window as unknown as { native: boolean }).native)).toBe(true);
+});
+
+test('M1 edge: on a phone, a double-tap zoom leaves the controls as they were', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await page.clock.install();
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).not.toHaveClass(/lb-idle/);
+  const box = (await page.locator('#screenshot-lightbox .lb-img').boundingBox())!;
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  for (let i = 0; i < 2; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toHaveAttribute('style', /scale\(2\)/);
+  await page.clock.runFor(500); // past the single tap's wait
+  await expect(lb).not.toHaveClass(/lb-idle/);
+});
+
+test('I2 edge: a key on a control reached with Tab leaves the controls shown', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await page.locator('.lb-next').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb-idle/);
+  await expect(page.locator('.lb-next')).toHaveCSS('opacity', '1');
 });
 
 test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms back out', async ({ page }, testInfo) => {

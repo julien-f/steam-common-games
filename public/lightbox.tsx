@@ -113,6 +113,8 @@ const LB_HINT_KEY = 'steam.isonoe.net:lightbox-hint-seen';
 // The viewer's own mute choice, kept across trailers and visits (a browser's refused sound isn't one).
 const LB_MUTED_KEY = 'steam.isonoe.net:lightbox-muted';
 let lbBufferTimer: ReturnType<typeof setTimeout> | undefined;
+// Whether the picture was last seen zoomed, so the zoom button resyncs only when that changes.
+let lbZoomShown = false;
 // Where a committed swipe left the item and its incoming neighbour, so the step carries on from there.
 let lbSwipeLeft: DOMRect | null = null;
 let lbSwipeEnterFrom: number | null = null;
@@ -320,8 +322,7 @@ function retryCurrentShot() {
   const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
-    const vid = lbVideoEl;
-    playHls(vid, shot.hls, showLbVideoError);
+    playLbTrailer(document.getElementById('screenshot-lightbox')!, shot);
   } else {
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
@@ -371,7 +372,11 @@ function applyLbTransform() {
     img.style.transform = `scale(${lbZoom}) translate(${lbPanX / lbZoom}px, ${lbPanY / lbZoom}px)`;
     img.style.cursor = 'grab';
   }
-  syncLbZoomBtn(img.closest('#screenshot-lightbox')!);
+  // Only when zoom starts or ends: syncing reads layout, and this runs on every pan or pinch move.
+  if (lbZoom > 1 !== lbZoomShown) {
+    lbZoomShown = lbZoom > 1;
+    syncLbZoomBtn(img.closest('#screenshot-lightbox')!);
+  }
 }
 
 function resetLbZoom() {
@@ -447,6 +452,14 @@ function resetLbVc(vc: HTMLElement) {
   scrub.value = String(0);
   scrub.style.backgroundImage = lbScrubGradient(0);
   syncLbTime(vc, 0, 0);
+}
+
+// Starts a trailer at the viewer's own mute, falling back to muted (and saying so) where the browser refuses sound.
+function playLbTrailer(lb: HTMLElement, shot: MediaItem) {
+  lbVideoEl.muted = lbMutedChoice();
+  syncLbMuteBtn(lb);
+  lb.classList.remove('lb--automuted', 'lb--ended');
+  playHls(lbVideoEl, shot.hls, showLbVideoError, () => lb.classList.add('lb--automuted'));
 }
 
 function syncLbTime(vc: HTMLElement, at: number, duration: number) {
@@ -702,7 +715,7 @@ function wireButtons(lb: HTMLElement) {
     e.preventDefault();
     closeLightbox();
   });
-  lb.addEventListener('close', closeLightbox);
+  lb.addEventListener('close', closeLightboxNow); // already closed: nothing left to morph from
   // A click, not a drag that ended there (panning a zoomed picture past its edge).
   const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
   let downX = 0,
@@ -731,8 +744,8 @@ function wireKeyboard(lb: HTMLElement) {
       // Ctrl/⌘/Alt+key is the browser's (reload, find, print); Shift is part of some bindings.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
-      // The keyboard gets no chrome; Tab, moving focus onto it, does.
-      if (e.key !== 'Tab' && e.key !== 'Shift') hideLbChrome();
+      // The keyboard gets no chrome; Tab, moving focus onto it, does — and keeps it while focus is on a control.
+      if (e.key !== 'Tab' && e.key !== 'Shift' && !(e.target as Element).closest('button, input')) hideLbChrome();
 
       // Focus trap
       if (e.key === 'Tab') {
@@ -997,7 +1010,7 @@ function wireTouchHandlers(lb: HTMLElement) {
       } else if (e.touches.length === 1) {
         // A touch starting on the chrome is operating it, not swiping the media behind it —
         // dragging the video scrubber sideways otherwise steps to the next shot as well.
-        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn, .lb-bigplay')) {
+        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn, .lb-bigplay, .lb-unmute')) {
           lbActive = false;
           return;
         }
@@ -1269,6 +1282,8 @@ function wireVideoControls(lb: HTMLElement) {
     'touchend',
     (e) => {
       const t = e.changedTouches[0];
+      // Already taken by wireTouchHandlers' own touchend: a double-tap's zoom or seek, a seek streak.
+      if (e.defaultPrevented) return;
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
       if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
       if (lbShowingVideo()) e.preventDefault(); // its click would play or pause: the centre button does
@@ -1613,18 +1628,15 @@ function renderLightbox() {
     vid.poster = shot.thumb || '';
     enterLbItem(vid, 'lb-video', dir, axis);
     vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
-    vid.muted = lbMutedChoice();
-    syncLbMuteBtn(lb);
-    lb.classList.remove('lb--automuted', 'lb--ended');
     vc.style.display = '';
     resetLbVc(vc);
-    playHls(vid, shot.hls, showLbVideoError, () => lb.classList.add('lb--automuted'));
+    playLbTrailer(lb, shot);
     syncLbPaused();
     schedHideLbChrome();
   } else {
     stopHls(vid);
     detachLbVideo();
-    lb.classList.remove('lb--unstarted');
+    lb.classList.remove('lb--unstarted', 'lb--automuted', 'lb--ended', 'lb--buffering');
     syncLbPaused();
     vc.style.display = 'none';
     img.style.display = 'block';
