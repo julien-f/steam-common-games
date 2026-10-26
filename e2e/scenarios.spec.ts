@@ -3417,6 +3417,7 @@ test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there',
     const w = window as Window & { locks?: string[] };
     w.locks = [];
     screen.orientation.lock = async (type: string) => void w.locks!.push(type);
+    screen.orientation.unlock = () => void w.locks!.push('unlock');
   });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -3429,6 +3430,33 @@ test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there',
   // Firefox for Android drops the lock when a trailer stops; the orientation change re-locks it.
   await page.evaluate(() => screen.orientation.dispatchEvent(new Event('change')));
   await expect.poll(locks).toEqual(['landscape', 'landscape']);
+  // Leaving fullscreen hands the rotation back.
+  await page.evaluate(() => document.exitFullscreen());
+  await expect.poll(locks).toEqual(['landscape', 'landscape', 'unlock']);
+});
+
+test('F1 edge: without element fullscreen (an iPhone), only a trailer offers it, in the native player', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    for (const name of ['fullscreenEnabled', 'webkitFullscreenEnabled'])
+      Object.defineProperty(Document.prototype, name, { get: () => false });
+    (HTMLVideoElement.prototype as HTMLVideoElement & { webkitEnterFullscreen: () => void }).webkitEnterFullscreen =
+      function () {
+        (window as unknown as { native: boolean }).native = true;
+      };
+  });
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const fullscreen = page.locator('.lb-fullscreen');
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  await expect(fullscreen).toBeHidden();
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await reachForControls(page);
+  await fullscreen.click();
+  expect(await page.evaluate(() => (window as unknown as { native: boolean }).native)).toBe(true);
 });
 
 test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms back out', async ({ page }, testInfo) => {

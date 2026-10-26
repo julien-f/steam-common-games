@@ -225,8 +225,25 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
-function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void } {
-  return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+type WebkitDoc = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+  webkitFullscreenEnabled?: boolean;
+};
+function webkitDoc(): WebkitDoc {
+  return document as WebkitDoc;
+}
+
+// An iPhone has no element fullscreen: only a <video>'s own, in the native player.
+type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+function canElementFullscreen() {
+  return !!(document.fullscreenEnabled || webkitDoc().webkitFullscreenEnabled);
+}
+
+// Shown only where it does something: element fullscreen, else a trailer the native player can take.
+function syncLbFullscreenShown(lb: HTMLElement) {
+  const native = lbShowingVideo() && !!(lbVideoEl as WebkitVideo).webkitEnterFullscreen;
+  lb.querySelector<HTMLElement>('.lb-fullscreen')!.style.display = canElementFullscreen() || native ? '' : 'none';
 }
 
 function isFullscreen() {
@@ -246,6 +263,10 @@ function syncLightboxFullscreenBtn() {
 }
 
 function toggleLbFullscreen(lb: HTMLElement) {
+  if (!canElementFullscreen()) {
+    if (lbShowingVideo()) (lbVideoEl as WebkitVideo).webkitEnterFullscreen?.();
+    return;
+  }
   if (isFullscreen()) {
     exitFullscreen();
   } else {
@@ -263,7 +284,7 @@ function toggleLbFullscreen(lb: HTMLElement) {
 // unsupported (desktop, iOS) — nothing to do then.
 function lockLbLandscape() {
   const o = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
-  if (!isFullscreen()) return;
+  if (!isFullscreen()) return o?.unlock?.(); // back to the phone's own rotation
   o?.lock?.('landscape').catch(() => {});
 }
 
@@ -1626,6 +1647,7 @@ function renderLightbox() {
     schedHideLbChrome();
   }
   syncLbZoomBtn(lb);
+  syncLbFullscreenShown(lb);
   const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
   counter.textContent = `${i + 1} / ${list.length}`;
   counter.style.display = list.length > 1 ? '' : 'none';
