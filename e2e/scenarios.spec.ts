@@ -1186,11 +1186,12 @@ test('C8 edge: P in the lightbox presents its media and closes the lightbox', as
   expect(await page.evaluate(() => (window as unknown as { postsAtKey: number[] }).postsAtKey)).toEqual([0]);
 });
 
-test('C8 edge: a trailer presented before a click there says a click gives it sound; the next media cross-fades in', async ({
+test("C8 edge: a trailer the browser won't play with sound there says a click gives it; the next media cross-fades in", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
-  await hookPresentation(page, { neverActivated: true });
+  await hookPresentation(page, { fakePlayback: true, refusedSound: true });
+  await withTrailerStream(page);
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
@@ -1215,6 +1216,95 @@ test('C8 edge: a trailer presented before a click there says a click gives it so
   await expect.poll(() => shown.evaluate(() => (window as unknown as { ghosts: number }).ghosts)).toBe(1);
   await expect(shown.locator('.pres-ghost')).toHaveCount(0);
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+});
+
+test('C8 edge: a trailer the browser lets play with sound starts with it, no pill', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const video = shown.locator('video.pres-media');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.muted)).toBe(false);
+  await expect(shown.getByText('Click for sound')).toBeHidden();
+});
+
+test('C8 edge: a click on the TV enters fullscreen, and no later click leaves it; F and double-click do', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  const fullscreen = () => shown.evaluate(() => !!document.fullscreenElement);
+  // A double-click as the first: its second half doesn't undo the first's fullscreen.
+  await shown.locator('.pres').dblclick();
+  await expect.poll(fullscreen).toBe(true);
+  await shown.waitForTimeout(600);
+  await shown.locator('.pres').click(); // someone in the room
+  await shown.waitForTimeout(200);
+  expect(await fullscreen()).toBe(true);
+  await shown.keyboard.press('Control+f'); // the browser's find
+  await shown.waitForTimeout(200);
+  expect(await fullscreen()).toBe(true);
+  await shown.keyboard.press('f');
+  await expect.poll(fullscreen).toBe(false);
+  await shown.locator('.pres').dblclick();
+  await expect.poll(fullscreen).toBe(true);
+});
+
+test("C8 edge: P on what's already up doesn't restart it; on an ended trailer, it does", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const video = shown.locator('video.pres-media');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await video.evaluate((v: HTMLVideoElement) => {
+    const w = window as unknown as { plays: number; ghosts: number };
+    w.plays = w.ghosts = 0;
+    v.addEventListener('play', () => w.plays++);
+    new MutationObserver(() => w.ghosts++).observe(document.querySelector('.pres')!, { childList: true });
+    v.currentTime = 30;
+  });
+  const seen = () =>
+    shown.evaluate(() => {
+      const { plays, ghosts } = window as unknown as { plays: number; ghosts: number };
+      return { plays, ghosts };
+    });
+  await page.keyboard.press('p');
+  await shown.waitForTimeout(300);
+  expect(await seen()).toEqual({ plays: 0, ghosts: 0 });
+  expect(await video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(30);
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.pause();
+    Object.defineProperty(v, 'ended', { get: () => true });
+  });
+  await page.keyboard.press('p');
+  await expect.poll(async () => (await seen()).plays).toBe(1);
+});
+
+test('C8 edge: P on a lightbox trailer carries on where it was on the TV', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360?shot=v1');
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  // Played to 0:42 (the fake stream errors in the lightbox, whose card would cover its play button).
+  await page.locator('#screenshot-lightbox .lb-video').evaluate((v: HTMLVideoElement) => {
+    v.currentTime = 42;
+    return v.play();
+  });
+  const shown = await startPresenting(page);
+  const video = shown.locator('video.pres-media');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(42);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
 });
 
 test("C8 edge: a screenshot whose thumbnail is broken but picture loads isn't called broken", async ({
@@ -3519,6 +3609,25 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await expect(img).not.toHaveAttribute('style', /scale/);
 });
 
+// The fixture trailer has no stream to start: give Hades' one (a stubbed browser plays anything).
+async function withTrailerStream(page: Page) {
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    const body = full.body
+      .split('\n\n')
+      .map((line: string) => {
+        if (!line.startsWith('data: ')) return line;
+        const event = JSON.parse(line.slice(6));
+        if (event.appid !== 1145360) return line;
+        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: '/trailer.m3u8' }));
+        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, movies } })}`;
+      })
+      .join('\n\n');
+    return route.fulfill({ ...full, body });
+  });
+}
+
 // A key hides the lightbox's controls; moving the mouse, as one reaching for them does (a tap on a phone), brings them back.
 async function reachForControls(page: Page) {
   if (await page.evaluate(() => matchMedia('(pointer: coarse)').matches)) {
@@ -4360,22 +4469,7 @@ test("M3 edge: a trailer the browser won't play with sound plays muted and says 
       return this.muted ? play.call(this) : Promise.reject(new DOMException('No sound yet', 'NotAllowedError'));
     };
   });
-  // The fixture trailer has no stream to start: give it one (the stubbed browser plays anything).
-  await page.route('**/api/game-details/stream', (route) => {
-    const req = route.request();
-    const full = respond(req.method(), new URL(req.url()), req.postData());
-    const body = full.body
-      .split('\n\n')
-      .map((line: string) => {
-        if (!line.startsWith('data: ')) return line;
-        const event = JSON.parse(line.slice(6));
-        if (event.appid !== 1145360) return line;
-        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: '/trailer.m3u8' }));
-        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, movies } })}`;
-      })
-      .join('\n\n');
-    return route.fulfill({ ...full, body });
-  });
+  await withTrailerStream(page);
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
   const unmute = page.locator('.lb-unmute');

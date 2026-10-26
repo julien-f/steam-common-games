@@ -80,11 +80,11 @@ if (resumedId) connect(resumedId);
 
 // Shows one media of `game` in the presentation window, opening it first if needed (it then asks for
 // the media on hello). A plain object: store rows are proxies, which postMessage can't clone.
-export function present(game: ReadonlyGame, shotId: string): void {
+export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAir, 'startAt' | 'paused'>): void {
   const item = buildMediaItems(game.appid, game.details?.meta).find((s) => s.shotId === shotId);
   if (!item) return;
   const wasPresenting = presented() != null;
-  const onAir = { appid: game.appid, name: game.name || `App ${game.appid}`, item };
+  const onAir = { appid: game.appid, name: game.name || `App ${game.appid}`, item, ...handover };
   setPresented(onAir);
   seen();
   // An open window main forgot (missed beats) is sent to, not reopened: that would reload it out of fullscreen.

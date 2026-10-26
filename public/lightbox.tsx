@@ -822,7 +822,10 @@ function wireKeyboard(lb: HTMLElement) {
         e.stopImmediatePropagation();
         const game = lbGame();
         const shot = shots()[idx()];
-        if (game && shot) present(game, shot.shotId);
+        // A trailer carries on where it was, as a cast does.
+        const vid = lbShowingVideo() ? lbVideoEl : null;
+        if (game && shot)
+          present(game, shot.shotId, vid ? { startAt: vid.currentTime, paused: vid.paused } : undefined);
         closeLightbox();
         return;
       }

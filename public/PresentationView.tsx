@@ -43,7 +43,7 @@ function PresentationView() {
     root.append(ghost);
   }
 
-  function show({ item }: OnAir) {
+  function show({ item, startAt, paused }: OnAir) {
     setFailed(false);
     fadeOut();
     // A late error or load from the previous media is dropped.
@@ -54,10 +54,12 @@ function PresentationView() {
       video.hidden = false;
       video.poster = item.thumb;
       setLoading(false);
-      // Browsers refuse sound before a first click in this window (the main window's doesn't count).
-      video.muted = !navigator.userActivation?.hasBeenActive;
-      setSilenced(video.muted);
-      playHls(video, item.hls, fail);
+      // With sound when the browser allows it; muted, and saying so, when it wants a click here first.
+      video.muted = false;
+      setSilenced(false);
+      if (startAt) video.currentTime = startAt;
+      if (paused) video.addEventListener('play', () => video.pause(), { once: true });
+      playHls(video, item.hls, fail, () => setSilenced(true));
     } else {
       stopHls(video);
       setSilenced(false);
@@ -81,20 +83,38 @@ function PresentationView() {
     // The main window is back from a reload: tell it at once, before it opens a second window.
     if (msg.type === 'main') report();
     if (msg.type === 'onAir') {
-      setOnAir(msg.onAir);
-      show(msg.onAir);
+      const shown = onAir();
+      const same = shown?.appid === msg.onAir.appid && shown.item.shotId === msg.onAir.item.shotId;
+      // P again on what's up: the caption says what it is; only an ended trailer starts over.
+      if (same && !video.hidden && video.ended) video.play().catch(() => {});
+      else if (!same) {
+        setOnAir(msg.onAir);
+        show(msg.onAir);
+      }
       wake();
       report();
     }
   }
 
-  // Its only control; the first click also lets the trailer on screen have its sound.
   function toggleFullscreen() {
-    video.muted = false;
-    setSilenced(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else root.requestFullscreen?.().catch(() => {});
+  }
+
+  // The first click (or key) here enters fullscreen and gives sound; later ones never leave fullscreen
+  // (someone in the room clicking), double-click or F does.
+  let activatedAt = 0;
+  function activate() {
+    video.muted = false;
+    setSilenced(false);
+    if (!activatedAt) {
+      activatedAt = Date.now();
+      if (!document.fullscreenElement) toggleFullscreen();
+    }
     wake();
+  }
+  function onDoubleClick() {
+    if (Date.now() - activatedAt > 500) toggleFullscreen(); // not the activating click's second half
   }
 
   let wakeLock: WakeLockSentinel | null = null;
@@ -116,6 +136,8 @@ function PresentationView() {
       HEARTBEAT_MS,
     );
     const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // the browser's
+      if (!activatedAt) return activate();
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
     };
     const bye = () => post({ type: 'bye' });
@@ -140,7 +162,8 @@ function PresentationView() {
       classList={{ 'pres--awake': awake(), 'pres--loading': loading() }}
       ref={root}
       onPointerMove={wake}
-      onClick={toggleFullscreen}
+      onClick={activate}
+      onDblClick={onDoubleClick}
     >
       <img class="pres-media" ref={img} alt="" hidden />
       <video class="pres-media" ref={video} playsinline hidden />

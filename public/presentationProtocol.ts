@@ -8,6 +8,10 @@ export interface OnAir {
   appid: number;
   name: string;
   item: MediaItem;
+  // A trailer handed over from the lightbox: where it was, and whether it was paused. Optional: a
+  // window opened before they existed still takes the message.
+  startAt?: number;
+  paused?: boolean;
 }
 export type ToPresentation = { main: string } & (
   { type: 'onAir'; onAir: OnAir } | { type: 'close' } | { type: 'main' }
