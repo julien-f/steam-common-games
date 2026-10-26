@@ -14,6 +14,9 @@ export interface PresentationHooks {
   occludable?: boolean;
   // `window.mediaKeys`: the Media Session handlers set, to press as the OS keys would.
   mediaKeys?: boolean;
+  // A laptop and a TV ("LG TV", at x 1920) under the Window Management API, its permission in this
+  // state (a prompt answers yes); `window.placed` records fullscreen requests and moves.
+  screens?: { permission: 'granted' | 'prompt' | 'denied'; count: number };
 }
 
 export async function hookPresentation(page: Page, hooks: PresentationHooks): Promise<void> {
@@ -75,6 +78,39 @@ function install(hooks: PresentationHooks) {
     MediaSession.prototype.setActionHandler = function (action: string, handler: (() => void) | null) {
       keys[action] = handler;
     } as MediaSession['setActionHandler'];
+  }
+  if (hooks.screens) {
+    const { count } = hooks.screens;
+    let permission = hooks.screens.permission;
+    const laptop = { label: 'Laptop', left: 0, top: 0, availLeft: 0, availTop: 0, availWidth: 1920, availHeight: 1050 };
+    const tv = {
+      label: 'LG TV',
+      left: 1920,
+      top: 0,
+      availLeft: 1920,
+      availTop: 0,
+      availWidth: 1920,
+      availHeight: 1080,
+    };
+    const placed: { fullscreen: string[]; moves: number[][] } = { fullscreen: [], moves: [] };
+    (window as unknown as { placed: typeof placed }).placed = placed;
+    Object.defineProperty(Screen.prototype, 'isExtended', { get: () => count > 1 });
+    (window as unknown as { getScreenDetails: () => Promise<unknown> }).getScreenDetails = async () => {
+      if (permission === 'denied') throw new DOMException('Denied', 'NotAllowedError');
+      permission = 'granted';
+      return { screens: count > 1 ? [laptop, tv] : [laptop], currentScreen: laptop };
+    };
+    const query = navigator.permissions.query.bind(navigator.permissions);
+    navigator.permissions.query = ((d: PermissionDescriptor) =>
+      d.name === ('window-management' as PermissionName)
+        ? Promise.resolve({ state: permission } as PermissionStatus)
+        : query(d)) as Permissions['query'];
+    HTMLElement.prototype.requestFullscreen = function (options?: { screen?: { label: string } }) {
+      placed.fullscreen.push(options?.screen?.label ?? 'this screen');
+      return Promise.resolve();
+    } as HTMLElement['requestFullscreen'];
+    window.moveTo = (x: number, y: number) => void placed.moves.push([x, y]);
+    window.resizeTo = () => {};
   }
   if (hooks.refusedSound) {
     const play = HTMLMediaElement.prototype.play;

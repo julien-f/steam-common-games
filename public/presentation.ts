@@ -6,6 +6,7 @@ import type { ReadonlyGame } from './types.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
 import type { Control, FromPresentation, OnAir, Playback, ToPresentation } from './presentationProtocol.ts';
 import { announce } from './announce.ts';
+import { remembered } from './presentationScreen.ts';
 
 const MISSED_BEATS = 3;
 // A hidden window's throttled timers beat about once a minute: its silence means less.
@@ -124,7 +125,12 @@ export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAi
   connect(id);
   const url = `/present.html?main=${encodeURIComponent(id)}`;
   // Blocked: P or a click is a user gesture, so browsers seldom do.
-  win = window.open(url, `playshelf-presentation-${id}`, 'popup,width=960,height=540');
+  // Straight onto the screen it was placed on last time (the browser keeps it on this one without the permission).
+  const at = remembered();
+  const where = at
+    ? `left=${at.availLeft},top=${at.availTop},width=${at.availWidth},height=${at.availHeight}`
+    : 'width=960,height=540';
+  win = window.open(url, `playshelf-presentation-${id}`, `popup,${where}`);
   if (win) return;
   forget();
   announce('Allow pop-ups for this site to present.'); // the browser's own blocked-pop-up icon is visual only

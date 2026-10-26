@@ -155,7 +155,7 @@ Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `re
 
 Outside the blob: `steam.isonoe.net:taste:<accountId>` (`tagTaste.ts`'s `Taste`: play profile, the library's tag rarities and each owned game's top 10 tags — ~325 KB for 1,000 games), rewritten each time that account's Owned list finishes loading and read by every list's Taste fit and the panel's similar owned games. A device-local cache (`tasteCache.ts`): never synced, and kept out of the blob that every pref read parses.
 
-Also outside it, device-local: `steam.isonoe.net:lightbox-hint-seen`, set once the lightbox's one-time hint has shown, and `steam.isonoe.net:lightbox-muted`, the viewer's own trailer mute.
+Also outside it, device-local: `steam.isonoe.net:lightbox-hint-seen`, set once the lightbox's one-time hint has shown, `steam.isonoe.net:lightbox-muted`, the viewer's own trailer mute, and `steam.isonoe.net:presentation-screen`, the screen the presentation window was last placed on.
 
 - **Bounded**: at most `TASTE_CACHE_MAX` (5) tastes; saving one evicts the oldest (`at`, the last Owned load), never the ★ or current account's. An evicted account's Taste fit asks to open its Owned again.
 - **Evicted first when storage is full**: a write that hits the quota (`QuotaExceededError`) evicts tastes oldest first until it fits — a pref write any taste, a taste write any but the ★, current and its own — and puts them back if it never does. A `setPref` write that still fails isn't pushed to the server either (the edit snaps back), warns `[prefs]` and shows a banner ([frontend.md](frontend.md)).

@@ -198,6 +198,25 @@ body {
 .pres-card p {
   margin: 0;
 }
+/* Chromium with a second screen: straight onto it. */
+.pres-place {
+  margin-top: 0.3em;
+  padding: 0.5em 1.1em;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 400;
+  cursor: pointer;
+}
+.pres-place:hover {
+  background: rgb(255 255 255 / 0.15);
+}
+.pres-place:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 .pres-card .lucide {
   width: 1.6em;
   height: 1.6em;

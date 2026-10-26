@@ -7,6 +7,8 @@ import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import VolumeX from 'lucide-solid/icons/volume-x';
 import { playHls, stopHls } from './hlsPlayer.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
+import { canPlace, placementGranted, remember, targetScreen } from './presentationScreen.ts';
+import type { ScreenDetailed } from './presentationScreen.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
 import type { Control, FromPresentationBody, OnAir, ToPresentation } from './presentationProtocol.ts';
 
@@ -213,6 +215,35 @@ function PresentationView() {
       if (!document.fullscreenElement) toggleFullscreen();
     }
   }
+  // Placing it on the TV (Chromium): the card's button. Granted already, one click puts it there in
+  // fullscreen; a first grant outlasts that click's activation, so the button then asks for another.
+  const [placing, setPlacing] = createSignal<'no' | 'ask' | 'ready'>('no');
+  const [targetLabel, setTargetLabel] = createSignal('');
+  let target: ScreenDetailed | null = null;
+  function aim(s: ScreenDetailed | null) {
+    target = s;
+    setTargetLabel(s?.label ?? '');
+    setPlacing(s ? 'ready' : 'ask');
+  }
+  async function place(e: MouseEvent) {
+    e.stopPropagation(); // not also fullscreen on this screen
+    if (!target) {
+      const s = await targetScreen().catch(() => null);
+      if (s) aim(s);
+      else setPlacing('no'); // refused, or no other screen after all
+      return;
+    }
+    remember(target);
+    activatedAt = Date.now();
+    setActivated(true);
+    video.muted = false;
+    setSilenced(false);
+    root.requestFullscreen?.({ screen: target } as FullscreenOptions).catch(() => {});
+    // Leaving fullscreen puts the window back where it was: on the TV, then.
+    window.moveTo(target.availLeft, target.availTop);
+    window.resizeTo(target.availWidth, target.availHeight);
+  }
+
   function onDoubleClick() {
     if (Date.now() - activatedAt > 500) toggleFullscreen(); // not the activating click's second half
   }
@@ -275,6 +306,8 @@ function PresentationView() {
     keepScreenOn();
     wake();
     post({ type: 'hello' });
+    if (canPlace())
+      void placementGranted().then(async (granted) => aim(granted ? await targetScreen().catch(() => null) : null));
     onCleanup(() => {
       clearInterval(heartbeat);
       document.removeEventListener('keydown', onKey);
@@ -310,6 +343,11 @@ function PresentationView() {
         <div class="pres-card pres-glass">
           <Cast aria-hidden="true" />
           <p>{silenced() ? 'Click for fullscreen and sound' : 'Click for fullscreen'}</p>
+          <Show when={placing() !== 'no'}>
+            <button type="button" class="pres-place" onClick={place}>
+              {placing() === 'ready' ? `Fullscreen on “${targetLabel()}”` : 'Place on the other screen'}
+            </button>
+          </Show>
         </div>
       </Show>
       <Show when={activated() && silenced()}>

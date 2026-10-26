@@ -1348,6 +1348,66 @@ test('C8 edge: in forced colours, the TV keeps its black and its text takes the 
   await expect(shown.locator('.pres-card')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0.7)');
 });
 
+for (const [permission, clicks] of [
+  ['granted', 1],
+  ['prompt', 2],
+] as const) {
+  test(`C8 edge: with a second screen and the permission ${permission}, the TV goes fullscreen on it in ${clicks} click(s), remembered`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+    await hookPresentation(page, { screens: { permission, count: 2 } });
+    await page.goto('/game/1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const shown = await startPresenting(page);
+    type Placed = { placed: { fullscreen: string[]; moves: number[][] } };
+    const placed = () => shown.evaluate(() => (window as unknown as Placed).placed);
+    const place = shown.locator('.pres-place');
+    if (clicks === 2) {
+      await place.click(); // asks the permission: that click's activation is spent on the prompt
+      expect((await placed()).fullscreen).toEqual([]);
+    }
+    await expect(place).toHaveText('Fullscreen on “LG TV”');
+    await place.click();
+    expect(await placed()).toEqual({ fullscreen: ['LG TV'], moves: [[1920, 0]] });
+    await expect(shown.locator('.pres-card')).toBeHidden();
+    // Next time, the main window opens it there.
+    await page.evaluate(() => {
+      const w = window as unknown as { opens: string[] };
+      w.opens = [];
+      const open = window.open.bind(window);
+      window.open = (url, name, features) => (w.opens.push(String(features)), open(url, name, features));
+    });
+    const closed = shown.waitForEvent('close');
+    await page.getByRole('button', { name: 'Stop presenting Hades' }).click();
+    await closed;
+    await startPresenting(page);
+    expect(await page.evaluate(() => (window as unknown as { opens: string[] }).opens)).toEqual([
+      'popup,left=1920,top=0,width=1920,height=1080',
+    ]);
+  });
+}
+
+for (const [why, screens] of [
+  ['the permission refused', { permission: 'denied', count: 2 }],
+  ['one screen', { permission: 'granted', count: 1 }],
+] as const) {
+  test(`C8 edge: with ${why}, the TV offers no placing`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+    await hookPresentation(page, { screens });
+    await page.goto('/game/1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const shown = await startPresenting(page);
+    const place = shown.locator('.pres-place');
+    if (screens.count > 1) {
+      await expect(place).toHaveText('Place on the other screen');
+      await place.click();
+    }
+    await expect(place).toBeHidden();
+    await expect(shown.locator('.pres-card')).toHaveText('Click for fullscreen'); // the drag, then
+  });
+}
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');

@@ -160,14 +160,14 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. open a game's panel
   2. **P** (or the panel's cast button): the presentation window opens on the panel's media
-  3. drag it to the second screen, click it for fullscreen
+  3. place it on the second screen (its button, in Chrome or Edge with two screens; else drag it there), click it for fullscreen
   4. browse other games and lists; the presentation doesn't move
   5. pause, play, mute or replay the trailer from the nav bar's chip, which shows what's on the TV
   6. open a media from the panel: it's presented instead of opening the lightbox, the panel marking it "On screen"
   7. present another game
   8. stop presenting from the nav bar's ×
 - **Done when**: the second screen changed only when something was presented or controlled from the chip, and stayed fullscreen through it; the nav bar names the game and media presented; nothing's left after stopping.
-- **Edges**: Ctrl+P (the browser's print); pop-ups blocked; the presentation window reloaded, closed or crashed (the nav bar forgets it); the main window reloaded (it remembers) or closed (the presentation closes); P right after reloading the main window (no second window); a second tab of the app (doesn't drive this window); Esc on the presentation; a trailer that fails (says so); P in the lightbox (presents it from where the trailer was, closes the lightbox); P again on what's up (no restart, except an ended trailer); a click in the room (stays fullscreen); the browser refusing sound (muted, says so); a phone (no Present button).
+- **Edges**: Ctrl+P (the browser's print); pop-ups blocked; the presentation window reloaded, closed or crashed (the nav bar forgets it); the main window reloaded (it remembers) or closed (the presentation closes); P right after reloading the main window (no second window); a second tab of the app (doesn't drive this window); Esc on the presentation; a trailer that fails (says so); P in the lightbox (presents it from where the trailer was, closes the lightbox); P again on what's up (no restart, except an ended trailer); a click in the room (stays fullscreen); placing refused or one screen (the drag, then); placed before (opens there); the browser refusing sound (muted, says so); a phone (no Present button).
 
 ## Lists
 
