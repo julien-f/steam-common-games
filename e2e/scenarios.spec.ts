@@ -3411,7 +3411,7 @@ test('F1 edge: the panel closes from its Close button after scrolling it', async
   await expect(page.locator('#game-panel')).toBeHidden();
 });
 
-test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there', async ({ page }) => {
+test('M3 edge: fullscreen media turns a phone to landscape, and keeps it there', async ({ page }) => {
   // Desktop browsers reject the lock, so record the calls instead.
   await page.addInitScript(() => {
     const w = window as Window & { locks?: string[] };
@@ -3435,7 +3435,7 @@ test('F1 edge: fullscreen media turns a phone to landscape, and keeps it there',
   await expect.poll(locks).toEqual(['landscape', 'landscape', 'unlock']);
 });
 
-test('F1 edge: without element fullscreen (an iPhone), only a trailer offers it, in the native player', async ({
+test('M3 edge: without element fullscreen (an iPhone), only a trailer offers it, in the native player', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -3717,7 +3717,7 @@ test('F1 edge: the lightbox leaves Ctrl/⌘/Alt shortcuts to the browser', async
   await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
 });
 
-test('F1 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
+test('M2 edge: stepping back to a game just left in the lightbox lands where it was left', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
@@ -3834,7 +3834,7 @@ test('F1 edge: ←/→ on a Cover standing in while the media streams still lets
   await expect(counter).toContainText('Screenshot 1 of 2');
 });
 
-test('F1 edge: a refresh that shrinks the media on screen still remembers where it was left', async ({ page }) => {
+test('M1 edge: a refresh that shrinks the media on screen still remembers where it was left', async ({ page }) => {
   let shrunk = false;
   await page.route('**/api/game-details/1145360?refresh=1', (route) => {
     const req = route.request();
@@ -4053,7 +4053,7 @@ test('I2 edge: opened from the keyboard, the lightbox shows only the media; a ke
   await expect(page.locator('.lb-osd')).toHaveAttribute('data-kind', 'mute');
 });
 
-test('F1 edge: the first open shows a hint at the hidden controls, once', async ({ page }, testInfo) => {
+test('M1 edge: the first open shows a hint at the hidden controls, once', async ({ page }, testInfo) => {
   await page.clock.install();
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');
@@ -4309,7 +4309,7 @@ test("F1 edge: the lightbox's counters say what they count", async ({ page }) =>
   await expect(page.getByRole('dialog', { name: 'Hades media viewer' })).toBeVisible();
 });
 
-test("F1 edge: a trailer the browser won't play with sound plays muted and says so; a mute is kept", async ({
+test("M3 edge: a trailer the browser won't play with sound plays muted and says so; a mute is kept", async ({
   page,
 }) => {
   await fakePlayback(page);
@@ -4353,7 +4353,7 @@ test("F1 edge: a trailer the browser won't play with sound plays muted and says 
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
-test('F1 edge: a trailer that ends offers a replay, and its seek line reads out its time', async ({ page }) => {
+test('M3 edge: a trailer that ends offers a replay, and its seek line reads out its time', async ({ page }) => {
   await fakePlayback(page);
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
@@ -4445,7 +4445,7 @@ test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls 
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
 });
 
-test('F1 edge: ←/→ step past a playing trailer; Shift+←/→ and J/L seek it', async ({ page }, testInfo) => {
+test('M1 edge: ←/→ step past a playing trailer; Shift+←/→ and J/L seek it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'keyboard');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
@@ -4534,7 +4534,7 @@ test('F1 edge: a trailer pauses when the page is hidden, and stays paused', asyn
   await expect(page.getByRole('button', { name: 'Play trailer' })).toBeVisible();
 });
 
-test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves it playing", async ({
+test("M3 edge: on a phone, the tap that brings back a trailer's controls leaves it playing", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');
@@ -4559,7 +4559,7 @@ test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves 
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
 });
 
-test('F1 edge: on a phone, a double-tap seek leaves the trailer playing', async ({ page }, testInfo) => {
+test('M3 edge: on a phone, a double-tap seek leaves the trailer playing', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');
   await page.clock.install();
   await fakePlayback(page);
@@ -4630,7 +4630,7 @@ test('F1 edge: on a phone, a pinch zooms around the point between the fingers', 
   expect(Math.abs((mid.x - after.x) / after.width - 0.75)).toBeLessThan(0.01);
 });
 
-test('F1 edge: on a phone, swiping down closes a lightbox with no list of games to page', async ({
+test('M1 edge: on a phone, swiping down closes a lightbox with no list of games to page', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');

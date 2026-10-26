@@ -15,6 +15,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - [Ranking](#ranking)
 - [Bundles and prices](#bundles-and-prices)
 - [Finding a game](#finding-a-game)
+- [Media](#media)
 - [Sharing](#sharing)
 - [Sync](#sync)
 - [Freshness and failures](#freshness-and-failures)
@@ -347,6 +348,44 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. Back to where I came from
 - **Done when**: the list is named for the developer or publisher ("Games by X", "Published by X"); ownership and Taste fit show; the ones I don't own open as a shared list I can save; the panel opens in place; Back returns.
 - **Edges**: no game under that exact name; more than Steam's first page (only those are ranked); Steam's store search down; a game with no Steam tags; developer = publisher; a name ending in `.io` or holding a `/`; opened from `/game/:appid`; going from one developer's list to another's; phone width; keyboard only.
+
+## Media
+
+### M1 Get a feel for a game from its media
+
+- **Who / goal**: before buying or ranking a game, I want to see what it looks like in play, with nothing but the media on screen.
+- **Steps**:
+  1. open a game's panel
+  2. click, tap or Enter its picture
+  3. step through its screenshots with ←/→ or a swipe
+  4. reach a trailer; it plays
+  5. zoom a screenshot to read its interface
+  6. close with Esc, ×, Back or a swipe down where there's no list
+- **Done when**: the media fills the screen; driven by keyboard, nothing shows but the media and a brief counter after each step; ←/→ keep stepping across a playing trailer; closing lands on the panel showing the last item, focus where it was.
+- **Edges**: a game with only its Cover (its media still loading); a refresh that shrinks the media; a slow picture (its thumbnail stands in); reduced motion; the first open's hint.
+
+### M2 Pick tonight's game by its look
+
+- **Who / goal**: browse a filtered list (F3, R2) by screenshots rather than by rows.
+- **Steps**:
+  1. open the lightbox on a game of the list
+  2. ↓ or swipe up through the games
+  3. R for a random one
+  4. ↑ back to one I liked
+  5. close, and the panel is on that game
+- **Done when**: every step lands on real media, never on a trailer from a screenshot; the game's name and its place in the list flash briefly, then go; a game paged back to opens on the item last looked at.
+- **Edges**: wrapping past either end; no list behind the game (no game stepping, and nothing suggests it); a game whose details are still loading.
+
+### M3 Watch a trailer, on a phone or the couch
+
+- **Who / goal**: watch a game's trailer full screen, with the controls out of the way.
+- **Steps**:
+  1. open the trailer
+  2. go fullscreen (F, or its button)
+  3. tap to show the controls; seek, mute, pause with the centre button
+  4. tap again to hide them
+- **Done when**: a tap toggles the controls and never pauses by itself; targets are 44 px under a finger; a mute is kept for the next trailers; the phone turns to landscape and back after; Esc leaves fullscreen before closing.
+- **Edges**: the browser refuses sound (muted, an Unmute button saying so); a double-tap seek, then more taps on that side; an iPhone (the native player); the trailer ends (a replay, no moving on).
 
 ## Sharing
 
