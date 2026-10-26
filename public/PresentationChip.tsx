@@ -1,5 +1,5 @@
-// In the site nav while presenting (presentation.ts): what's on the TV and the host's remote for it —
-// play/pause/replay and mute for a trailer, Retry after a failure, × to stop.
+// In the site nav while presenting (presentation.ts): what's on the TV, opening it in the lightbox (`onOpen`),
+// and the host's remote — play/pause/replay and mute for a trailer, Retry after a failure, × to stop.
 import { Show, type JSX } from 'solid-js';
 import Pause from 'lucide-solid/icons/pause';
 import Play from 'lucide-solid/icons/play';
@@ -10,7 +10,7 @@ import VolumeX from 'lucide-solid/icons/volume-x';
 import X from 'lucide-solid/icons/x';
 import { control, playback, presented, stopPresenting } from './presentation.ts';
 
-export function PresentationChip(): JSX.Element {
+export function PresentationChip(props: { onOpen: () => void }): JSX.Element {
   const failed = () => !!playback()?.failed;
   const isVideo = () => presented()?.item.type === 'video';
   const ended = () => !!playback()?.ended;
@@ -37,16 +37,17 @@ export function PresentationChip(): JSX.Element {
           tabindex="0"
           onKeyDown={onKey}
         >
-          <Show
-            when={!failed()}
-            fallback={<TriangleAlert class="present-chip-alert" role="img" aria-label="Couldn't load on the TV" />}
-          >
-            <img class="present-chip-thumb" src={onAir().item.thumb} alt="" />
-          </Show>
-          <span class="present-chip-name">{onAir().name}</span>
-          <span class="present-chip-item" aria-hidden="true">
-            {onAir().label}
-          </span>
+          <button type="button" class="present-chip-open" title="Open what's on the TV" onClick={() => props.onOpen()}>
+            <Show
+              when={!failed()}
+              fallback={<TriangleAlert class="present-chip-alert" role="img" aria-label="Couldn't load on the TV" />}
+            >
+              <img class="present-chip-thumb" src={onAir().item.thumb} alt="" />
+            </Show>
+            <span class="present-chip-name">{onAir().name}</span>
+            <span class="present-chip-item">{onAir().label}</span>
+            <span class="visually-hidden">: open what's on the TV</span>
+          </button>
           <Show when={failed()}>
             <button type="button" class="present-chip-btn" onClick={() => control('retry')}>
               Retry

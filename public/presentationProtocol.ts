@@ -36,6 +36,8 @@ export interface Playback {
 export type ToPresentation = { main: string } & (
   | { type: 'onAir'; onAir: OnAir }
   | { type: 'control'; control: Control }
+  // The caption again: a key pressed there that does nothing (the host browsing privately).
+  | { type: 'caption' }
   | { type: 'close' }
   | { type: 'main' }
   | { type: 'bye' }

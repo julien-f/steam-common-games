@@ -168,6 +168,10 @@ export function onRelayedKey(fn: (key: string, up: boolean) => void): () => void
   };
 }
 
+export function flashCaption(): void {
+  if (mainId && presented()) post({ main: mainId, type: 'caption' });
+}
+
 // The host's remote control: the window answers with `playback`.
 export function control(c: Control): void {
   if (mainId && presented()) post({ main: mainId, type: 'control', control: c });

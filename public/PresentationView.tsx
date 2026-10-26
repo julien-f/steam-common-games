@@ -196,6 +196,7 @@ function PresentationView() {
       setTimeout(() => window.close(), FADE_MS);
     }
     if (msg.type === 'control') obey(msg.control);
+    if (msg.type === 'caption') showCaption(CAPTION_MEDIA_MS);
     // 10 s: a slow reload of the main window must have time to say `main` again.
     if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 10_000);
     // The main window is back from a reload: tell it at once, before it opens a second window.

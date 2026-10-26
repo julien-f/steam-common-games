@@ -1812,6 +1812,78 @@ test('C8 edge: a linked trailer goes back to the lightbox paused where the TV wa
   expect(await local.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });
 
+test("C8 edge: the chip opens what's on the TV in the lightbox, steering it from that game, without sending it again", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect.poll(() => sentShots(shown)).toEqual(['s1']);
+  await page.keyboard.press('Escape');
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole('button', { name: "Open what's on the TV" }).click();
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(500);
+  expect(await sentShots(shown)).toEqual(['s1']);
+  await page.keyboard.press('ArrowDown');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
+});
+
+test("C8 edge: keys pressed on the TV step it through the main window's lightbox, opening it if need be; private, they don't", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page); // from the panel: no lightbox
+  await expect.poll(() => sentShots(shown)).toEqual(['s1']);
+  await shown.locator('.pres').click(); // its first click; then keys go on to the main window
+  await shown.keyboard.press('ArrowRight');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).toHaveAttribute('open');
+  await expect.poll(() => sentShots(shown)).toEqual(['s1', 's2']);
+  await page.keyboard.press('p'); // private
+  await page.keyboard.press('Escape');
+  await expect(lightbox).not.toHaveAttribute('open');
+  await shown.keyboard.press('ArrowRight');
+  await expect(shown.locator('.pres-caption')).toHaveClass(/pres-caption--on/); // the TV says what it still shows
+  await page.waitForTimeout(500);
+  await expect(lightbox).not.toHaveAttribute('open');
+  expect(await sentShots(shown)).toEqual(['s1', 's2']);
+});
+
+test('C8 edge: hidden behind a fullscreen TV, the main window sends a key held there once, on its release', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360?shot=s3');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3']);
+  await shown.locator('.pres').click();
+  // Hidden, its timers throttled: frozen here, so only the release can send it.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 60_000);
+  await page.evaluate(() =>
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }),
+  );
+  for (let i = 0; i < 3; i++) await shown.keyboard.down('ArrowLeft');
+  await shown.keyboard.up('ArrowLeft');
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 'v1']);
+  await shown.waitForTimeout(300);
+  expect(await sentShots(shown)).toEqual(['s3', 'v1']);
+});
+
 test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now on the TV', async ({
   page,
 }, testInfo) => {

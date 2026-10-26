@@ -1,6 +1,16 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
-import { control, present, presented, playback, privateMode, setPrivateMode, stopPresenting } from './presentation.ts';
+import {
+  control,
+  flashCaption,
+  onRelayedKey,
+  present,
+  presented,
+  playback,
+  privateMode,
+  setPrivateMode,
+  stopPresenting,
+} from './presentation.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
@@ -153,6 +163,7 @@ let _onLightboxParamChange: (shotId: string | null) => void = () => {};
 let _onGameNav: (dir: number) => void = () => {};
 let _onGameRandom: () => void = () => {};
 let _getGamePosition: () => { index: number; total: number } | null = () => null;
+let _onRejoin: () => Promise<boolean> = async () => false;
 // Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
 // Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
 // picked by the same rule the re-point itself would have used.
@@ -173,22 +184,25 @@ const _lbPrefetchedHls = new Set();
 // behind a fullscreen image that never changed. Both re-point through `repointLightboxGame`.
 // `getGamePosition()`: where the open game sits in that list, for the caption — null when there
 // is no list to page through at all (a standalone lookup), which is also what hides the caption's
-// own ↑/↓ buttons.
+// own ↑/↓ buttons. `onRejoin()`: opens this lightbox, linked, on what the TV shows (AppShell's).
 export function initLightbox({
   onParamChange,
   onGameNav,
   onGameRandom,
   getGamePosition,
+  onRejoin,
 }: {
   onParamChange: (shotId: string | null) => void;
   onGameNav: (dir: number) => void;
   onGameRandom: () => void;
   getGamePosition: () => { index: number; total: number } | null;
+  onRejoin: () => Promise<boolean>;
 }) {
   _onLightboxParamChange = onParamChange;
   _onGameNav = onGameNav;
   _onGameRandom = onGameRandom;
   _getGamePosition = getGamePosition;
+  _onRejoin = onRejoin;
   _lbTeardown?.();
   const abort = new AbortController();
   _lbSignal = abort.signal;
@@ -203,8 +217,10 @@ export function initLightbox({
   document.addEventListener('webkitfullscreenchange', lockLbLandscape, { signal: _lbSignal });
   screen.orientation?.addEventListener('change', lockLbLandscape, { signal: _lbSignal });
   const dispose = mountLightboxDom();
+  const stopRelay = onRelayedKey(onTvKey);
   _lbTeardown = () => {
     abort.abort();
+    stopRelay();
     dispose();
     _lbTeardown = null;
   };
@@ -341,13 +357,14 @@ function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
 // A wrap past either end of the list enters from the other side, the cue that it went back round —
 // except after a swipe, where the new game follows the finger.
-function stepGameNav(dir: number, swipe = false) {
+function stepGameNav(dir: number, swipe = false, relayed = false) {
   const pos = _getGamePosition();
   const wraps = !swipe && pos !== null && pos.index === (dir > 0 ? pos.total - 1 : 0);
-  stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir);
+  stepGameFromLightbox(() => _onGameNav(dir), wraps ? -dir : dir, relayed);
 }
 
-function stepGameFromLightbox(step: () => void, dir = 0) {
+// `relayed`: pressed on the TV, where the keyboard focus is; nothing to keep here.
+function stepGameFromLightbox(step: () => void, dir = 0, relayed = false) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const before = document.activeElement;
   if (dir !== 0) {
@@ -361,8 +378,34 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
     lbLastDir = 0;
     lbLastAxis = 'x';
   }
-  if (lb.contains(document.activeElement)) return;
+  if (relayed || lb.contains(document.activeElement)) return;
   ((before && lb.contains(before) ? before : lbSurface(lb)) as HTMLElement).focus();
+}
+
+// The stepping keys, pressed here or on the TV (`onTvKey`); false for any other.
+function lightboxCommand(key: string, relayed = false): boolean {
+  if (key === 'ArrowLeft' || key === 'ArrowRight') stepLightbox(key === 'ArrowRight' ? 1 : -1);
+  else if (key === 'Home' || key === 'End') gotoLightbox(key === 'Home' ? 0 : shots().length - 1);
+  else if (key === 'ArrowUp' || key === 'ArrowDown') stepGameNav(key === 'ArrowDown' ? 1 : -1, false, relayed);
+  else if (key === 'r' || key === 'R') stepGameFromLightbox(_onGameRandom, 0, relayed);
+  else return false;
+  return true;
+}
+
+// A key pressed on the TV: steps the linked lightbox, opening it on what's on the TV first; private, the TV
+// only says again what it shows. Hidden (under a fullscreen TV), timers are throttled: a step goes on release.
+let lbRejoining = false;
+function onTvKey(key: string, up: boolean) {
+  if (!presented() || lbRejoining) return;
+  if ([...document.querySelectorAll('dialog[open]')].some((d) => d.id !== 'screenshot-lightbox')) return;
+  if (privateMode()) return void (up || flashCaption());
+  if (up) return void (document.visibilityState === 'hidden' && flushLbTv());
+  if (isLightboxOpen()) return void lightboxCommand(key, true);
+  lbRejoining = true;
+  void _onRejoin().then((ok) => {
+    lbRejoining = false;
+    if (ok) lightboxCommand(key, true);
+  });
 }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
@@ -964,7 +1007,7 @@ function wireKeyboard(lb: HTMLElement) {
       if (!onScrub && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const dir = e.key === 'ArrowRight' ? 1 : -1;
-        if (!e.shiftKey) stepLightbox(dir);
+        if (!e.shiftKey) lightboxCommand(e.key);
         else if (trailer) {
           seekLb(dir * LB_SEEK_SECONDS);
           osdLb('seek');
@@ -974,20 +1017,11 @@ function wireKeyboard(lb: HTMLElement) {
         seekLb((e.key.toLowerCase() === 'l' ? 1 : -1) * LB_LONG_SEEK_SECONDS);
         osdLb('seek');
       }
-      if (!onScrub && (e.key === 'Home' || e.key === 'End')) {
+      // Home/End, ↑/↓ and R — the same random pick the panel offers: page-level shortcuts are all
+      // blocked while the lightbox is open (panelKeyboard.ts hands it the keyboard wholesale).
+      if (!onScrub && ['Home', 'End', 'ArrowUp', 'ArrowDown', 'r', 'R'].includes(e.key)) {
         e.preventDefault();
-        gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
-      }
-      if (!onScrub && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault();
-        stepGameNav(e.key === 'ArrowDown' ? 1 : -1);
-      }
-      // R, the same random pick the panel offers — page-level shortcuts are all blocked while the
-      // lightbox is open (panelKeyboard.ts hands it the keyboard wholesale), so it has to be bound
-      // here to work at all, exactly as ↑/↓ above do.
-      if (!onScrub && (e.key === 'r' || e.key === 'R')) {
-        e.preventDefault();
-        stepGameFromLightbox(_onGameRandom);
+        lightboxCommand(e.key);
       }
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
