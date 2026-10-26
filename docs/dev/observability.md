@@ -25,19 +25,19 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart, exc
 ### Outbound — `groups`
 
 - Every outbound call goes through `trackedFetch` (`lib/metrics.js`), a drop-in for `fetch`. Modules reach it only through `createTrackedFetch(group)`, bound once per group at load; it returns `(label, url, opts)` and registers the group, which is how `budgets` lists it from startup.
-- `group` is the service or routing boundary: `steam-store` (`fetchStoreApi`/`storeLimit`), `steam-browse` (`tagLimit`), `steam-reviews` (`GetAppReviews`), `steam-api` (the keyed `api.steampowered.com` calls), `steam-openid`, `protondb`, `hltb`, `itad`, `fanatical`. `label` is the calling function, so one operation stalling shows apart from its siblings.
+- `group` is the service or routing boundary: `steam-store` (`fetchStoreApi`/`storeLimit`), `steam-browse` (`tagLimit`), `steam-reviews` (`GetAppReviews`), `steam-api` (the keyed `api.steampowered.com` calls), `steam-openid`, `protondb`, `hltb`, `itad`, `fanatical`, `gamepass`. `label` is the calling function, so one operation stalling shows apart from its siblings.
 - `statusCounts` is a `{ [status]: count }` map, deliberately not one "errors" count: several non-2xx answers are expected outcomes (403 = private profile or no stats on achievements, 404 = no ProtonDB reports; see [integrations.md](integrations.md)). Read it against what's expected for that label.
 - `networkErrors`: `fetch()` itself threw (timeout, DNS, abort); never an expected outcome.
 - `avgLatencyMs`/`maxLatencyMs` cover every outcome, so an upstream slowing down before it errors shows here first.
 
 ### Inbound — `rateLimiters`
 
-- Trips (requests rejected) per `express-rate-limit` instance in `server.js`, recorded by the shared `namedRateLimit` wrapper: `search`, `friends`, `details`, `meta`, `news`, `gameSearch`, `creatorGames`, `achievements`, `bundlesList`, `bundlesById`, `bundlesResolve`, `prices`, `gameBundles`, `auth`. Plus `stream`: details streams refused by `STREAM_MAX_PER_IP`.
+- Trips (requests rejected) per `express-rate-limit` instance in `server.js`, recorded by the shared `namedRateLimit` wrapper: `search`, `friends`, `details`, `meta`, `news`, `gameSearch`, `creatorGames`, `achievements`, `bundlesList`, `bundlesById`, `bundlesResolve`, `prices`, `gameBundles`, `gamePass`, `auth`. Plus `stream`: details streams refused by `STREAM_MAX_PER_IP`.
 - Only trips count, not requests a limiter saw or skipped as cached.
 
 ### `dedupHits`, `cacheHits`, `cacheEntries`
 
-- `dedupHits`: concurrent calls `createDedup(name)` (`lib/dedup.js`) coalesced into one in flight — `steam`, `itad`, `fanatical`. A burst points at a retry loop or a polling client.
+- `dedupHits`: concurrent calls `createDedup(name)` (`lib/dedup.js`) coalesced into one in flight — `steam`, `itad`, `fanatical`, `gamepass`. A burst points at a retry loop or a polling client.
 - `cacheHits`: `getCached()` outcomes per `lib/cache.js` `GROUPS` label (`library`, `resolve`, `rating`, `meta`, `search`, `news`, `bundles`, `itad-ids`). `forced` (a user's ↻) is kept apart from `misses`. A rate limiter's cache check doesn't record, so each request counts once. Tells "traffic grew" apart from "the cache stopped working" when outbound counts jump.
 - `cacheEntries`: row count per group, read from `db.sqlite` (survives restarts, lists every group). With `cacheHits`: few entries plus many misses means a TTL too short; many entries plus many misses, a key space the cache can't help.
 

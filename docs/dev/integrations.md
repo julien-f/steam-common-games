@@ -5,7 +5,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 **Trust tiers.**
 
 - **Sanctioned**: Steam's keyed `api.steampowered.com` endpoints (among them `ResolveVanityURL` and `GetOwnedGames`, `lib/steam.js`), its key-less `GetAppReviews`, Steam OpenID's `check_authentication` (`lib/auth.js`) and the IsThereAnyDeal API — documented.
-- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/search-results/store-browse/appdetails/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
+- **Untrusted**: everything else here — HLTB's search API, Steam's wishlist/store-search/search-results/store-browse/appdetails/packagedetails/ajaxresolvebundles endpoints, ProtonDB, Fanatical's storefront feed, Microsoft's Game Pass catalog and product catalog. Undocumented, reached without a key (sometimes with spoofed browser headers), not guaranteed sanctioned by their terms, liable to break or be blocked without notice. Usage is low-volume and non-commercial; **don't scale up request volume without revisiting these notes.**
 - **Other people use the live site** (steam.isonoe.net), so their Steam IDs and profiles pass through it: attribution and privacy are real requirements, not a local tool's.
 - **Circuit breakers** (`lib/circuitBreaker.js`) on the ones that answer a block with a 403 — Steam's store, HLTB's search, ProtonDB: 2 consecutive 403s leave that upstream alone for 5 minutes, including requests already queued when it trips.
 - **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB, the store browse API and Steam reviews take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store or reviews 429 pauses every request to that upstream for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
@@ -28,6 +28,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
   - [Currency is passed through, not converted](#currency-is-passed-through-not-converted)
   - [Rate limiting](#rate-limiting)
 - [Fanatical — pick-and-mix tier prices](#fanatical--pick-and-mix-tier-prices)
+- [Xbox PC Game Pass — catalog feed](#xbox-pc-game-pass--catalog-feed)
 
 ## HLTB — no npm package
 
@@ -127,7 +128,7 @@ Documented endpoints whose "no data" answers are error statuses, treated as answ
 
 Bundle browsing (`/bundles`, `/lists/bundle/:bundleId`) and every price column come from the [IsThereAnyDeal API](https://docs.isthereanydeal.com/) via `lib/itad.js` — free, key-gated, with published (if sparse) OpenAPI docs: sanctioned tier.
 
-- **Optional**: gated on `ITAD_API_KEY`. `isItadConfigured()` (`server.js`) is checked per request; `GET /api/bundles`, `GET /api/bundles/:id`, `POST /api/bundles/resolve`, `POST /api/prices` and `GET /api/game-bundles/:appid` return 503 when unset, and the frontend hides those surfaces (`GET /api/health`'s `itadConfigured`).
+- **Optional**: gated on `ITAD_API_KEY`. `isItadConfigured()` (`server.js`) is checked per request; `GET /api/bundles`, `GET /api/bundles/:id`, `POST /api/bundles/resolve`, `POST /api/prices`, `GET /api/game-bundles/:appid` and `GET /api/game-pass` return 503 when unset, and the frontend hides those surfaces (`GET /api/health`'s `itadConfigured`).
 - **Batches of 200 ids** (`BATCH_MAX`) for every multi-id call: documented for `/games/prices/v3` (`gids-200`); an assumption for the two `/lookup/` endpoints, whose docs list no cap.
 - **Links are passed through unmodified** — ITAD's terms require prices and links as returned. An opened bundle's hero shows "View on IsThereAnyDeal ↗" (`details`) and "Get this bundle ↗" (`url`, the shop/affiliate link with its tracking params). The one addition anywhere is **Buy on Fanatical**'s `scg=…` parameter ([Fanatical](#fanatical--pick-and-mix-tier-prices)), inside that same link; every tracking parameter is left alone.
 
@@ -151,7 +152,7 @@ Bundle browsing (`/bundles`, `/lists/bundle/:bundleId`) and every price column c
 
 Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` (`lib/itad.js`, `POST /api/bundles/resolve`):
 
-1. Steam's ITAD shop id via `GET /service/shops/v1` (`getSteamShopId`, `itad-shop:steam`).
+1. Steam's ITAD shop id via `GET /service/shops/v1`, by title (`getShopId`, `itad-shop:steam`).
 2. The game ids through **`POST /lookup/shop/{shopId}/id/v1`** — not the `/lookup/{shopId}/gid/v1` the sibling endpoints' naming suggests; ITAD's convention is `/lookup/{lookup-what}/{by-what}/`, confirmed against the live API. Each shop id comes back namespaced: `"app/<id>"` (a store page, used directly), `"sub/<id>"` (a package) or `"bundle/<id>"` (a Steam bundle page).
 3. **`sub/` and `bundle/` are expanded, not misses** (`expandSteamShopId`), through two more untrusted, key-less Steam endpoints (`lib/steam.js`):
    - `GET /api/packagedetails?packageids=<id>` (`resolveSteamPackageAppids`): usually one title with no `app/` page of its own (confirmed live on "Garbage Dwellers Bundle") → one appid.
@@ -185,7 +186,7 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
 
 ### Rate limiting
 
-- `BUNDLES_RATE_LIMIT_MAX` backs five limiters — `bundlesListLimit`, `bundlesByIdLimit`, `bundlesResolveLimit`, `pricesLimit`, `gameBundlesLimit` — each `skip`ping a request it can answer from cache by rebuilding that route's cache key (the same pattern as `detailsLimit`). Without the skip, reloading a bundle page a few times would 429 a genuinely new bundle open.
+- `BUNDLES_RATE_LIMIT_MAX` backs six limiters — `bundlesListLimit`, `bundlesByIdLimit`, `bundlesResolveLimit`, `pricesLimit`, `gameBundlesLimit`, `gamePassLimit` — each `skip`ping a request it can answer from cache by rebuilding that route's cache key (the same pattern as `detailsLimit`). Without the skip, reloading a bundle page a few times would 429 a genuinely new bundle open.
 - `pricesLimit` checks `itad-price:` for whichever of `gids`/`appids` was sent, plus `itad-gid:` for `appids`.
 - `bundlesByIdLimit` can't skip — `findBundleById` walks a variable number of pages — so it gets twice the budget instead; its pages are still cached underneath.
 
@@ -212,3 +213,17 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
 - **Frontend**: [frontend.md](frontend.md#each-list-kind-in-practice) — tier chips, the per-game Tier Price, the selection's cost (`cheapestPicks`).
 - **Pricing rule** (confirmed by the maintainer): any number of games can be picked, each at the per-game rate of the largest tier reached — 6 games at "5 for €5.99" cost 6 × €5.99 / 5. `cheapestPicks` also considers rounding up to a larger tier when its price is lower.
 - **Assumptions** (unconfirmed against Fanatical's checkout): below the smallest tier, that tier's price is the minimum; the total is rounded to the cent, not each game's price.
+
+## Xbox PC Game Pass — catalog feed
+
+`GET /api/game-pass?country=` (`lib/gamepass.js`): the Steam games in PC Game Pass, plus the ones not on Steam by name.
+
+1. **Catalog**: `GET https://catalog.gamepass.com/sigls/v2?id=fdd9e2a7-0fee-49f6-ad69-4354098401ff&language=en-us&market=<country>` — the "All PC Games" collection xbox.com's PC Game Pass page lists. Undocumented, key-less: untrusted tier. The first entry describes the collection; the rest are `{ id }`, Microsoft Store product ids.
+   - **Varies by market** (checked 2026-10-26: US 516 ids; FR identical; DE and BR 2 fewer; JP 24 fewer and 4 of its own), so it follows the app's region and is cached per market (`gamepass:pc:<country>`).
+   - An empty or unparseable catalog is an upstream error, never cached as an empty Game Pass.
+2. **Product ids → ITAD gids**: `POST /lookup/id/shop/{shopId}/v1`, the Microsoft Store shop looked up by title (`getShopId('Microsoft Store')`, `lookupShopGids`). The reply also keys ids lowercased (seen live), so they're matched case-insensitively. Several product ids (editions) map to one gid: each game counts once. Cached with the catalog.
+3. **Gids → Steam appids**: `resolveSteamAppIds`, as for [bundles](#resolving-bundle-games-to-steam). Checked 2026-10-26 on US: 516 ids → 377 gids → 344 on Steam.
+4. **Names of the games not on Steam** (no gid, or a gid with no Steam listing): `GET https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=<ids>&market=<country>&languages=en-us&fieldsTemplate=browse` — Microsoft's product catalog, undocumented, key-less: untrusted tier. 100 ids per call; `browse` is the smallest template carrying `ProductTitle` (~13 KB per product). Cached per product (`msstore-title:`); a failure logs `[gamepass]` and degrades to the bare id.
+
+- **Volume**: one catalog call and one ITAD lookup per market per `BUNDLES_CACHE_TTL_MINUTES`, plus titles for newly seen non-Steam products (about 2 calls on a cold US cache).
+- **Failure**: a gid whose Steam lookup errored is counted in `failed` (uncached, retried next time), not reported as not on Steam.

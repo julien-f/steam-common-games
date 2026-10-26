@@ -1517,6 +1517,47 @@ test('GET /api/creator-games: 502 when the store search fails', async (t) => {
   assert.ok(res.body.error);
 });
 
+// ── GET /api/game-pass ───────────────────────────────────────────────────────
+
+test('GET /api/game-pass: 200 with appids, games not on Steam and fetchedAt; refresh=1 re-fetches', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  setCache('itad-shop:microsoft store', 48);
+  setCache('itad-appid:g1', 10);
+  setCache('msstore-title:B', 'Bee');
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.match(url, /^https:\/\/catalog\.gamepass\.com\/.*market=DE/);
+    return { ok: true, json: async () => [{ siglId: 'x' }, { id: 'A' }, { id: 'B' }] };
+  });
+  setCache('gamepass:pc:DE', [
+    { id: 'A', gid: 'g1' },
+    { id: 'B', gid: null },
+  ]);
+  const res = await api.get('/api/game-pass?country=de');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.appids, [10]);
+  assert.deepEqual(res.body.notOnSteam, [{ id: 'B', title: 'Bee' }]);
+  assert.equal(res.body.failed, 0);
+  assert.equal(res.body.fetchedAt, getCachedAt('gamepass:pc:DE'));
+  assert.equal(fetchMock.mock.callCount(), 0);
+  fetchMock.mock.mockImplementation(async (url) =>
+    url.startsWith('https://catalog.gamepass.com/')
+      ? { ok: true, json: async () => [{ id: 'A' }, { id: 'B' }] }
+      : { ok: true, json: async () => ({ A: 'g1' }) },
+  );
+  await api.get('/api/game-pass?country=DE&refresh=1');
+  assert.equal(fetchMock.mock.callCount(), 2, 'the catalog and its ITAD lookup');
+});
+
+test('GET /api/game-pass: 502 when the catalog fails', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  const res = await api.get('/api/game-pass');
+  assert.equal(res.status, 502);
+  assert.ok(res.body.error);
+});
+
 test('GET /api/search-games: empty results (no fetch) when q is missing', async (t) => {
   _reset();
   let fetchCalled = false;

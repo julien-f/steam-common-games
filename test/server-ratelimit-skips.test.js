@@ -192,3 +192,23 @@ test('game bundles limiter: counts cache misses but never counts cache hits', as
     hits: { 'cached bundles': gameBundles(710), 'null gid': gameBundles(711) },
   });
 });
+
+test('game pass limiter: counts cache misses but never counts cache hits', async (t) => {
+  _reset();
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(String(url));
+    if (String(url).startsWith('https://catalog.gamepass.com/')) return { ok: true, json: async () => [{ id: 'A' }] };
+    return { ok: true, json: async () => ({ A: 'g1' }) };
+  });
+  setCache('itad-shop:microsoft store', 48);
+  setCache('itad-appid:g1', 10);
+  setCache('gamepass:pc:FR', [{ id: 'A', gid: 'g1' }]);
+
+  const gamePass = (query) => () => api.get(`/api/game-pass?${query}`);
+  await assertMissesCountHitsDont(calls, {
+    misses: { 'uncached market': gamePass('country=US'), 'another market': gamePass('country=DE') },
+    over: gamePass('country=JP'),
+    hits: { 'cached market': gamePass('country=fr') },
+  });
+});
