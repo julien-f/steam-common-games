@@ -4098,7 +4098,7 @@ test('F1 edge: on a phone, the previous/next media buttons sit clear of the medi
   await page.goto('/lists/owned?game=1145360&shot=v1');
   await page.getByRole('button', { name: 'Play trailer' }).click();
   // At the ends of the trailer's control row.
-  await clear('#screenshot-lightbox .lb-vctrls > *');
+  await clear('#screenshot-lightbox :is(.lb-vc-row > *, .lb-vc-scrub)');
 });
 
 test("F1 edge: the viewer's toolbar holds only fullscreen, zoom and close", async ({ page }) => {
@@ -4241,6 +4241,69 @@ test("F1 edge: the lightbox's counters say what they count", async ({ page }) =>
   await page.getByRole('button', { name: 'Previous screenshot' }).click();
   await expect(status).toHaveText('Cover');
   await expect(page.getByRole('dialog', { name: 'Hades media viewer' })).toBeVisible();
+});
+
+test("F1 edge: a trailer the browser won't play with sound plays muted and says so; a mute is kept", async ({
+  page,
+}) => {
+  await fakePlayback(page);
+  // A browser that plays the stream natively (so it autoplays here) and refuses sound before any click.
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.canPlayType = () => 'maybe';
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      return this.muted ? play.call(this) : Promise.reject(new DOMException('No sound yet', 'NotAllowedError'));
+    };
+  });
+  // The fixture trailer has no stream to start: give it one (the stubbed browser plays anything).
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    const body = full.body
+      .split('\n\n')
+      .map((line: string) => {
+        if (!line.startsWith('data: ')) return line;
+        const event = JSON.parse(line.slice(6));
+        if (event.appid !== 1145360) return line;
+        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: '/trailer.m3u8' }));
+        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, movies } })}`;
+      })
+      .join('\n\n');
+    return route.fulfill({ ...full, body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  const unmute = page.locator('.lb-unmute');
+  await expect(unmute).toBeVisible();
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause'); // playing, muted
+  await unmute.click();
+  await expect(unmute).toBeHidden();
+  expect(await page.locator('.lb-video').evaluate((v: HTMLVideoElement) => v.muted)).toBe(false);
+  // The viewer's own mute holds for the next trailer, even after a reload.
+  await page.locator('.lb-vc-mute').click();
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await expect(page.locator('.lb-vc-mute')).toHaveAccessibleName('Unmute');
+  await expect(unmute).toBeHidden(); // muted by choice, not by the browser
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+});
+
+test('F1 edge: a trailer that ends offers a replay, and its seek line reads out its time', async ({ page }) => {
+  await fakePlayback(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=v1');
+  await page.getByRole('button', { name: 'Play trailer' }).click();
+  await expect(page.getByRole('slider', { name: 'Seek' })).toHaveAttribute('aria-valuetext', '0:00 of 0:00');
+  // As a browser does at the end: pause, then ended.
+  await page.locator('.lb-video').evaluate(async (v: HTMLVideoElement) => {
+    v.pause();
+    await new Promise((resolve) => setTimeout(resolve));
+    v.dispatchEvent(new Event('ended'));
+  });
+  const replay = page.getByRole('button', { name: 'Replay trailer' });
+  await expect(replay).toBeVisible();
+  await expect(replay.locator('.lucide-rotate-ccw')).toBeVisible();
+  await replay.click();
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });
 
 test('F1 edge: a paused trailer offers a large play button', async ({ page }) => {

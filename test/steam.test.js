@@ -1177,6 +1177,7 @@ test('getAppDetails: extracts movies with hls field', async (t) => {
   assert.equal(result.movies.length, 2);
   assert.equal(result.movies[0].thumbnail, 'https://example.com/thumb.jpg');
   assert.equal(result.movies[0].hls, 'https://example.com/vid.m3u8');
+  assert.equal(result.movies[0].name, 'Trailer');
   assert.equal(result.movies[1].hls, null);
 });
 

@@ -23,6 +23,7 @@ import Minimize from 'lucide-solid/icons/minimize';
 import Pause from 'lucide-solid/icons/pause';
 import Play from 'lucide-solid/icons/play';
 import Rewind from 'lucide-solid/icons/rewind';
+import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import Volume2 from 'lucide-solid/icons/volume-2';
 import VolumeX from 'lucide-solid/icons/volume-x';
 import X from 'lucide-solid/icons/x';
@@ -108,6 +109,9 @@ const LB_DOUBLE_TAP_DIST = 30;
 let lbByKey = false;
 let lbChromeTapTimer: ReturnType<typeof setTimeout> | undefined;
 const LB_HINT_KEY = 'steam.isonoe.net:lightbox-hint-seen';
+// The viewer's own mute choice, kept across trailers and visits (a browser's refused sound isn't one).
+const LB_MUTED_KEY = 'steam.isonoe.net:lightbox-muted';
+let lbBufferTimer: ReturnType<typeof setTimeout> | undefined;
 
 // No-ops until initLightbox sets them; nothing can open the lightbox before that.
 let _onLightboxParamChange: (shotId: string | null) => void = () => {};
@@ -407,7 +411,7 @@ function flashSeek(side: 'left' | 'right', seconds: number) {
 }
 
 function lbScrubGradient(pct: number) {
-  return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+  return `linear-gradient(to right, var(--accent) ${pct}%, rgb(255 255 255 / 0.3) ${pct}%)`;
 }
 
 // Zeroes out the scrubber/time labels immediately so a newly-loaded video
@@ -417,8 +421,38 @@ function resetLbVc(vc: HTMLElement) {
   const scrub = vc.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
   scrub.value = String(0);
   scrub.style.backgroundImage = lbScrubGradient(0);
-  vc.querySelector<HTMLElement>('.lb-vc-time')!.textContent = '0:00';
-  vc.querySelector<HTMLElement>('.lb-vc-dur')!.textContent = '0:00';
+  syncLbTime(vc, 0, 0);
+}
+
+function syncLbTime(vc: HTMLElement, at: number, duration: number) {
+  vc.querySelector('.lb-vc-time')!.textContent = `${fmtTime(at)} / ${fmtTime(duration)}`;
+  vc.querySelector('.lb-vc-scrub')!.setAttribute('aria-valuetext', `${fmtTime(at)} of ${fmtTime(duration)}`);
+}
+
+// The viewer's mute (the button, M, the Unmute pill): kept for the next trailers, unlike the browser's.
+function setLbMuted(muted: boolean) {
+  lbVideoEl.muted = muted;
+  document.getElementById('screenshot-lightbox')?.classList.remove('lb--automuted');
+  try {
+    localStorage.setItem(LB_MUTED_KEY, muted ? '1' : '0');
+  } catch {
+    // storage refused: the choice lasts this trailer
+  }
+}
+
+// Also called right after a render sets `muted`: a just-attached <video> may not report it in `volumechange`.
+function syncLbMuteBtn(lb: HTMLElement) {
+  const btn = lb.querySelector('.lb-vc-mute')!;
+  btn.classList.toggle('lb-on', lbVideoEl.muted);
+  btn.setAttribute('aria-label', lbVideoEl.muted ? 'Unmute' : 'Mute');
+}
+
+function lbMutedChoice(): boolean {
+  try {
+    return localStorage.getItem(LB_MUTED_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 // ── Chrome (toolbar/nav/video-controls) idle-hide ──────────────────────────
@@ -562,20 +596,26 @@ function LightboxDom() {
         <button class="lb-bigplay lb-glass" aria-label="Play trailer">
           <Play class="lb-icon-off" />
           <Pause class="lb-icon-on" />
+          <RotateCcw class="lb-bigplay-replay" />
         </button>
+        <button class="lb-unmute lb-glass">
+          <VolumeX /> Unmute
+        </button>
+        {/* The seek line across the top, the buttons and time below it (YouTube's). */}
         <div class="lb-vctrls" style={{ display: 'none' }}>
-          {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
-          <button class="lb-vc-btn lb-vc-play" aria-label="Play">
-            <Play class="lb-icon-off" />
-            <Pause class="lb-icon-on" />
-          </button>
-          <span class="lb-vc-time">0:00</span>
           <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
-          <span class="lb-vc-dur">0:00</span>
-          <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">
-            <Volume2 class="lb-icon-off" />
-            <VolumeX class="lb-icon-on" />
-          </button>
+          <div class="lb-vc-row">
+            {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
+            <button class="lb-vc-btn lb-glass lb-vc-play" aria-label="Play">
+              <Play class="lb-icon-off" />
+              <Pause class="lb-icon-on" />
+            </button>
+            <button class="lb-vc-btn lb-glass lb-vc-mute" aria-label="Mute">
+              <Volume2 class="lb-icon-off" />
+              <VolumeX class="lb-icon-on" />
+            </button>
+            <span class="lb-vc-time lb-glass">0:00 / 0:00</span>
+          </div>
         </div>
         <div class="lb-toolbar">
           {/* The list stepper, on the thing it changes; ↑/↓ first, so they stay put whatever the name's length. */}
@@ -754,7 +794,7 @@ function wireKeyboard(lb: HTMLElement) {
           vid.paused ? vid.play().catch(() => {}) : vid.pause();
         }
         if (e.key === 'm' || e.key === 'M') {
-          vid.muted = !vid.muted;
+          setLbMuted(!vid.muted);
           osdLb(vid.muted ? 'mute' : 'unmute');
         }
       }
@@ -1073,8 +1113,6 @@ function wireVideoControls(lb: HTMLElement) {
   const vid2 = lbVideoEl;
   const vc2 = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const scrub = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
-  const timEl = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
-  const durEl = vc2.querySelector<HTMLElement>('.lb-vc-dur')!;
   const playBtn = vc2.querySelector<HTMLElement>('.lb-vc-play')!;
   const muteBtn = vc2.querySelector<HTMLElement>('.lb-vc-mute')!;
 
@@ -1085,17 +1123,27 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('timeupdate', () => {
     if (!vid2.duration) return;
     scrub.value = String(vid2.currentTime / vid2.duration);
-    timEl.textContent = fmtTime(vid2.currentTime);
+    syncLbTime(vc2, vid2.currentTime, vid2.duration);
     updateScrubBg();
   });
-  vid2.addEventListener('durationchange', () => {
-    durEl.textContent = fmtTime(vid2.duration);
+  vid2.addEventListener('durationchange', () => syncLbTime(vc2, vid2.currentTime, vid2.duration || 0));
+  // Stalled: a spinner, after a moment so a brief wait doesn't flash one.
+  const buffered = () => {
+    clearTimeout(lbBufferTimer);
+    lb.classList.remove('lb--buffering');
+  };
+  vid2.addEventListener('waiting', () => {
+    clearTimeout(lbBufferTimer);
+    lbBufferTimer = setTimeout(() => lb.classList.add('lb--buffering'), 400);
   });
+  for (const type of ['playing', 'pause', 'emptied']) vid2.addEventListener(type, buffered);
+  lb.querySelector('.lb-unmute')!.addEventListener('click', () => setLbMuted(false));
   vid2.addEventListener('play', () => {
     playBtn.classList.add('lb-on');
     playBtn.setAttribute('aria-label', 'Pause');
     bigPlay.classList.add('lb-on');
     bigPlay.setAttribute('aria-label', 'Pause trailer');
+    lb.classList.remove('lb--ended');
     document.getElementById('screenshot-lightbox')?.classList.remove('lb--unstarted');
     syncLbPaused();
     schedHideLbChrome();
@@ -1109,18 +1157,17 @@ function wireVideoControls(lb: HTMLElement) {
     if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
     revealLbChrome();
   });
+  // Stays on its last frame, offering a replay: no moving on by itself.
   vid2.addEventListener('ended', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
     bigPlay.classList.remove('lb-on');
-    bigPlay.setAttribute('aria-label', 'Play trailer');
+    bigPlay.setAttribute('aria-label', 'Replay trailer');
+    lb.classList.add('lb--ended');
     syncLbPaused();
     revealLbChrome();
   });
-  vid2.addEventListener('volumechange', () => {
-    muteBtn.classList.toggle('lb-on', vid2.muted);
-    muteBtn.setAttribute('aria-label', vid2.muted ? 'Unmute' : 'Mute');
-  });
+  vid2.addEventListener('volumechange', () => syncLbMuteBtn(lb));
 
   scrub.addEventListener('input', () => {
     if (vid2.duration) vid2.currentTime = Number(scrub.value) * vid2.duration;
@@ -1143,9 +1190,7 @@ function wireVideoControls(lb: HTMLElement) {
     },
     { signal: _lbSignal },
   );
-  muteBtn.addEventListener('click', () => {
-    vid2.muted = !vid2.muted;
-  });
+  muteBtn.addEventListener('click', () => setLbMuted(!vid2.muted));
 
   // A click plays or pauses; a finger's tap toggles the controls instead (below, which cancels its click).
   vid2.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
@@ -1326,7 +1371,16 @@ export function closeLightbox() {
   detachLbVideo();
   lb.close();
   setLbLoading(lb, false);
-  lb.classList.remove('lb-idle', 'lb--paused', 'lb--unstarted', 'lb--stepped', 'lb--stepped-game');
+  lb.classList.remove(
+    'lb-idle',
+    'lb--paused',
+    'lb--unstarted',
+    'lb--stepped',
+    'lb--stepped-game',
+    'lb--automuted',
+    'lb--ended',
+    'lb--buffering',
+  );
   lbRenderedAppid = undefined;
   clearTimeout(lbStatusTimer);
   lb.querySelector('.lb-status')!.textContent = '';
@@ -1451,10 +1505,13 @@ function renderLightbox() {
     attachLbVideo();
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
-    vid.setAttribute('aria-label', label);
+    vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
+    vid.muted = lbMutedChoice();
+    syncLbMuteBtn(lb);
+    lb.classList.remove('lb--automuted', 'lb--ended');
     vc.style.display = '';
     resetLbVc(vc);
-    playHls(vid, shot.hls, showLbVideoError);
+    playHls(vid, shot.hls, showLbVideoError, () => lb.classList.add('lb--automuted'));
     syncLbPaused();
     schedHideLbChrome();
   } else {

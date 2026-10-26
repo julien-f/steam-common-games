@@ -2967,9 +2967,14 @@
     right: 0;
     z-index: 2;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
     padding: 24px 16px 16px;
+  }
+  .lb-vc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   /* Idle (unattended, or keyboard-driven): chrome and cursor hidden, by part so a step can flash the counter alone.
      In fast, out slower, each part drifting a few pixels toward its edge. */
@@ -3112,41 +3117,75 @@
   .lb-vc-play .lucide {
     fill: currentColor;
   }
-  .lb-vc-time,
-  .lb-vc-dur {
-    color: #fff;
-    font-size: var(--fs-meta);
+  .lb-vc-time {
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    font-size: var(--fs-ui);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
+    white-space: nowrap;
     user-select: none;
   }
+  /* The seek line: thin, thicker with its handle under the mouse, a finger or focus. */
   .lb-vc-scrub {
     -webkit-appearance: none;
     appearance: none;
-    flex: 1;
-    min-width: 0; /* a range input's own minimum overflowed the row between a phone's ‹ › */
-    height: 3px;
+    width: 100%;
+    margin: 0;
+    height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.25);
+    background-color: transparent;
     cursor: pointer;
     border: none;
+    transition: height var(--dur-1) var(--ease-out);
+  }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active) {
+    height: 6px;
   }
   .lb-vc-scrub::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 0;
+    height: 14px;
     border-radius: 50%;
     background: #fff;
     cursor: pointer;
   }
   .lb-vc-scrub::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
+    width: 0;
+    height: 14px;
     border-radius: 50%;
     background: #fff;
     border: none;
     cursor: pointer;
+  }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active)::-webkit-slider-thumb {
+    width: 14px;
+  }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active)::-moz-range-thumb {
+    width: 14px;
+  }
+
+  /* When the browser refused autoplay with sound: it plays muted, and this says so until tapped. */
+  .lb-unmute {
+    position: absolute;
+    right: 16px;
+    bottom: 120px;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 20px;
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  #screenshot-lightbox.lb--automuted .lb-unmute {
+    display: flex;
   }
 
   /* ‹ ›: at the screen's edges for a mouse; in the bottom band for a finger, below. */
@@ -3307,7 +3346,7 @@
   .lb-img.lb-anim-top {
     animation: lb-enter-top var(--dur-2) var(--ease-out) forwards;
   }
-  #screenshot-lightbox.lb--loading .lb-surface::after {
+  #screenshot-lightbox:is(.lb--loading, .lb--buffering) .lb-surface::after {
     content: '';
     position: absolute;
     width: 32px;
@@ -3396,7 +3435,14 @@
   .lb-bigplay svg {
     width: 32px;
     height: 32px;
+  }
+  .lb-bigplay .lucide-play {
     margin-left: 2px; /* the triangle's visual centre sits left of its box */
+  }
+  /* Ended: a replay in place of play/pause. */
+  #screenshot-lightbox:not(.lb--ended) .lb-bigplay-replay,
+  #screenshot-lightbox.lb--ended .lb-bigplay :is(.lb-icon-on, .lb-icon-off) {
+    display: none;
   }
   /* Delayed, so it doesn't flash up in the moment before autoplay starts. */
   #screenshot-lightbox.lb--paused .lb-bigplay {
@@ -3442,22 +3488,33 @@
       transform: none;
       font-size: 24px;
     }
-    #screenshot-lightbox:has(.lb-video) .lb-vctrls {
-      padding-inline: 76px;
+    #screenshot-lightbox:has(.lb-video) .lb-vc-row {
+      padding-inline: 60px;
     }
-    /* The seek bar keeps its thin look inside a taller hit area. */
-    .lb-vc-scrub {
-      height: 24px;
-      background-color: transparent;
-      background-size: 100% 3px;
+    /* Clears the seek line's tall hit area off ‹ ›, level with the row below it. */
+    .lb-vctrls {
+      gap: 22px;
+    }
+    .lb-vc-time {
+      height: 44px;
+      border-radius: 22px;
+    }
+    /* The seek line keeps its thin look inside a finger-sized hit area, its handle always shown. */
+    .lb-vc-scrub,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active) {
+      height: 44px;
+      margin-block: -20px;
+      background-size: 100% 4px;
       background-position: center;
       background-repeat: no-repeat;
     }
-    .lb-vc-scrub::-webkit-slider-thumb {
+    .lb-vc-scrub::-webkit-slider-thumb,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active)::-webkit-slider-thumb {
       width: 18px;
       height: 18px;
     }
-    .lb-vc-scrub::-moz-range-thumb {
+    .lb-vc-scrub::-moz-range-thumb,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active)::-moz-range-thumb {
       width: 18px;
       height: 18px;
     }
