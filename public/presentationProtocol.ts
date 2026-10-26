@@ -13,9 +13,12 @@ export interface OnAir {
   startAt?: number;
   paused?: boolean;
 }
+// `bye`: the main window is going (closed, or reloading: then `main` follows).
 export type ToPresentation = { main: string } & (
-  { type: 'onAir'; onAir: OnAir } | { type: 'close' } | { type: 'main' }
+  { type: 'onAir'; onAir: OnAir } | { type: 'close' } | { type: 'main' } | { type: 'bye' }
 );
-// `state` is the heartbeat, echoing what the window shows.
-export type FromPresentationBody = { type: 'hello' } | { type: 'state'; onAir: OnAir | null } | { type: 'bye' };
+// `state` is the heartbeat, echoing what the window shows; `hidden` (occluded or minimized) means its
+// timers are throttled, beating about once a minute.
+export type FromPresentationBody =
+  { type: 'hello' } | { type: 'state'; onAir: OnAir | null; hidden?: boolean } | { type: 'bye' };
 export type FromPresentation = { main: string } & FromPresentationBody;

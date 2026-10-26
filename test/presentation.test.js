@@ -35,7 +35,19 @@ global.sessionStorage = {
   removeItem: (k) => session.delete(k),
 };
 global.addEventListener = () => {};
-global.document = { visibilityState: 'visible' };
+const announced = [];
+global.document = {
+  visibilityState: 'visible',
+  // announce.ts's status line, enough to read what it says.
+  createElement: () => ({
+    setAttribute() {},
+    style: {},
+    set textContent(text) {
+      if (text) announced.push(text);
+    },
+  }),
+  body: { append() {} },
+};
 global.window = {
   open: (url) => {
     opened.push(url);
@@ -145,10 +157,13 @@ test('Stop presenting before the window says hello closes it', () => {
   assert.equal(closed, 1);
 });
 
-test('a blocked pop-up leaves nothing presented', () => {
+test('a blocked pop-up leaves nothing presented, and says so', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   openResult = null;
   p.present(game(1), 'banner');
   assert.equal(p.presented(), null);
+  t.mock.timers.tick(100);
+  assert.equal(announced.at(-1), 'Allow pop-ups for this site to present.');
 });
 
 test("another tab's presentation window is ignored", async () => {
@@ -248,20 +263,55 @@ async function presentWithMockedClock(t) {
   await flush();
 }
 
-test('three missed heartbeats forget the window', async (t) => {
+test("with the window's handle, its silence doesn't matter, only its closing", async (t) => {
   await presentWithMockedClock(t);
-  t.mock.timers.tick(15000);
+  t.mock.timers.tick(60000);
   assert.equal(p.presented().appid, 10);
+  openResult.closed = true;
   t.mock.timers.tick(5000);
   assert.equal(p.presented(), null);
 });
 
+// A main window reloaded while presenting: a fresh instance of the module, without the window's handle.
+let reloads = 0;
+async function reloadedMain(t, id) {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'] });
+  session.set('playshelf-presentation-main', id);
+  const main = await import(`${require.resolve('../public/presentation.ts')}?reload=${++reloads}`);
+  const remote = fakeWindow(id);
+  remote.say({
+    type: 'state',
+    onAir: { appid: 10, name: 'Game 10', item: { type: 'image', thumb: 't', shotId: 's1' } },
+  });
+  await flush();
+  t.after(() => main.stopPresenting());
+  return { main, remote };
+}
+
+test('without its handle, three missed heartbeats forget the window', async (t) => {
+  const { main } = await reloadedMain(t, 'beats');
+  t.mock.timers.tick(15000);
+  assert.equal(main.presented().appid, 10);
+  t.mock.timers.tick(5000);
+  assert.equal(main.presented(), null);
+});
+
+test('a window that said it was hidden (throttled to a beat a minute) is given 2.5 min', async (t) => {
+  const { main, remote } = await reloadedMain(t, 'hidden');
+  remote.say({ type: 'state', onAir: main.presented(), hidden: true });
+  await flush();
+  t.mock.timers.tick(120000);
+  assert.equal(main.presented().appid, 10);
+  t.mock.timers.tick(35000);
+  assert.equal(main.presented(), null);
+});
+
 test('missed heartbeats are not judged while this window is hidden', async (t) => {
-  await presentWithMockedClock(t);
+  const { main } = await reloadedMain(t, 'self-hidden');
   document.visibilityState = 'hidden';
   try {
     t.mock.timers.tick(20000);
-    assert.equal(p.presented().appid, 10);
+    assert.equal(main.presented().appid, 10);
   } finally {
     document.visibilityState = 'visible';
   }

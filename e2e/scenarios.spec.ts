@@ -1121,6 +1121,40 @@ test('C8 edge: a desktop window narrowed while presenting keeps Present and the 
   await closed;
 });
 
+test('C8 edge: the TV survives a reload of the main window, and an occluded TV its throttled silence', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.clock.install(); // the main window's: its checks decide whether the TV is forgotten
+  await hookPresentation(page, { occludable: true });
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  const chip = page.getByRole('banner').locator('.present-chip');
+  await expect(chip).toContainText('Hades');
+  // A reload says bye then main again: the TV stays.
+  await page.reload();
+  await expect(chip).toContainText('Hades');
+  await shown.waitForTimeout(3500);
+  expect(shown.isClosed()).toBe(false);
+  // Without the TV's handle (lost in the reload), main goes by its beats: an occluded TV beats about once a minute.
+  await shown.evaluate(() => (window as unknown as { presTest: { hide(): void } }).presTest.hide());
+  await page.clock.runFor(60_000);
+  await expect(chip).toContainText('Hades');
+  await page.clock.runFor(120_000); // past 2.5 min of silence: gone after all
+  await expect(chip).toBeHidden();
+});
+
+test('C8 edge: a blocked pop-up is announced', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.addInitScript(() => (window.open = () => null));
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.keyboard.press('p');
+  await expect(page.locator('[role="status"]', { hasText: 'Allow pop-ups for this site to present.' })).toBeAttached();
+  await expect(page.getByRole('banner').locator('.present-chip')).toHaveCount(0);
+});
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');

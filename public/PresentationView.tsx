@@ -24,7 +24,12 @@ function PresentationView() {
   const channel = new BroadcastChannel(PRESENTATION_CHANNEL);
 
   const post = (msg: FromPresentationBody) => main && channel.postMessage({ main, ...msg });
-  const report = () => post({ type: 'state', onAir: onAir() });
+  // Nothing after `bye`: a closing window's last visibilitychange would otherwise cancel it.
+  let closing = false;
+  const report = () =>
+    !closing && post({ type: 'state', onAir: onAir(), hidden: document.visibilityState === 'hidden' });
+  // The main window said it's going: closed unless it says `main` again (a reload) within this.
+  let mainGone: ReturnType<typeof setTimeout> | undefined;
 
   function wake() {
     setAwake(true);
@@ -80,8 +85,12 @@ function PresentationView() {
     const msg = e.data;
     if (msg?.main !== main) return;
     if (msg.type === 'close') window.close();
+    if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 3000);
     // The main window is back from a reload: tell it at once, before it opens a second window.
-    if (msg.type === 'main') report();
+    if (msg.type === 'main') {
+      clearTimeout(mainGone);
+      report();
+    }
     if (msg.type === 'onAir') {
       const shown = onAir();
       const same = shown?.appid === msg.onAir.appid && shown.item.shotId === msg.onAir.item.shotId;
@@ -140,9 +149,13 @@ function PresentationView() {
       if (!activatedAt) return activate();
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
     };
-    const bye = () => post({ type: 'bye' });
+    const bye = () => {
+      post({ type: 'bye' });
+      closing = true;
+    };
     document.addEventListener('keydown', onKey);
     document.addEventListener('visibilitychange', keepScreenOn);
+    document.addEventListener('visibilitychange', report); // hidden: main allows for throttled beats
     addEventListener('pagehide', bye);
     keepScreenOn();
     wake();
@@ -151,6 +164,7 @@ function PresentationView() {
       clearInterval(heartbeat);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', keepScreenOn);
+      document.removeEventListener('visibilitychange', report);
       removeEventListener('pagehide', bye);
       channel.close();
     });

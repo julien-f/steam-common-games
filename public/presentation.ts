@@ -5,8 +5,11 @@ import { buildMediaItems } from './mediaItems.ts';
 import type { ReadonlyGame } from './types.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
 import type { FromPresentation, OnAir, ToPresentation } from './presentationProtocol.ts';
+import { announce } from './announce.ts';
 
 const MISSED_BEATS = 3;
+// A hidden window's throttled timers beat about once a minute: its silence means less.
+const HIDDEN_SILENCE_MS = 150_000;
 const ID_KEY = 'playshelf-presentation-main';
 
 // What the presentation window shows; null while not presenting.
@@ -17,6 +20,7 @@ let mainId: string | null = null;
 let channel: BroadcastChannel | null = null;
 let win: Window | null = null;
 let lastSeen = 0;
+let lastHidden = false;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let byeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -32,12 +36,15 @@ function post(msg: ToPresentation) {
   channel?.postMessage(msg);
 }
 
-// Starts or keeps the watch on the window's heartbeat; `bye` misses a crash or a discarded tab.
+// Starts or keeps the watch on the window: its handle when this window opened it, else its heartbeat
+// (`bye` misses a crash), judged by whether it last said it was hidden.
 function seen() {
   lastSeen = Date.now();
   heartbeatTimer ??= setInterval(() => {
+    if (win) return void (win.closed && forget());
+    const silence = lastHidden ? HIDDEN_SILENCE_MS : HEARTBEAT_MS * MISSED_BEATS;
     // Judged only while this window is visible: a hidden tab's own timers are throttled and would misjudge.
-    if (document.visibilityState === 'visible' && Date.now() - lastSeen > HEARTBEAT_MS * MISSED_BEATS) forget();
+    if (document.visibilityState === 'visible' && Date.now() - lastSeen > silence) forget();
   }, HEARTBEAT_MS);
 }
 
@@ -58,6 +65,7 @@ function onMessage(e: MessageEvent<FromPresentation>) {
     return;
   }
   seen();
+  if (msg.type === 'state') lastHidden = !!msg.hidden;
   const current = presented();
   // A reloaded window asks again; a reloaded main window learns what's shown from the window's state.
   if (msg.type === 'hello' && current) post({ main: mainId, type: 'onAir', onAir: current });
@@ -77,6 +85,9 @@ function connect(id: string) {
 // A tab that presented before a reload keeps driving the same window.
 const resumedId = storedId();
 if (resumedId) connect(resumedId);
+// Going: the window closes unless `main` follows (a reload), or this page comes back from the bfcache.
+addEventListener('pagehide', () => mainId && post({ main: mainId, type: 'bye' }));
+addEventListener('pageshow', (e) => e.persisted && mainId && post({ main: mainId, type: 'main' }));
 
 // Shows one media of `game` in the presentation window, opening it first if needed (it then asks for
 // the media on hello). A plain object: store rows are proxies, which postMessage can't clone.
@@ -99,7 +110,9 @@ export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAi
   const url = `/present.html?main=${encodeURIComponent(id)}`;
   // Blocked: P or a click is a user gesture, so browsers seldom do.
   win = window.open(url, `playshelf-presentation-${id}`, 'popup,width=960,height=540');
-  if (!win) forget();
+  if (win) return;
+  forget();
+  announce('Allow pop-ups for this site to present.'); // the browser's own blocked-pop-up icon is visual only
 }
 
 // A new id for the next window: the closing one's last bye and heartbeat then go unheard.

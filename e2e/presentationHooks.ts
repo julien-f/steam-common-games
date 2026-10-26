@@ -10,6 +10,8 @@ export interface PresentationHooks {
   fakePlayback?: boolean;
   // A browser refusing a trailer's sound until a click in that window.
   refusedSound?: boolean;
+  // `window.presTest.hide()`: the window occluded, so throttled that its heartbeats stop coming.
+  occludable?: boolean;
 }
 
 export async function hookPresentation(page: Page, hooks: PresentationHooks): Promise<void> {
@@ -49,6 +51,20 @@ function install(hooks: PresentationHooks) {
     };
     HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
       if (playing.delete(this)) this.dispatchEvent(new Event('pause'));
+    };
+  }
+  if (hooks.occludable) {
+    let silent = false;
+    const post = BroadcastChannel.prototype.postMessage;
+    BroadcastChannel.prototype.postMessage = function (this: BroadcastChannel, msg: { type?: string }) {
+      if (!silent || msg?.type !== 'state') post.call(this, msg);
+    };
+    (window as unknown as { presTest: { hide(): void } }).presTest = {
+      hide() {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange')); // says so, once
+        silent = true;
+      },
     };
   }
   if (hooks.refusedSound) {
