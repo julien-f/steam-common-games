@@ -1199,6 +1199,32 @@ test('C8.5: the nav chip plays, pauses, mutes and replays the TV, and shows how 
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime === 0 && !v.paused)).toBe(true);
 });
 
+test("C8 edge: the host's mute holds from one media to the next on the TV", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  await shown.locator('.pres').click(); // sound and fullscreen
+  const chip = page.getByRole('group', { name: /^Presenting Hades/ });
+  await chip.getByRole('button', { name: 'Mute the TV' }).click();
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  // A screenshot, then the trailer again: still muted.
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  await page.keyboard.press('p');
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  await page.keyboard.press('p');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.hidden && !v.paused)).toBe(true);
+  expect(await tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  await expect(chip.getByRole('button', { name: 'Unmute the TV' })).toBeVisible();
+  // A click in the room doesn't undo it either.
+  await shown.locator('.pres').click();
+  expect(await tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+});
+
 test('C8 edge: Space and M on the focused chip pause and mute the TV, without scrolling the page', async ({
   page,
 }, testInfo) => {

@@ -44,6 +44,8 @@ function PresentationView() {
   let mainGone: ReturnType<typeof setTimeout> | undefined;
   // The host's unmute this window refused: no click here yet (see `Playback.needsClick`).
   let needsClick = false;
+  // The host's mute (chip, M), kept from one media to the next; the browser's own (no click here yet) isn't.
+  let hostMuted = false;
   let lastTimeReport = 0;
   const reportPlayback = () =>
     !closing &&
@@ -122,8 +124,9 @@ function PresentationView() {
       video.hidden = false;
       video.poster = item.thumb;
       setLoading(false);
-      // With sound when the browser allows it; muted, and saying so, when it wants a click here first.
-      video.muted = false;
+      // With sound when the browser allows it, unless the host muted it; muted, and saying so, when the
+      // browser wants a click here first.
+      video.muted = hostMuted;
       setSilenced(false);
       // A lightbox handover: loading the stream resets the position, so it's set once loaded; listeners
       // tied to this show only (a trailer that never starts mustn't pause the next one).
@@ -164,9 +167,10 @@ function PresentationView() {
       video.currentTime = 0;
       video.play().catch(() => {});
     }
-    if (c === 'mute') video.muted = true;
+    if (c === 'mute') video.muted = hostMuted = true;
     // Unmuted before a click here, Chrome would pause it: it waits for that click instead.
     if (c === 'unmute') {
+      hostMuted = false;
       if (activatedAt || navigator.userActivation?.hasBeenActive) {
         video.muted = false;
         setSilenced(false);
@@ -220,7 +224,7 @@ function PresentationView() {
   let activatedAt = 0;
   const [activated, setActivated] = createSignal(false);
   function activate() {
-    video.muted = false;
+    if (!hostMuted) video.muted = false; // the browser's mute lifts; the host's stays
     setSilenced(false);
     needsClick = false;
     if (!activatedAt) {
@@ -251,7 +255,7 @@ function PresentationView() {
     remember(target);
     activatedAt = Date.now();
     setActivated(true);
-    video.muted = false;
+    if (!hostMuted) video.muted = false;
     setSilenced(false);
     root.requestFullscreen?.({ screen: target } as FullscreenOptions).catch(() => {});
     // Leaving fullscreen puts the window back where it was: on the TV, then.
