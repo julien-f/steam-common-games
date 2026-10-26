@@ -1328,6 +1328,25 @@ test('C8 edge: a picture the TV failed to load shows on the chip, which retries 
   await expect(chip.locator('.present-chip-thumb')).toBeVisible();
 });
 
+test('C8 edge: P again on a picture the TV failed to load loads it, the spinner going', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['slow-media'] }); // media from /api/mock-media, so one can fail
+  let broken = true;
+  await page
+    .context()
+    .route('**/api/mock-media/**?full', (route) => (broken ? route.fulfill({ status: 500 }) : route.fallback()));
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page);
+  await expect(shown.getByRole('alert')).toBeVisible();
+  broken = false;
+  await page.keyboard.press('p');
+  await expect(shown.getByRole('alert')).toHaveCount(0);
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('full');
+  await expect(shown.locator('.pres')).not.toHaveClass(/pres--loading/);
+});
+
 test('C8 edge: the panel says which of its media is on the TV', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');
@@ -1363,6 +1382,18 @@ test("C8 edge: the keyboard's play/pause key pauses the TV's trailer from anywhe
   await tv.evaluate((v: HTMLVideoElement) => v.dispatchEvent(new Event('ended')));
   await expect.poll(() => shown.evaluate(() => navigator.mediaSession.metadata)).toBeNull();
   expect(await shown.evaluate(() => (window as unknown as Keys).mediaKeys.play)).toBeNull();
+  // Replayed: the TV's again.
+  await tv.evaluate((v: HTMLVideoElement) => {
+    v.currentTime = 90; // ended, for the chip too
+    v.pause();
+  });
+  await page
+    .getByRole('group', { name: /^Presenting Hades/ })
+    .getByRole('button', { name: 'Replay on the TV' })
+    .click();
+  await expect.poll(() => shown.evaluate(() => navigator.mediaSession.metadata?.title)).toBe('Hades');
+  await press('pause');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });
 
 test("C8 edge: the TV's lower third says the game and media a while, not on a mouse move; its title and labels too", async ({
@@ -1409,8 +1440,10 @@ test('C8 edge: on the TV, Space and M play and mute a trailer; a stall spins, an
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
   await tv.evaluate((v: HTMLVideoElement) => v.dispatchEvent(new Event('waiting')));
   await expect(shown.locator('.pres')).toHaveClass(/pres--loading/);
-  // Under reduced motion (the tests' default), the spinner stands still.
-  expect(await shown.locator('.pres').evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none');
+  // Under reduced motion (the tests' default), the spinner stands still, still after a moment.
+  expect(await shown.locator('.pres').evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe(
+    'pres-appear',
+  );
   await shown.evaluate(() => {
     const w = window as unknown as { faded: boolean };
     new MutationObserver(
@@ -1475,6 +1508,35 @@ for (const [permission, clicks] of [
     ]);
   });
 }
+
+test("C8 edge: the TV's Place button is reached by Tab, which doesn't go fullscreen here; placing it gives sound", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {
+    screens: { permission: 'granted', count: 2 },
+    fakePlayback: true,
+    neverActivated: true,
+  });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const chip = page.getByRole('group', { name: /^Presenting Hades/ });
+  // Unmuted before any click there: the TV waits for one.
+  await chip.getByRole('button', { name: 'Mute the TV' }).click();
+  await chip.getByRole('button', { name: /Unmute the TV/ }).click();
+  await expect(chip.locator('.present-chip-btn[title="Click the TV for sound"]')).toBeVisible();
+  const place = shown.getByRole('button', { name: 'Fullscreen on “LG TV”' });
+  await expect(place).toBeVisible();
+  await shown.keyboard.press('Tab');
+  await expect(place).toBeFocused();
+  await shown.keyboard.press('Enter');
+  expect(
+    await shown.evaluate(() => (window as unknown as { placed: { fullscreen: string[] } }).placed.fullscreen),
+  ).toEqual(['LG TV']);
+  await expect(chip.getByRole('button', { name: 'Mute the TV' })).toBeVisible(); // sound: no click wanted any more
+});
 
 for (const [why, screens] of [
   ['the permission refused', { permission: 'denied', count: 2 }],
@@ -1725,7 +1787,7 @@ test("C8 edge: a linked trailer's controls drive the TV, showing one state at a 
   // Unmuted before a click there, the TV waits for one, and the lightbox says so.
   await lightbox.getByRole('button', { name: 'Unmute TV' }).click();
   await expect(lightbox.getByRole('button', { name: 'Click the TV for sound' }).first()).toBeVisible();
-  await expect(lightbox.locator('.lb-status')).toHaveText('Click the TV for sound');
+  await expect(lightbox.locator('.lb-status')).toContainText('Click the TV for sound');
 
   // Seeking: Shift+→ and L add up on the TV's own position.
   await tv.evaluate((v: HTMLVideoElement) => (v.currentTime = 30));

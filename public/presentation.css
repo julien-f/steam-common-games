@@ -101,6 +101,7 @@ body {
   position: absolute;
   left: 5vw;
   bottom: 5vh;
+  max-width: 90vw;
   display: flex;
   flex-direction: column;
   gap: 0.15em;
@@ -163,10 +164,9 @@ body {
   .pres-caption {
     translate: none;
   }
-  /* A ring standing still: a single near-instant run would freeze it mid-turn. */
+  /* A ring standing still (a near-instant spin would freeze it mid-turn), after the same moment. */
   .pres--loading::after {
-    animation: none;
-    opacity: 1;
+    animation: pres-appear 1ms var(--dur-4) forwards;
   }
 }
 

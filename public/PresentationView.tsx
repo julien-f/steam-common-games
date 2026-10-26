@@ -112,7 +112,8 @@ function PresentationView() {
   }
 
   let showAbort: AbortController | undefined;
-  function show({ name, item, spoken, startAt, paused }: OnAir) {
+  // A lightbox handover (`startAt`, `paused`) is applied once, never kept in `onAir()`: a retry or reload starts afresh.
+  function show({ name, item, spoken }: OnAir, { startAt, paused }: Pick<OnAir, 'startAt' | 'paused'> = {}) {
     setFailed(false);
     fadeOut();
     document.title = `${name} — Playshelf presentation`;
@@ -174,7 +175,10 @@ function PresentationView() {
       video.currentTime = 0;
       video.play().catch(() => {});
     }
-    if (c === 'mute') video.muted = hostMuted = true;
+    if (c === 'mute') {
+      video.muted = hostMuted = true;
+      needsClick = false;
+    }
     // Unmuted before a click here, Chrome would pause it: it waits for that click instead.
     if (c === 'unmute') {
       hostMuted = false;
@@ -198,7 +202,10 @@ function PresentationView() {
     if (msg.type === 'control') obey(msg.control);
     if (msg.type === 'caption') showCaption(CAPTION_MEDIA_MS);
     // 10 s: a slow reload of the main window must have time to say `main` again.
-    if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 10_000);
+    if (msg.type === 'bye') {
+      clearTimeout(mainGone);
+      mainGone = setTimeout(() => window.close(), 10_000);
+    }
     // The main window is back from a reload: tell it at once, before it opens a second window.
     if (msg.type === 'main') {
       clearTimeout(mainGone);
@@ -208,17 +215,20 @@ function PresentationView() {
       const shown = onAir();
       const same = shown?.appid === msg.onAir.appid && shown.item.shotId === msg.onAir.item.shotId;
       // P again on what's up: the caption says what it is; only an ended trailer starts over.
-      if (same && failed())
-        show(msg.onAir); // P again on what failed: another try
-      else if (same && !video.hidden && msg.onAir.startAt != null) {
+      const { startAt, paused, ...kept } = msg.onAir;
+      if (same && failed()) {
+        // P again on what failed: another try, on the item stored (`show` checks it's still current).
+        setOnAir(kept);
+        show(kept, { startAt, paused });
+      } else if (same && !video.hidden && startAt != null) {
         // A lightbox handover on the trailer already up: the room follows the host's playhead.
-        video.currentTime = msg.onAir.startAt;
-        void (msg.onAir.paused ? video.pause() : video.play().catch(() => {}));
+        video.currentTime = startAt;
+        void (paused ? video.pause() : video.play().catch(() => {}));
       } else if (same && !video.hidden && video.ended) video.play().catch(() => {});
       else if (!same) {
         const gameChanged = shown?.appid !== msg.onAir.appid;
-        setOnAir(msg.onAir);
-        show(msg.onAir);
+        setOnAir(kept);
+        show(kept, { startAt, paused });
         showCaption(gameChanged ? CAPTION_GAME_MS : CAPTION_MEDIA_MS);
       }
       if (same) showCaption(CAPTION_MEDIA_MS);
@@ -235,16 +245,20 @@ function PresentationView() {
   // later ones never leave fullscreen (someone in the room clicking), double-click or F does.
   let activatedAt = 0;
   const [activated, setActivated] = createSignal(false);
-  function activate() {
-    if (!hostMuted) video.muted = false; // the browser's mute lifts; the host's stays
+  // A gesture here: the browser's mute lifts (the host's stays), and the chip's mute is a mute again.
+  function giveSound() {
+    if (!hostMuted) video.muted = false;
     setSilenced(false);
     needsClick = false;
+    reportPlayback();
+  }
+  function activate() {
+    giveSound();
     if (!activatedAt) {
       activatedAt = Date.now();
       setActivated(true);
       if (!document.fullscreenElement) toggleFullscreen();
     }
-    reportPlayback(); // needsClick cleared: the chip's mute is a mute again
   }
   // Placing it on the TV (Chromium): the card's button. Granted already, one click puts it there in
   // fullscreen; a first grant outlasts that click's activation, so the button then asks for another.
@@ -267,8 +281,7 @@ function PresentationView() {
     remember(target);
     activatedAt = Date.now();
     setActivated(true);
-    if (!hostMuted) video.muted = false;
-    setSilenced(false);
+    giveSound();
     root.requestFullscreen?.({ screen: target } as FullscreenOptions).catch(() => {});
     // Leaving fullscreen puts the window back where it was: on the TV, then.
     window.moveTo(target.availLeft, target.availTop);
@@ -301,7 +314,10 @@ function PresentationView() {
     // For a host who clicked into the TV: the lightbox's keys, no more (it has no other controls).
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return; // the browser's
-      if (!activatedAt) return activate();
+      // Tab and Escape aren't a gesture for fullscreen, and the card's own button keeps its keys.
+      if (!activatedAt && !['Tab', 'Escape'].includes(e.key) && !(e.target as Element).closest?.('.pres-card'))
+        return activate();
+      if (!activatedAt) return;
       if (RELAYED_KEYS.has(e.key)) {
         e.preventDefault(); // not the page's scroll
         post({ type: 'key', key: e.key, up: false });
@@ -331,10 +347,17 @@ function PresentationView() {
     document.addEventListener('keyup', onKeyUp);
     // Stalled: the spinner (after a moment, by its own CSS delay).
     video.addEventListener('waiting', () => setLoading(true));
-    for (const type of ['playing', 'pause', 'emptied']) video.addEventListener(type, () => setLoading(false));
+    // A trailer's: not the picture that replaced it, whose own load set it.
+    for (const type of ['playing', 'pause', 'emptied'])
+      video.addEventListener(type, () => !video.hidden && setLoading(false));
     // At once, unlike the time (below): the host's lightbox mirrors them.
     for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange', 'seeked', 'waiting', 'playing'])
       video.addEventListener(type, reportPlayback);
+    // Played again (a replay, a seek back): the keys are the TV's again.
+    video.addEventListener('play', () => {
+      const shown = onAir();
+      if (!video.hidden && shown?.item.type === 'video') claimMediaKeys(shown.name, shown.item.thumb);
+    });
     video.addEventListener('ended', () => {
       claimMediaKeys();
       showCaption(CAPTION_GAME_MS); // so the room knows what they just watched
