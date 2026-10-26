@@ -634,7 +634,14 @@ function wireButtons(lb: HTMLElement) {
     closeLightbox();
   });
   lb.addEventListener('close', closeLightbox);
-  lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
+  // A click, not a drag that ended there (panning a zoomed picture past its edge).
+  const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
+  let downX = 0,
+    downY = 0;
+  backdrop.addEventListener('pointerdown', (e) => ((downX = e.clientX), (downY = e.clientY)));
+  backdrop.addEventListener('click', (e) => {
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) closeLightbox();
+  });
   lb.querySelector('.lb-close')!.addEventListener('click', closeLightbox);
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
@@ -756,19 +763,43 @@ function wireKeyboard(lb: HTMLElement) {
 }
 
 function wireMouseHandlers(lb: HTMLElement) {
+  const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  // A trackpad's sideways swipe steps once per gesture: the gesture ends after a pause in its events.
+  let swipeDx = 0,
+    swiped = false,
+    swipeEnd: ReturnType<typeof setTimeout> | undefined;
   lb.addEventListener(
     'wheel',
     (e) => {
-      if (!lbShowingImage()) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        clearTimeout(swipeEnd);
+        swipeEnd = setTimeout(() => ((swipeDx = 0), (swiped = false)), 300);
+        if (lbZoom > 1) {
+          lbPanX -= e.deltaX;
+          applyLbTransform();
+        } else if (!swiped && Math.abs((swipeDx += e.deltaX)) > 40) {
+          swiped = true;
+          stepLightbox(Math.sign(swipeDx), true);
+        }
+        return;
+      }
+      // Over the picture only (a wheel elsewhere is no zoom), toward the cursor: the point under it stays put.
+      if (e.target !== lbImg) return;
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-      lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
+      const z0 = lbZoom;
+      const z1 = Math.max(1, Math.min(4, z0 * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      const rect = lbImg.getBoundingClientRect();
+      const dx = e.clientX - (rect.left + rect.width / 2 - lbPanX);
+      const dy = e.clientY - (rect.top + rect.height / 2 - lbPanY);
+      lbPanX = dx - (z1 / z0) * (dx - lbPanX);
+      lbPanY = dy - (z1 / z0) * (dy - lbPanY);
+      lbZoom = z1;
       applyLbTransform();
     },
     { passive: false },
   );
 
-  const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
   let lbDragging = false,
     lbDragStartX = 0,
     lbDragStartY = 0,

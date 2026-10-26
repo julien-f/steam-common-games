@@ -4336,6 +4336,36 @@ test('F1 edge: ←/→ step past a playing trailer; Shift+←/→ and J/L seek i
   await expect(status).toContainText('Screenshot 1 of 3');
 });
 
+test('F1 edge: the wheel zooms toward the cursor over the picture only; a sideways swipe steps once', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'mouse');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  const box = (await img.boundingBox())!;
+  await page.mouse.move(box.x + 5, 450); // the backdrop, beside the picture
+  await page.mouse.move(box.x - 20, 450);
+  await page.mouse.wheel(0, -100);
+  await expect(img).not.toHaveAttribute('style', /scale/);
+  // Over the picture, near its right edge: that edge stays under the cursor.
+  const at = { x: box.x + box.width - 40, y: box.y + box.height / 2 };
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.wheel(0, -100);
+  await expect(img).toHaveAttribute('style', /scale\(1\.15\)/);
+  const after = (await img.boundingBox())!;
+  expect(Math.abs(after.x + after.width - 40 * 1.15 - at.x)).toBeLessThan(1);
+  await page.keyboard.press('z'); // back out
+  await expect(img).not.toHaveAttribute('style', /scale/);
+  // One trackpad gesture, many events: one step.
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(30, 0);
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await page.waitForTimeout(400); // the gesture ends
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(-30, 0);
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
+});
+
 test('F1 edge: on a zoomed screenshot the arrows pan it, and Esc zooms back out before closing', async ({
   page,
 }, testInfo) => {

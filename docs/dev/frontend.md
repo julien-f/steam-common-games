@@ -347,7 +347,7 @@ Above 768px the shell is locked to the viewport and **`.app-scroll` is the page'
   - That age is the **oldest** of five separately cached sources (reviews, HLTB, store metadata, tags, ProtonDB — tiers in [data.md](data.md)), so the tooltip breaks it down per source (`detailsFetchedAts`, from `/api/game-details`' `fetchedAts`).
   - The tooltip also names what else it re-fetches, and says when the price isn't included: a game its list already priced has a null `priceSource`, so its price refreshes from the list's Prices tile.
 
-**The lightbox** (`lightbox.tsx`, a lazy singleton) owns its own DOM: HLS playback, zoom/pan (a toolbar toggle and Z, plus double-click, double-tap and pinch), touch/swipe, focus trap, loading indicator, `?shot=` deep links.
+**The lightbox** (`lightbox.tsx`, a lazy singleton) owns its own DOM: HLS playback, zoom/pan (a toolbar toggle and Z, plus double-click, double-tap, pinch and the wheel over the picture, toward the cursor; a trackpad's sideways swipe steps once per gesture), touch/swipe, focus trap, loading indicator, `?shot=` deep links.
 
 - A modal `<dialog>` (`showModal()`): the page behind is inert, and the shortcuts dialog stacks over it. It opens focused on `.lb-surface` (`autofocus`, no ring), where its shortcuts act; Tab reaches the controls. Fullscreen goes on `.lb-surface`: a dialog can't be the fullscreen element.
 - Esc and Android's Back fire `cancel`, closed like ×; `close` covers a dialog the browser closed itself (it does when `cancel` can't be cancelled, without a user activation since the last). Both end in the idempotent `closeLightbox`, which keeps the URL and history in step.
