@@ -386,7 +386,8 @@ function toggleLbZoom() {
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
 
-const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
+const LB_LONG_SEEK_SECONDS = 10; // a double-tap's and J/L's, as YouTube's
+const LB_PAN_STEP = 80; // px an arrow pans a zoomed picture
 
 function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
   if (!vid) return;
@@ -553,10 +554,10 @@ function LightboxDom() {
           <button class="lb-error-retry">Retry</button>
         </div>
         <div class="lb-seek-flash lb-glass lb-seek-flash-left" aria-hidden="true">
-          <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
+          <Rewind /> {LB_LONG_SEEK_SECONDS}s
         </div>
         <div class="lb-seek-flash lb-glass lb-seek-flash-right" aria-hidden="true">
-          {LB_TOUCH_SEEK_SECONDS}s <FastForward />
+          {LB_LONG_SEEK_SECONDS}s <FastForward />
         </div>
         <button class="lb-bigplay lb-glass" aria-label="Play trailer">
           <Play />
@@ -681,20 +682,33 @@ function wireKeyboard(lb: HTMLElement) {
 
       const vid = lbShowingVideo() ? lbVideoEl : null;
 
-      if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      // A zoomed picture: the arrows pan it, and Esc zooms back out before it closes anything.
+      if (lbZoom > 1 && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const [dx, dy] = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key]!;
+        lbPanX += dx * LB_PAN_STEP;
+        lbPanY += dy * LB_PAN_STEP;
+        applyLbTransform();
+        return;
+      }
+      if (lbZoom > 1 && e.key === 'Escape') {
+        e.preventDefault(); // or the dialog's `cancel` would close it too
+        resetLbZoom();
+        return;
+      }
+      // ←/→ always step, a trailer playing or not; seeking is Shift+←/→ and J/L (YouTube's).
+      if (!onScrub && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const dir = e.key === 'ArrowRight' ? 1 : -1;
-        // While a video is playing, bare arrows seek it in place so the user
-        // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
-        // forces media navigation instead, as an explicit escape hatch — even
-        // when focus is on the scrub bar itself, whose native range-input
-        // behavior would otherwise consume a bare arrow key to nudge its value.
-        if (vid && !vid.paused && !e.shiftKey) {
+        if (!e.shiftKey) stepLightbox(dir);
+        else if (vid) {
           seekVideo(vid, dir * LB_SEEK_SECONDS);
           osdLb('seek');
-        } else {
-          stepLightbox(dir);
         }
+      }
+      if (vid && ['j', 'J', 'l', 'L'].includes(e.key)) {
+        seekVideo(vid, (e.key.toLowerCase() === 'l' ? 1 : -1) * LB_LONG_SEEK_SECONDS);
+        osdLb('seek');
       }
       if (!onScrub && (e.key === 'Home' || e.key === 'End')) {
         e.preventDefault();
@@ -965,10 +979,10 @@ function wireTouchHandlers(lb: HTMLElement) {
               e.preventDefault(); // no click: it would play or pause
             }
             if (frac < 1 / 3) {
-              seekVideo(vid, -LB_TOUCH_SEEK_SECONDS);
+              seekVideo(vid, -LB_LONG_SEEK_SECONDS);
               flashSeek('left');
             } else if (frac > 2 / 3) {
-              seekVideo(vid, LB_TOUCH_SEEK_SECONDS);
+              seekVideo(vid, LB_LONG_SEEK_SECONDS);
               flashSeek('right');
             }
           }

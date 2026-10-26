@@ -135,8 +135,9 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
-- **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
-- **R** jumps to a random game, **Home / End** to the first or last media, **Esc** closes. **?** lists the shortcuts over it.
+- **← / →** step through the game's media, **↑ / ↓** move to the previous or next game in the list; on a zoomed screenshot, the arrows pan it instead.
+- **R** jumps to a random game, **Home / End** to the first or last media, **Esc** zooms back out, else closes. **?** lists the shortcuts over it.
+- On a video, **Shift + ← / →** seek 5 s and **J / L** 10 s.
 - **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it; **P** presents it instead, closing the lightbox ([below](#presenting-on-a-second-screen)).
 - On touch, swipe sideways for media and up or down for games; a double-tap on a video's left or right third seeks 10 s.
 - Its controls show when the mouse moves or on a tap, and stay out of the way otherwise; used from the keyboard, nothing but the media shows, plus a brief counter after each step. The first time, a hint says what the arrows do.

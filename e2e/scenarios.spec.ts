@@ -3542,8 +3542,8 @@ test('F1 edge: a slow screenshot shows its thumbnail and a spinner until it has 
     )
     .toBe(true);
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
-  await page.keyboard.press('Shift+ArrowRight');
-  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('ArrowRight'); // past the trailer
+  await page.keyboard.press('ArrowRight');
   const lb = page.locator('#screenshot-lightbox');
   const img = lb.locator('.lb-img');
   await expect(lb.locator('.lb-status')).toContainText('Screenshot 1 of 3');
@@ -4316,18 +4316,46 @@ test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls 
   expect(await lb.getAttribute('class')).toMatch(/lb-idle/); // read once, as above
 });
 
-test('F1 edge: arrows seek a trailer only while it plays, and step past it otherwise', async ({ page }) => {
+test('F1 edge: ←/→ step past a playing trailer; Shift+←/→ and J/L seek it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
   await fakePlayback(page);
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
-  const counter = page.locator('.lb-status');
+  const status = page.locator('.lb-status');
+  const time = () => page.locator('.lb-video').evaluate((v: HTMLVideoElement) => v.currentTime);
   await page.getByRole('button', { name: 'Play trailer' }).click();
+  await page.keyboard.press('Shift+ArrowRight');
+  expect(await time()).toBe(5);
+  await page.keyboard.press('l');
+  expect(await time()).toBe(15);
+  await page.keyboard.press('j');
+  await page.keyboard.press('Shift+ArrowLeft');
+  expect(await time()).toBe(0);
+  await expect(status).toContainText('Trailer 1 of 1');
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toContainText('Trailer 1 of 1');
-  await reachForControls(page);
-  await page.locator('.lb-vc-play').click(); // pause
+  await expect(status).toContainText('Screenshot 1 of 3');
+});
+
+test('F1 edge: on a zoomed screenshot the arrows pan it, and Esc zooms back out before closing', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'keyboard');
+  await page.setViewportSize({ width: 800, height: 600 });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).not.toHaveClass(/lb--loading/);
+  await page.keyboard.press('z');
+  await expect(img).toHaveAttribute('style', /scale\(2\) translate\(0px, 0px\)/);
   await page.keyboard.press('ArrowRight');
-  await expect(counter).toContainText('Screenshot 1 of 3');
+  await expect(img).toHaveAttribute('style', /scale\(2\) translate\(-40px, 0px\)/);
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3'); // panned, not stepped
+  await page.keyboard.press('Escape');
+  await expect(img).not.toHaveAttribute('style', /scale/);
+  await expect(lb).toHaveAttribute('open');
+  await page.keyboard.press('Escape');
+  await expect(lb).not.toHaveAttribute('open');
 });
 
 test('F1 edge: a trailer pauses when the page is hidden, and stays paused', async ({ page }) => {
