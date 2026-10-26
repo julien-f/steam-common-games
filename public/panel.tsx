@@ -67,7 +67,7 @@ import { createSignal, createEffect, createMemo, createResource, createRoot, For
 import { Dynamic, render } from 'solid-js/web';
 import { A, useLocation } from '@solidjs/router';
 import { creatorListPath, type CreatorRole } from './creatorData.ts';
-import { present, presented } from './presentation.ts';
+import { present, presented, privateMode } from './presentation.ts';
 import ArrowUpDown from 'lucide-solid/icons/arrow-up-down';
 import Check from 'lucide-solid/icons/check';
 import ChevronLeft from 'lucide-solid/icons/chevron-left';
@@ -685,6 +685,12 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
   }
   if (wrap) (document.getElementById('panel-hero')?.querySelector('.panel-hero-open') as HTMLElement | null)?.focus();
   return true;
+}
+
+// Whether `shotId` of the open game is what the presentation window shows.
+function onTv(shotId: string | undefined): boolean {
+  const on = presented();
+  return !!on && on.appid === panelGame()?.appid && on.item.shotId === shotId;
 }
 
 // P and the Present button: the hero's current media goes to the presentation window.
@@ -1893,15 +1899,13 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
   const [loadedSrc, setLoadedSrc] = createSignal<string>();
   const [brokenSrc, setBrokenSrc] = createSignal<string>();
   const loading = () => loadedSrc() !== src() && brokenSrc() !== src();
+  const isOnTv = createMemo(() => onTv(current().shotId));
+  // While presenting (and not private), the lightbox it opens puts it on the TV and steers it there.
+  const toTv = () => !!presented() && !privateMode();
   // A pointer click on a loaded picture morphs it into the lightbox's; a key or a video opens at once.
-  // While presenting, the presentation window stands in for the lightbox.
   const openCurrent = (e: MouseEvent & { currentTarget: HTMLElement }) => {
     const g = panelGame();
     if (!g) return;
-    if (presented()) {
-      present(g, current().shotId);
-      return;
-    }
     const img = e.currentTarget.querySelector<HTMLImageElement>('.panel-hero-img');
     if (e.detail > 0 && img && current().type === 'image' && !loading() && brokenSrc() !== src())
       openLightboxFrom(img, g, idx());
@@ -1919,12 +1923,18 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
     >
       <button
         class="panel-hero-open"
-        classList={{ 'panel-hero-open--present': !!presented() }}
-        aria-label={presented() ? 'Present this media' : 'Open in lightbox'}
+        classList={{ 'panel-hero-open--present': toTv() }}
+        aria-label={isOnTv() ? 'On TV: open in the lightbox' : toTv() ? 'Present this media' : 'Open in lightbox'}
         onClick={openCurrent}
       >
+        {/* Said on the picture, not only in its label: a click presents it, or it's what the TV shows. */}
         <Show when={presented()}>
-          <Cast class="panel-hero-present" aria-hidden="true" />
+          <span class="panel-hero-present lb-glass" aria-hidden="true">
+            <Show when={isOnTv()} fallback={!privateMode() && <Cast />}>
+              <span class="panel-hero-present-dot" />
+            </Show>
+            {isOnTv() ? 'On TV' : privateMode() ? 'Open' : 'Present'}
+          </span>
         </Show>
         <img
           class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
@@ -2362,13 +2372,20 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
 }
 
 // Presents the hero's media (presentation.ts), opening the presentation window first if needed.
+// Pressed, in the accent, while the hero's media is what's on the second screen.
 function PresentButton(): JSX.Element {
+  const heroOnTv = createMemo(() => {
+    const items = getPanelItems();
+    return onTv(items[clampedHeroIdx(items.length)]?.shotId);
+  });
   return (
     <button
       type="button"
       class="panel-icon-link panel-present-btn"
-      title="Present (P)"
-      aria-label="Present (P)"
+      classList={{ 'panel-present-btn--on': heroOnTv() }}
+      title={heroOnTv() ? 'On TV' : 'Present on second screen (P)'}
+      aria-label={heroOnTv() ? 'On TV' : 'Present on second screen'}
+      aria-keyshortcuts="P"
       onClick={presentHero}
     >
       <Cast />

@@ -156,17 +156,21 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 
 ### C8 Present games on a second screen while I browse
 
-- **Who / goal**: the host of a game night shows trailers and screenshots on a second screen to the people in the room, while freely browsing the app on their own; the second screen changes only when they present something.
+- **Who / goal**: the host of a game night shows trailers and screenshots on a second screen to the people in the room, while freely browsing the app on their own; the second screen changes only when they present something, or step through the lightbox steering it.
 - **Steps**:
   1. open a game's panel
   2. **P** (or the panel's cast button): the presentation window opens on the panel's media
-  3. drag it to the second screen, click it for fullscreen
+  3. place it on the second screen (its button, in Chrome or Edge with two screens; else drag it there), click it for fullscreen
   4. browse other games and lists; the presentation doesn't move
-  5. open a media from the panel: it's presented instead of opening the lightbox
-  6. present another game
-  7. stop presenting from the nav bar's ×
-- **Done when**: the second screen changed only when something was presented and stayed fullscreen through it; the nav bar names the game presented; nothing's left after stopping.
-- **Edges**: Ctrl+P (the browser's print); pop-ups blocked; the presentation window reloaded, closed or crashed (the nav bar forgets it); the main window reloaded (it remembers) or closed (the presentation closes); P right after reloading the main window (no second window); a second tab of the app (doesn't drive this window); Esc on the presentation; a trailer that fails (says so); P in the lightbox (presents it, closes the lightbox); a phone (no Present button).
+  5. pause, play, mute or replay the trailer from the nav bar's chip, which shows what's on the TV
+  6. open a media from the panel: the lightbox opens on it, on the TV, the panel marking it "On TV"; ←/→ step the TV through the game's media, ↑/↓ through the list's games; Esc leaves the TV on the last one
+  7. click what the nav bar's chip says is on the TV: the lightbox reopens on it, steering the TV again
+  8. stop presenting from the nav bar's ×
+- **Done when**: the second screen changed only when something was presented, stepped to in the lightbox or controlled from the chip, and stayed fullscreen through it; the nav bar names the game and media presented; nothing's left after stopping.
+- **Edges**:
+  - the windows: Ctrl+P (the browser's print); pop-ups blocked; the presentation window reloaded, closed or crashed (the nav bar forgets it); the main window reloaded (it remembers), closed or crashed (the presentation closes); P right after reloading the main window (no second window); a second tab of the app (doesn't drive this window); Esc on the presentation; a click in the room (stays fullscreen); placing refused or one screen (the drag, then); placed before (opens there); a phone (no Present button)
+  - what's shown: a trailer that fails (says so, in the lightbox too); P again on what's up (no restart, except an ended trailer); the browser refusing sound (muted, says so)
+  - the lightbox: P in one not presenting (presents it from where the trailer was, then steers the TV); P in one steering the TV (private: browse without the room seeing, on every open, until P again); a held → or ↓ (the TV gets the first step at once, then only where it stops; a game whose media is still loading, once); a trailer on the TV (its poster here, its controls driving the TV); stop from its pill, or the TV lost (a plain lightbox, nothing starting by itself); keys pressed on the TV (step it, opening it if need be; private, they don't)
 
 ## Lists
 

@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A comparison's Players section shows each player's own tags and play style, the tags and favourites they share, and what to suggest to each
 - Saved views of Owned and Wishlist, as tabs under the list's header: ready-made Recently played, Play next and Bargains, or the table as it is
 - Short games suggested view on Owned: barely played games with a main story of 5 h or less, best rated first
-- Present trailers and screenshots on a second screen while browsing
+- Present trailers and screenshots on a second screen (straight onto the TV in Chrome and Edge) while browsing, and steer it from the lightbox
 - PC Game Pass list: the Steam games in your region's PC Game Pass catalog, from a Home card, and combinable with your wishlist or library
 
 ### Changed

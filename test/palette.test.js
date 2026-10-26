@@ -9,7 +9,7 @@ const read = (file) => fs.readFileSync(path.join(__dirname, '../public/styles', 
 const base = read('base.css');
 const vendor = read('vendor-data-table.css');
 
-const rootBlock = base.match(/:root\s*{([^}]*)}/)[1];
+const rootBlock = read('tokens.css').match(/:root\s*{([^}]*)}/)[1];
 const tokens = Object.fromEntries([...rootBlock.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6});/gi)].map((m) => [m[1], m[2]]));
 
 const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -47,7 +47,7 @@ const below = (names, min) =>
       .map(([n, g, r]) => `--${n} on ${g}: ${r.toFixed(2)}`),
   );
 
-test('palette: every token is a 6-digit hex in base.css', () => {
+test('palette: every token is a 6-digit hex in tokens.css', () => {
   for (const name of [
     'bg',
     'surface',

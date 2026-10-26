@@ -4,6 +4,8 @@
 // already drifted: both silently did nothing when the Clipboard API was unavailable (it needs a
 // secure context, and can be permission-denied), leaving a button that looks broken, while the
 // lightbox's third copy fell back to a `window.prompt` the user could copy out of by hand.
+import { announce } from './announce.ts';
+
 export const COPIED_MS = 1500;
 
 // Resolves true if the text reached the clipboard, false if the user was given the prompt
@@ -13,26 +15,11 @@ export function copyText(text: string): Promise<boolean> {
   if (!clipboard?.writeText) return Promise.resolve(promptFallback(text));
   return clipboard.writeText(text).then(
     () => {
-      announce('Copied to clipboard');
+      announce('Copied to clipboard'); // the buttons' ✓ is visual only
       return true;
     },
     () => promptFallback(text),
   );
-}
-
-// The buttons' ✓ is visual only; screen readers hear this instead.
-let liveRegion: HTMLElement | undefined;
-function announce(message: string): void {
-  if (!liveRegion) {
-    liveRegion = document.createElement('div');
-    liveRegion.setAttribute('role', 'status');
-    liveRegion.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';
-    document.body.append(liveRegion);
-  }
-  const region = liveRegion;
-  // Emptied first so a second copy in a row is announced again.
-  region.textContent = '';
-  setTimeout(() => (region.textContent = message), 100);
 }
 
 function promptFallback(text: string): boolean {

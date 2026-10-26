@@ -1,0 +1,75 @@
+/* The design tokens, shared by the app (style.css) and the presentation window (presentation.css). */
+@layer base {
+  :root {
+    color-scheme: dark;
+    --bg: #0f1420;
+    --surface: #161d2b;
+    --surface-2: #141b29;
+    /* Dividers only: under 3:1, so a control's edge uses --line-control. */
+    --line: #222c3d;
+    --line-strong: #2c3850;
+    --line-control: #6a7992;
+    --text: #e6ebf2;
+    --text-body: #c3ccd9;
+    --muted: #8d9ab0;
+    /* State (current page or game, pressed, active tab), a view's one primary action and the brand
+       mark; never decoration. Text on it is --bg. test/palette.test.js checks these pairs. */
+    --accent: #4cc2ff;
+    --good: #5ad19a;
+    /* A warning (a source that didn't answer, a middling score) and a bad score: ≥5.5:1 on every surface. */
+    --warn: #f2b84b;
+    --bad: #ff7a7a;
+    /* What the account has: owned warns against buying twice, wishlisted is the one to buy. */
+    --owned: var(--warn);
+    --wishlisted: var(--good);
+    /* The panel's Tags & details dots, one per kind; each kind also has its own dot shape. */
+    --kind-tag: #b48cf2;
+    --kind-genre: #6f9cf0;
+    --kind-category: #48c9b0;
+    --kind-devpub: #e88fc4;
+    /* ProtonDB tiers, under white badge text. */
+    --tier-borked: #b91c1c;
+    --tier-bronze: #8b4513;
+    --tier-silver: #757575;
+    --tier-gold: #8a6a00;
+    --tier-platinum: #5b6b85;
+    --tier-native: #15803d;
+    --radius-1: 4px;
+    --radius-2: 6px;
+    --radius-3: 8px;
+    --dur-1: 120ms;
+    --dur-2: 180ms;
+    --dur-3: 250ms;
+    /* An ambient loop (the skeleton's shimmer), not a change. */
+    --dur-loop: 2.4s;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    /* Fields and buttons, the table library's included. */
+    --control-h: 34px;
+    /* The page's side margin, shell and routes alike (navPopover.ts's POPOVER_MARGIN matches the phone one). */
+    --gutter: 20px;
+    /* The side panel's width, and the room .app-shell.panel-open keeps for it. */
+    --panel-w: 380px;
+    /* The type scale (docs/dev/ui-guidelines.md); px sizes are left only to icon glyphs, 22px and up. */
+    --fs-label: 11px;
+    --fs-meta: 12px;
+    --fs-ui: 13px;
+    --fs-body: 14px;
+    --fs-title: 16px;
+    --fs-page: 18px;
+    --fs-figure: 20px;
+    /* The platform's own faces, so a page load downloads no font. */
+    --font-sans:
+      system-ui, -apple-system, 'Segoe UI', Roboto, Cantarell, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono:
+      ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono',
+      monospace;
+
+    /* Glass: dark enough behind full-white text for 4.7:1 over a pure-white picture (WCAG AA); don't
+       lighten it. The TV's is darker still, read from across a room (presentation.css). */
+    --glass-bg: rgb(0 0 0 / 0.55);
+    --glass-blur: blur(12px) saturate(1.4);
+    --glass-edge: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+    /* A room's pace, on the TV: a 250ms change reads there as a cut. */
+    --dur-4: 400ms;
+  }
+}

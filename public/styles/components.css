@@ -332,47 +332,113 @@
     }
   }
   /* What the presentation window shows (PresentationChip.tsx), and × to stop; desktop only, as the Present button. */
+  /* What's on the TV, and the host's remote for it (PresentationChip.tsx). Presenting is a state: accent border and tint. */
   .present-chip {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 4px;
     min-width: 0;
     height: var(--control-h);
-    padding: 0 4px 0 10px;
+    padding: 0 3px 0 6px;
     border: 1px solid var(--accent);
     border-radius: var(--radius-3);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
-  .present-chip-icon {
+  .present-chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* What's on the TV: a click opens it in the lightbox, steering the TV. */
+  .present-chip-open {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 28px;
+    padding: 0 4px 0 0;
+    border: none;
+    border-radius: var(--radius-2);
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .present-chip-open:hover {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .present-chip-thumb {
     flex: none;
-    color: var(--accent);
+    width: 32px;
+    height: 18px;
+    border-radius: var(--radius-1);
+    object-fit: cover;
+  }
+  .present-chip-alert {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    color: var(--warn);
   }
   .present-chip-name {
     max-width: 180px;
     overflow: hidden;
-    padding: 0 4px;
+    padding: 0 2px 0 4px;
     color: var(--text);
     font-size: var(--fs-ui);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .present-chip-item {
+    color: var(--muted);
+    font-size: var(--fs-meta);
+    white-space: nowrap;
+  }
+  /* 28px: inside the 34px chip, over the 24px minimum (only shown with a fine pointer). */
   .present-chip-btn {
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 4px;
     border: 0;
     border-radius: var(--radius-2);
     background: transparent;
     color: var(--text);
+    font-size: var(--fs-ui);
     cursor: pointer;
   }
   .present-chip-btn:hover {
     background: var(--line);
   }
-  @media (max-width: 768px) {
-    .present-chip {
+  .present-chip-btn .lucide {
+    width: 16px;
+    height: 16px;
+  }
+  /* Along the chip's inside bottom edge, its corners rounded with it (the chip itself clips nothing: focus rings). */
+  .present-chip-progress {
+    position: absolute;
+    inset: auto 0 0;
+    height: 2px;
+    border-radius: 0 0 calc(var(--radius-3) - 1px) calc(var(--radius-3) - 1px);
+    background: linear-gradient(to right, var(--accent) var(--present-progress), transparent 0);
+    pointer-events: none;
+    forced-color-adjust: none; /* forced colours would repaint its fill away */
+  }
+  /* Narrower, it never hides (it stops the TV): the item first, then the picture, then a shorter name. */
+  @media (max-width: 1100px) {
+    .present-chip-item {
       display: none;
+    }
+  }
+  @media (max-width: 900px) {
+    .present-chip-thumb {
+      display: none;
+    }
+    .present-chip-name {
+      max-width: 8em;
     }
   }
 
@@ -1702,11 +1768,25 @@
     top: 8px;
     left: 8px;
     z-index: 1;
-    padding: 4px;
-    border-radius: var(--radius-2);
-    background: rgb(0 0 0 / 0.6);
-    color: #fff;
-    font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 999px;
+    font-size: var(--fs-meta);
+  }
+  .panel-hero-present .lucide {
+    width: 16px;
+    height: 16px;
+  }
+  .panel-hero-present-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .panel-icon-link.panel-present-btn--on {
+    color: var(--accent);
   }
   .panel-hero-img {
     display: block;
@@ -1951,8 +2031,9 @@
   .panel-refresh-icon.is-refreshing {
     animation: spin 0.75s linear infinite;
   }
-  /* The presentation window is a second window on a second screen: a desktop's. */
-  @media (max-width: 768px) {
+  /* The presentation window is a second window on a second screen: a desktop's, at any width (a
+     window snapped to half the screen still presents). The chip, which stops it, never hides. */
+  @media not (any-pointer: fine) {
     .panel-present-btn {
       display: none;
     }
@@ -2957,11 +3038,10 @@
     visibility: visible;
   }
 
-  /* Glass: dark enough behind full-white text for 4.7:1 over a pure-white picture (WCAG AA); don't lighten it. */
   .lb-glass {
-    background: rgb(0 0 0 / 0.55);
-    backdrop-filter: blur(12px) saturate(1.4);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge);
     color: #fff;
   }
   :is(button.lb-glass, .lb-glass button):hover:not(:disabled) {
@@ -3224,6 +3304,39 @@
   #screenshot-lightbox.lb--automuted .lb-unmute {
     display: flex;
   }
+  /* A linked trailer playing on the TV, over its poster here; chrome or not. */
+  .lb-tvplaying {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    margin: 0;
+    padding: 0 16px;
+    border-radius: 20px;
+    font-size: var(--fs-body);
+    pointer-events: none;
+  }
+  .lb-tvplaying .lucide {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+  }
+  #screenshot-lightbox.lb--tv.lb--tv-playing:not(.lb--tv-failed) .lb-tvplaying {
+    display: flex;
+  }
+  /* One state at a time over it: failed, then buffering, then paused or ended. */
+  #screenshot-lightbox.lb--tv:is(.lb--buffering, .lb--tv-failed) .lb-bigplay {
+    opacity: 0;
+    visibility: hidden;
+  }
+  #screenshot-lightbox.lb--tv-failed .lb-surface::after {
+    display: none;
+  }
 
   /* ‹ ›: at the screen's edges for a mouse; in the bottom band for a finger, below. */
   .lb-btn {
@@ -3328,6 +3441,51 @@
     align-items: center;
     gap: 8px;
     margin-left: auto;
+  }
+  /* Presenting: steering the TV (the cast in the accent), or private; the toggle, then the × that stops presenting. */
+  .lb-tv {
+    flex: none;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    border-radius: 20px;
+  }
+  .lb-tv .lb-tv-toggle {
+    width: auto;
+    height: 100%;
+    gap: 6px;
+    padding: 0 10px 0 12px;
+    border-radius: 20px 0 0 20px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    font-size: var(--fs-ui);
+    white-space: nowrap;
+  }
+  .lb-tv-toggle .lucide {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+  }
+  .lb-tv--private .lb-tv-toggle .lucide {
+    color: rgb(255 255 255 / 0.6);
+  }
+  .lb-tv .lb-tv-stop {
+    width: 28px;
+    height: 28px;
+    margin-right: 6px;
+    border-left: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 0 14px 14px 0;
+    background: none;
+    color: #fff;
+    font-size: var(--fs-title);
+  }
+  /* "· On TV" after the counter: only in a keyboard step's flash, the chrome having the pill. */
+  .lb-counter-tv {
+    margin-left: 1ch;
+  }
+  #screenshot-lightbox:not(.lb-idle) .lb-counter-tv {
+    display: none;
   }
 
   /* The new item slides in from the side it was stepped toward (from where a swipe's peek was), fading in. */
@@ -3516,9 +3674,14 @@
       height: 44px;
     }
     .lb-caption,
-    .lb-counter {
+    .lb-counter,
+    .lb-tv {
       height: 44px;
       border-radius: 22px;
+    }
+    .lb-tv .lb-tv-stop {
+      width: 36px;
+      height: 36px;
     }
     .lb-caption button {
       width: 34px;
@@ -3582,6 +3745,14 @@
     }
     .lb-vc-scrub {
       appearance: auto;
+    }
+    /* On the TV, said without the accent. */
+    .lb-tv-toggle .lucide {
+      color: CanvasText;
+    }
+    .lb-tv:not(.lb-tv--private) .lb-tv-toggle {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
     }
   }
 

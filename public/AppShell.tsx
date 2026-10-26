@@ -11,10 +11,12 @@
 // open/close/position mechanics used to live here as a deliberate, temporary duplicate of
 // nav.tsx's identically-named pair for exactly that transition period; they're now navPopover.ts's
 // `bindNavPopover`, shared with the account chip's own popover (AccountChip.tsx).
-import { onMount, onCleanup, createEffect, createSignal, on, For, Show, type JSX } from 'solid-js';
+import { onMount, onCleanup, createEffect, createRoot, createSignal, on, For, Show, type JSX } from 'solid-js';
 import { A, useNavigate, useLocation, type RouteSectionProps } from '@solidjs/router';
 import { PrefsPanel } from './prefsPopover.tsx';
-import { initLightbox, repointLightboxGame } from './lightbox.tsx';
+import { initLightbox, openLightbox, repointLightboxGame } from './lightbox.tsx';
+import { buildMediaItems, preferredShotIndex } from './mediaItems.ts';
+import { presented, setPrivateMode } from './presentation.ts';
 import { initPanel, isPanelOpen, getPanelGame } from './panel.tsx';
 import { bindPanelKeyboardShortcuts } from './panelKeyboard.ts';
 import { initGameSearch } from './gameSearch.ts';
@@ -167,6 +169,41 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     navigate(withAccountParam(`/game/${appid}`, location.search));
   }
 
+  // Opens what's on the TV in the lightbox, steering it without sending it again: the panel on its game
+  // first (game steps go through its list), then the item once loaded (5 s at most), else a game step's landing.
+  function rejoinTv(): Promise<boolean> {
+    const on = presented();
+    if (!on) return Promise.resolve(false);
+    if (getPanelGame()?.appid !== on.appid) openGameGlobally(on.appid);
+    return new Promise((resolve) =>
+      createRoot((dispose) => {
+        let settled = false; // its effect may run again before the disposal takes
+        const done = (game: Game | null) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          dispose();
+          // Its details never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
+          if (!game || (!game.details && on.item.shotId !== 'banner')) return resolve(false);
+          setPrivateMode(false);
+          const items = buildMediaItems(game.appid, game.details?.meta);
+          const i = items.findIndex((s) => s.shotId === on.item.shotId);
+          openLightbox(game, i >= 0 ? i : preferredShotIndex(items, on.item.type));
+          resolve(true);
+        };
+        const ours = () => {
+          const game = getPanelGame();
+          return game?.appid === on.appid ? game : null;
+        };
+        const timeout = setTimeout(() => done(ours()), 5000);
+        createEffect(() => {
+          const game = ours();
+          if (game && (game.details || on.item.shotId === 'banner')) done(game);
+        });
+      }),
+    );
+  }
+
   onMount(() => {
     // Fire-and-forget: checks whether a session cookie is already signed in (e.g. having just
     // landed back from /auth/steam/callback) and reconciles prefs on this browser's first sign-in
@@ -206,6 +243,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
       // shows otherwise is media-within-this-game, which says nothing about where you are in
       // the list you're paging through.
       getGamePosition: () => routeHandlers.gamePosition?.() ?? null,
+      onRejoin: rejoinTv,
     });
     onCleanup(disposeLightbox);
     initPanel({
@@ -313,7 +351,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
             <SearchClearButton />
             <div id="app-search-results" class="game-search-results" hidden />
           </search>
-          <PresentationChip />
+          <PresentationChip onOpen={() => void rejoinTv()} />
           <AccountChip />
           <div class="site-nav-prefs site-nav-popover">
             <button

@@ -1,22 +1,19 @@
 /* The presentation window (present.html): media on black, read from across a room. */
+@import './styles/tokens.css';
+
 html,
 body {
   margin: 0;
   height: 100%;
   background: #000;
-  color: #e6ebf2;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    Cantarell,
-    'Noto Sans',
-    sans-serif;
+  color: var(--text);
+  font-family: var(--font-sans);
   overflow: hidden;
 }
 
 .pres {
+  /* Darker glass than the lightbox's: its text is read from across a room (≈8.6:1 over white). */
+  --glass-bg: rgb(0 0 0 / 0.7);
   position: fixed;
   inset: 0;
   display: grid;
@@ -28,8 +25,12 @@ body {
   cursor: default;
 }
 
-.pres-media {
-  grid-area: 1 / 1;
+/* Pinned to the screen, out of the grid: a video's intrinsic size changes as it loads (none, the poster's,
+   the stream's), which could resize a grid track and move the picture for a moment. */
+.pres-media,
+.pres-ghost {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -38,28 +39,24 @@ body {
   display: none;
 }
 
-/* The lightbox's glass (components.css's .lb-glass): full-white text keeps 4.7:1 over a white picture. */
+/* The lightbox's glass (components.css's .lb-glass), at the TV's darker --glass-bg. */
 .pres-glass {
   margin: 0;
   padding: 0.3em 0.7em;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 0.55);
-  backdrop-filter: blur(12px) saturate(1.4);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  border-radius: 0.4em;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge);
   color: #fff;
 }
 
 /* A new media fades in over the old one fading out (PresentationView's fadeOut). */
 .pres-media:not([hidden]) {
-  animation: pres-in 400ms ease-out;
+  animation: pres-in var(--dur-4) var(--ease-out);
 }
 .pres-ghost {
-  grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
   pointer-events: none;
-  animation: pres-out 400ms ease-out forwards;
+  animation: pres-out var(--dur-4) var(--ease-out) forwards;
 }
 @keyframes pres-in {
   from {
@@ -71,26 +68,21 @@ body {
     opacity: 0;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .pres-media,
-  .pres-ghost {
-    animation-duration: 1ms;
-  }
-}
-
-/* The full picture still loading: a spinner, after a moment so a quick load never shows one. */
+/* Loading or stalled: the lightbox's spinner at TV size, after a moment so a quick load never shows one. */
 .pres--loading::after {
   content: '';
   grid-area: 1 / 1;
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   border: 3px solid rgb(255 255 255 / 0.25);
   border-top-color: #fff;
   border-radius: 50%;
+  background: var(--glass-bg);
+  box-shadow: 0 0 0 12px var(--glass-bg);
   opacity: 0;
   animation:
     pres-spin 0.75s linear infinite,
-    pres-appear 1ms 400ms forwards;
+    pres-appear 1ms var(--dur-4) forwards;
 }
 @keyframes pres-appear {
   to {
@@ -103,31 +95,143 @@ body {
   }
 }
 
-/* The game's name, on a change or a mouse move, then gone with the cursor. */
+/* A TV channel's lower third, inside the title-safe 5 % a TV may crop: shown a while on each new media
+   (PresentationView's showCaption), rising a little as it comes. */
 .pres-caption {
   position: absolute;
-  left: 4vw;
-  bottom: 4vh;
-  font-size: clamp(20px, 3vw, 48px);
-  font-weight: 600;
+  left: 5vw;
+  bottom: 5vh;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  padding: 0.5em 0.8em;
   opacity: 0;
-  transition: opacity 400ms;
+  translate: 0 8px;
+  transition:
+    opacity var(--dur-4) var(--ease-out),
+    translate var(--dur-4) var(--ease-out);
 }
-.pres--awake .pres-caption {
+.pres-caption--on {
   opacity: 1;
+  translate: 0 0;
+}
+.pres-caption-name {
+  font-size: clamp(24px, 2.6vw, 56px);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.pres-caption-media {
+  font-size: clamp(16px, 1.6vw, 32px);
+  font-weight: 400;
+  color: rgb(255 255 255 / 0.85);
 }
 
-/* Over the poster or the black, until something else is presented. */
+/* Over the picture, dimmed, until something else is presented (the host's chip retries it). */
 .pres-error {
   grid-area: 1 / 1;
-  font-size: clamp(20px, 3vw, 48px);
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: clamp(20px, 2.4vw, 44px);
   font-weight: 600;
 }
+.pres-error .lucide {
+  width: 1.5em;
+  height: 1.5em;
+  color: var(--warn);
+}
+.pres--failed .pres-media {
+  opacity: 0.4;
+}
 
-/* A trailer muted for want of a first click here; stays until that click. */
+/* Stopped: to black, then the window closes itself. */
+.pres--closing {
+  opacity: 0;
+  transition: opacity var(--dur-4) var(--ease-out);
+}
+
+/* base.css's global rule isn't loaded here: this window's own. */
+@media (prefers-reduced-motion: reduce) {
+  .pres-media,
+  .pres-ghost {
+    animation-duration: 1ms;
+  }
+  .pres-caption,
+  .pres--closing {
+    transition: none;
+  }
+  .pres-caption {
+    translate: none;
+  }
+  /* A ring standing still (a near-instant spin would freeze it mid-turn), after the same moment. */
+  .pres--loading::after {
+    animation: pres-appear 1ms var(--dur-4) forwards;
+  }
+}
+
+/* The media surface stays black; the pills and card take the system's colours. */
+@media (forced-colors: active) {
+  .pres {
+    forced-color-adjust: none;
+  }
+  .pres-glass {
+    forced-color-adjust: auto;
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+}
+
+/* Until the window's first click: what that click does (fullscreen needs a gesture here, sound may). */
+.pres-card {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6em;
+  padding: 1.1em 1.4em;
+  font-size: clamp(16px, 1.6vw, 28px);
+  font-weight: 600;
+  text-align: center;
+}
+.pres-card p {
+  margin: 0;
+}
+/* Chromium with a second screen: straight onto it. */
+.pres-place {
+  margin-top: 0.3em;
+  padding: 0.5em 1.1em;
+  border: 1px solid rgb(255 255 255 / 0.6);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 400;
+  cursor: pointer;
+}
+.pres-place:hover {
+  background: rgb(255 255 255 / 0.15);
+}
+.pres-place:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.pres-card .lucide {
+  width: 1.6em;
+  height: 1.6em;
+}
+/* Fullscreen, its only sound cue: a trailer the browser still won't play aloud. Clear of the caption. */
 .pres-sound {
   position: absolute;
-  right: 4vw;
-  bottom: 4vh;
-  font-size: clamp(16px, 2vw, 32px);
+  top: 5vh;
+  right: 5vw;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-size: clamp(16px, 1.6vw, 32px);
+}
+.pres-sound .lucide {
+  width: 1.2em;
+  height: 1.2em;
 }
