@@ -62,6 +62,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the pattern matches the shell running the `pkill` command itself, so it kills that shell, and it can miss the server's actual process.
 - **Fix**: stop servers with `node scripts/mock-server.js down` / `node scripts/dev-server.js down`, never `pkill`.
 
+## A new `/api` route answers `Cannot GET` (404) under `npm run dev`
+
+- **Symptom**: the page says a source "didn't answer"; `curl localhost:3000/api/<route>` returns Express's `Cannot GET /api/<route>` HTML.
+- **Cause**: another worktree's dev server already holds port 3000, so this checkout's backend never binds and Vite proxies `/api` to the other one, which runs older code.
+- **Fix**: `node scripts/session-end.js` lists running servers; start this one on a free port with `PORT=3001 npm run dev` (Vite's proxy reads the same `PORT`), or stop the other.
+
 ## `document is not defined` in `browser_run_code_unsafe`
 
 - **Symptom**: `ReferenceError: document is not defined` (or `localStorage`, `setTimeout`, `require`) from a Playwright MCP code call.
