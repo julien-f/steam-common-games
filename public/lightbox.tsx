@@ -315,10 +315,9 @@ function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
   const failed = onTv && !!pb?.failed;
   if (failed !== lb.classList.contains('lb--tv-failed')) {
     lb.classList.toggle('lb--tv-failed', failed);
-    if (failed) {
-      showLbError("Couldn't load on the TV.");
-      noteLb(lb, "The TV couldn't load this");
-    } else hideLbError();
+    if (failed)
+      showLbError("Couldn't load on the TV."); // an alert: said as it shows
+    else hideLbError();
   }
   clearInterval(lbTvTick);
   if (!trailer) return;

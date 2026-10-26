@@ -1827,7 +1827,6 @@ test('C8 edge: what the TV fails to load the linked lightbox says, and retries',
   await page.keyboard.press('ArrowLeft'); // the trailer, broken
   await expect(shown.getByRole('alert')).toHaveText("Couldn't load this video.");
   await expect(lightbox.getByRole('alert')).toContainText("Couldn't load on the TV");
-  await expect(lightbox.locator('.lb-status')).toContainText("The TV couldn't load this");
   const retried = shown.evaluate(
     (name) =>
       new Promise((resolve) => {

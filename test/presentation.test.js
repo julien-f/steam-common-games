@@ -348,3 +348,78 @@ test("the window's relayed keys reach the one subscriber, down and up", async ()
     ['ArrowRight', true],
   ]);
 });
+
+test('a window reloading slower than the bye grace gets its media back, private mode too, and says so', async (t) => {
+  const remote = await started();
+  p.setPrivateMode(true);
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  remote.say({ type: 'bye' });
+  await flush();
+  t.mock.timers.tick(2000);
+  assert.equal(p.presented(), null);
+  t.mock.timers.tick(5000);
+  remote.say({ type: 'hello' });
+  await flush();
+  t.mock.timers.tick(100); // the status line's own delay
+  t.mock.timers.reset();
+  assert.equal(p.presented()?.appid, 10);
+  assert.equal(p.privateMode(), true);
+  assert.equal(remote.got.filter((m) => m.type === 'onAir').length, 2);
+  assert.equal(announced.at(-1), 'Presenting Game 10 again');
+});
+
+test('a hello 10 s after the bye that lost the window restores nothing', async (t) => {
+  const remote = await started();
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  remote.say({ type: 'bye' });
+  await flush();
+  t.mock.timers.tick(2000);
+  t.mock.timers.tick(10000);
+  remote.say({ type: 'hello' });
+  await flush();
+  t.mock.timers.reset();
+  assert.equal(p.presented(), null);
+});
+
+test('private mode is kept for a reload of the main window, and ends with presenting', async (t) => {
+  p.setPrivateMode(true);
+  assert.equal(session.get('playshelf-presentation-private'), '1');
+  const { main } = await reloadedMain(t, 'privately');
+  assert.equal(main.privateMode(), true);
+  main.stopPresenting();
+  assert.equal(main.privateMode(), false);
+  assert.equal(session.has('playshelf-presentation-private'), false);
+});
+
+test("a lightbox handover reaches the window's first hello only, and not a media presented after it", async () => {
+  p.present(game(10), 'banner', { startAt: 42, paused: true });
+  const id = mainIdOf(opened.at(-1));
+  p.present(game(10), 'banner', { startAt: 42, paused: true }); // again before the hello: still kept
+  const remote = fakeWindow(id);
+  remote.say({ type: 'hello' });
+  await tick();
+  remote.say({ type: 'hello' }); // the window reloaded: no replay
+  await tick();
+  const sent = remote.got.filter((m) => m.type === 'onAir').map((m) => m.onAir.startAt);
+  assert.deepEqual(sent, [42, undefined]);
+  p.stopPresenting();
+  p.present(game(10), 'banner', { startAt: 42 });
+  p.present(game(10), 's1');
+  const next = fakeWindow(mainIdOf(opened.at(-1)));
+  next.say({ type: 'hello' });
+  await tick();
+  assert.equal(next.got.find((m) => m.type === 'onAir').onAir.startAt, undefined);
+});
+
+test("a failure on the TV is said once, through the shell's status line", async (t) => {
+  const remote = await started();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const pb = { paused: true, muted: false, t: 0, dur: 0, ended: false, needsClick: false, buffering: false };
+  remote.say({ type: 'playback', playback: { ...pb, failed: true } });
+  remote.say({ type: 'playback', playback: { ...pb, failed: true } });
+  await flush();
+  t.mock.timers.tick(100);
+  t.mock.timers.reset();
+  assert.equal(announced.filter((a) => a.startsWith("Couldn't load")).length, 1);
+  assert.equal(announced.at(-1), "Couldn't load Game 10, Cover on the TV");
+});

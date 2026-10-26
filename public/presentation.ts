@@ -12,14 +12,28 @@ const MISSED_BEATS = 3;
 // A hidden window's throttled timers beat about once a minute: its silence means less.
 const HIDDEN_SILENCE_MS = 150_000;
 const ID_KEY = 'playshelf-presentation-main';
+// Kept beside the id: a reloaded main window mustn't push to the room what the host was browsing privately.
+const PRIVATE_KEY = 'playshelf-presentation-private';
+// How long after a bye-loss the window's hello still gets its media back: a slow reload (its own `main` grace).
+const RELOAD_GRACE_MS = 10_000;
 
 // What the presentation window shows; null while not presenting.
 const [presented, setPresented] = createSignal<OnAir | null>(null);
 // How the presented trailer (or picture) is doing, as the window last reported; null until it does.
 const [playback, setPlayback] = createSignal<Playback | null>(null);
 // The host's "private": the lightbox no longer steers the TV, on every open, until P relinks it or presenting stops.
-const [privateMode, setPrivateMode] = createSignal(false);
-export { presented, playback, privateMode, setPrivateMode };
+const [privateMode, setPrivate] = createSignal(false);
+export { presented, playback, privateMode };
+
+export function setPrivateMode(on: boolean): void {
+  setPrivate(on);
+  try {
+    if (on) sessionStorage.setItem(PRIVATE_KEY, '1');
+    else sessionStorage.removeItem(PRIVATE_KEY);
+  } catch {
+    // Private browsing: it just won't survive a reload.
+  }
+}
 
 let mainId: string | null = null;
 let channel: BroadcastChannel | null = null;
@@ -29,6 +43,10 @@ let lastHidden = false;
 // A lightbox trailer's playhead for the window's first sight of it (sent, or answered on its hello),
 // never kept in `presented()`: a reload or a retry would replay it.
 let handover: Pick<OnAir, 'startAt' | 'paused'> | undefined;
+// Whether the window has said hello (or its state): until then a post goes unheard, the handover kept for its hello.
+let helloed = false;
+// What a bye-loss forgot, for a hello within `RELOAD_GRACE_MS` (a reload slower than the bye grace).
+let recentlyLost: { onAir: OnAir; privately: boolean; at: number } | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let relayedKey: ((key: string, up: boolean) => void) | undefined;
 let byeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,6 +86,7 @@ function forget() {
   clearTimeout(byeTimer);
   lastHidden = false;
   handover = undefined;
+  helloed = false;
   setPresented(null);
   setPlayback(null);
   setPrivateMode(false);
@@ -81,19 +100,39 @@ function onMessage(e: MessageEvent<FromPresentation>) {
   // A reload also says bye, then hello: only a bye that stays one forgets the window.
   clearTimeout(byeTimer);
   if (msg.type === 'bye') {
-    byeTimer = setTimeout(lost, 2000);
+    byeTimer = setTimeout(() => {
+      const onAir = presented();
+      recentlyLost = onAir && { onAir, privately: privateMode(), at: Date.now() };
+      lost();
+    }, 2000);
     return;
   }
+  // Back from a slow reload: what it showed, as it was.
+  if (msg.type === 'hello' && !presented() && recentlyLost && Date.now() - recentlyLost.at < RELOAD_GRACE_MS) {
+    setPresented(recentlyLost.onAir);
+    setPrivateMode(recentlyLost.privately);
+    announce(`Presenting ${recentlyLost.onAir.name} again`);
+  }
+  recentlyLost = null;
   seen();
+  helloed = true;
   if (msg.type === 'state') lastHidden = !!msg.hidden;
-  if (msg.type === 'playback') setPlayback(msg.playback);
+  if (msg.type === 'playback') {
+    // The nav chip's warning sign, said: the shell's status line (the lightbox's error card is its own alert).
+    const on = presented();
+    if (msg.playback.failed && !playback()?.failed && on) announce(`Couldn't load ${on.name}, ${on.spoken} on the TV`);
+    setPlayback(msg.playback);
+  }
   if (msg.type === 'key') relayedKey?.(msg.key, msg.up);
   const current = presented();
   // A reloaded window asks again; a reloaded main window learns what's shown from the window's state.
   if (msg.type === 'hello') setPlayback(null); // a reloaded window: its report follows
   if (msg.type === 'hello' && current) post({ main: mainId, type: 'onAir', onAir: { ...current, ...handover } });
   if (msg.type === 'hello') handover = undefined;
-  if (msg.type === 'state' && !current && msg.onAir) setPresented(msg.onAir);
+  if (msg.type === 'state' && !current && msg.onAir) {
+    const { startAt, paused, ...kept } = msg.onAir; // a handover is never kept
+    setPresented(kept);
+  }
 }
 
 function connect(id: string) {
@@ -106,9 +145,16 @@ function connect(id: string) {
   post({ main: id, type: 'main' });
 }
 
-// A tab that presented before a reload keeps driving the same window.
+// A tab that presented before a reload keeps driving the same window, privately if it was.
 const resumedId = storedId();
-if (resumedId) connect(resumedId);
+if (resumedId) {
+  connect(resumedId);
+  try {
+    setPrivate(sessionStorage.getItem(PRIVATE_KEY) === '1');
+  } catch {
+    // Private browsing: nothing kept.
+  }
+}
 // Going: the window closes unless `main` follows (a reload), or this page comes back from the bfcache.
 addEventListener('pagehide', () => mainId && post({ main: mainId, type: 'bye' }));
 addEventListener('pageshow', (e) => e.persisted && mainId && post({ main: mainId, type: 'main' }));
@@ -137,7 +183,7 @@ export function present(
   // An open window main forgot (missed beats) is sent to, not reopened: that would reload it out of fullscreen.
   if (win ? !win.closed : wasPresenting) {
     post({ main: mainId!, type: 'onAir', onAir: { ...onAir, ...handover } });
-    handover = undefined;
+    if (helloed) handover = undefined;
     return;
   }
   const id = storedId() ?? crypto.randomUUID();
@@ -185,6 +231,7 @@ export function stopPresenting(): void {
   setTimeout(() => opened?.close(), 600);
   win = null;
   forget();
+  recentlyLost = null;
   mainId = null;
   try {
     sessionStorage.removeItem(ID_KEY);
