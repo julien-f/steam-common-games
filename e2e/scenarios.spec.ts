@@ -1185,6 +1185,36 @@ test('C8 edge: P in the lightbox presents its media and closes the lightbox', as
   expect(await page.evaluate(() => (window as unknown as { postsAtKey: number[] }).postsAtKey)).toEqual([0]);
 });
 
+test('C8 edge: a trailer presented before a click there says a click gives it sound; the next media cross-fades in', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const sound = shown.getByText('Click for sound');
+  await expect(sound).toBeVisible();
+  await expect(sound).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.55)'); // the lightbox's glass
+  await shown.locator('.pres').click();
+  await expect(sound).toBeHidden();
+  expect(await shown.locator('video.pres-media').evaluate((v: HTMLVideoElement) => v.muted)).toBe(false);
+  // The trailer fades out over the screenshot presented next (1 ms here, under reduced motion).
+  await shown.evaluate(() => {
+    const w = window as unknown as { ghosts: number };
+    w.ghosts = 0;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes) if ((n as Element).classList?.contains('pres-ghost')) w.ghosts++;
+    }).observe(document.querySelector('.pres')!, { childList: true });
+  });
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  await page.keyboard.press('p');
+  await expect.poll(() => shown.evaluate(() => (window as unknown as { ghosts: number }).ghosts)).toBe(1);
+  await expect(shown.locator('.pres-ghost')).toHaveCount(0);
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+});
+
 test('C8 edge: a trailer that fails to load says so on the presentation', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await mockApi(page, { states: ['broken-trailer'] });

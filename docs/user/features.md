@@ -148,7 +148,7 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
 A lightbox on another screen, for showing trailers and screenshots to the people in the room while you keep browsing on yours.
 
-- **P** (or the cast button among the panel's links) presents the media the panel shows, opening the presentation window first. Drag it to the other screen; a click (or **F**) there toggles fullscreen, its only control. Browsers play sound only after a first click in that window, so a trailer presented before it starts muted and gets its sound with that click.
+- **P** (or the cast button among the panel's links) presents the media the panel shows, opening the presentation window first. Drag it to the other screen; a click (or **F**) there toggles fullscreen, its only control. Browsers play sound only after a first click in that window, so a trailer presented before it starts muted, a **Click for sound** label saying so, and gets its sound with that click. Each new media fades in over the last, its thumbnail standing in while a screenshot loads.
 - While presenting, opening a media from the panel (a click on its picture, or **Enter**) presents it instead of opening the lightbox. Browsing the panel's media changes nothing on the other screen.
 - A screenshot stays up and a trailer plays once, until you present something else. One that fails to load says so there.
 - The nav bar names the game presented, and its × stops presenting; closing the tab that presents closes it too.
