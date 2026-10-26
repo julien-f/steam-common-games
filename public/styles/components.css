@@ -2829,27 +2829,62 @@
   }
 
   /* ── The screenshot and trailer viewer (lightbox.tsx): media on black, its chrome white over it. ── */
+  /* A modal <dialog>, its UA box (capped size, border, padding, background) reset to the viewport. */
   #screenshot-lightbox {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    background: none;
+    color: inherit;
   }
-  /* Fades in; its media then enters by its own lb-anim-* keyframes. */
-  #screenshot-lightbox.open {
-    display: flex;
-    transition: opacity var(--dur-2) var(--ease-out);
+  #screenshot-lightbox::backdrop {
+    background: none;
+  }
+  /* Fades in, its media growing from just under its size; fades out on close (kept rendered meanwhile). */
+  #screenshot-lightbox {
+    opacity: 0;
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      display var(--dur-2) allow-discrete,
+      overlay var(--dur-2) allow-discrete;
+  }
+  #screenshot-lightbox[open] {
+    opacity: 1;
   }
   @starting-style {
-    #screenshot-lightbox.open {
+    #screenshot-lightbox[open] {
       opacity: 0;
+    }
+    #screenshot-lightbox[open]:not(.lb-morph) :is(.lb-img, .lb-video) {
+      scale: 0.96;
     }
   }
   /* The hero's picture morphs in instead (lightbox.tsx's openLightboxFrom), over the backdrop's own fade. */
-  #screenshot-lightbox.open.lb-morph {
+  #screenshot-lightbox[open].lb-morph {
     transition: none;
+  }
+  /* What goes fullscreen: a dialog can't. Focused on open, with no ring: the shortcuts act from it.
+     The script handles every gesture on it; its controls keep the browser's taps. */
+  .lb-surface {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+    touch-action: none;
+  }
+  .lb-surface :is(button, input) {
+    touch-action: manipulation;
+  }
+  /* No pull-to-refresh or rubber-band behind a swipe. */
+  html:has(#screenshot-lightbox[open]) {
+    overscroll-behavior: none;
   }
   ::view-transition-new(lb-backdrop),
   ::view-transition-new(lb-chrome) {
@@ -2873,26 +2908,95 @@
     background: #000;
     cursor: zoom-out;
   }
+  /* The media gets the whole viewport, fullscreen or not; the chrome floats over it on scrims and glass. */
   .lb-img {
     position: relative;
-    max-width: 100vw;
-    max-height: 100vh;
+    max-width: 100dvw;
+    max-height: 100dvh;
     width: auto;
     height: auto;
     object-fit: contain;
     display: block;
-    transition: opacity var(--dur-2) var(--ease-out);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      scale var(--dur-2) var(--ease-out);
     transform-origin: center center;
     user-select: none;
   }
   .lb-video {
     position: relative;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
     display: block;
     cursor: pointer;
+    transition: scale var(--dur-2) var(--ease-out);
   }
+  /* The item stepped from, fading out where it was (lightbox.tsx's fadeOutLbItem). */
+  .lb-ghost {
+    position: absolute;
+    height: auto;
+    pointer-events: none;
+    animation: lb-fade-out var(--dur-3) var(--ease-out) forwards;
+  }
+  @keyframes lb-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  /* The neighbour a horizontal swipe drags in, a screen's width beside the item. */
+  .lb-peek {
+    position: absolute;
+    max-width: 100dvw;
+    max-height: 100dvh;
+    object-fit: contain;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .lb-peek--on {
+    visibility: visible;
+  }
+
+  /* Glass: dark enough behind full-white text for 4.7:1 over a pure-white picture (WCAG AA); don't lighten it. */
+  .lb-glass {
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(12px) saturate(1.4);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+    color: #fff;
+  }
+  :is(button.lb-glass, .lb-glass button):hover:not(:disabled) {
+    background-color: rgb(0 0 0 / 0.7);
+  }
+  #screenshot-lightbox .lucide {
+    stroke-width: 1.75;
+  }
+  /* Two-tone, so it shows over any picture: white, with dark on both sides. */
+  #screenshot-lightbox :is(button, input):focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgb(0 0 0 / 0.8);
+  }
+
+  /* Top and bottom scrims, fading with the chrome they back. */
+  .lb-toolbar::before,
+  .lb-vctrls::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .lb-toolbar::before {
+    top: 0;
+    height: 112px;
+    background: linear-gradient(rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.25) 50%, transparent);
+  }
+  .lb-vctrls::before {
+    bottom: 0;
+    height: 136px;
+    background: linear-gradient(transparent, rgb(0 0 0 / 0.25) 50%, rgb(0 0 0 / 0.55));
+  }
+
   .lb-vctrls {
     position: absolute;
     bottom: 0;
@@ -2900,317 +3004,383 @@
     right: 0;
     z-index: 2;
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 24px 16px 16px;
+  }
+  .lb-vc-row {
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding: 24px 14px 14px;
-    background: linear-gradient(transparent, rgb(0 0 0 / 0.65));
-    transition: opacity var(--dur-3) var(--ease-out);
   }
-  /* Idle state (video playing, unattended): hide all chrome + the cursor */
-  /* The toolbar's parts rather than the toolbar, so a step can show the counter (and a game step the caption) alone. */
-  #screenshot-lightbox.lb-idle .lb-vctrls,
-  #screenshot-lightbox.lb-idle .lb-btn,
+  /* Idle (unattended, or keyboard-driven): chrome and cursor hidden, by part so a step can flash the counter alone.
+     In fast, out slower, each part drifting a few pixels toward its edge. */
+  .lb-vctrls,
+  .lb-btn,
+  .lb-toolbar::before,
+  .lb-caption,
+  .lb-toolbar-right,
+  .lb-counter {
+    transition:
+      opacity var(--dur-1) var(--ease-out),
+      translate var(--dur-1) var(--ease-out),
+      background-color var(--dur-1) var(--ease-out);
+  }
+  #screenshot-lightbox.lb-idle :is(.lb-vctrls, .lb-btn, .lb-toolbar-right),
+  #screenshot-lightbox.lb-idle .lb-toolbar::before,
   #screenshot-lightbox.lb-idle:not(.lb--stepped-game) .lb-caption,
-  #screenshot-lightbox.lb-idle .lb-toolbar-left,
-  #screenshot-lightbox.lb-idle .lb-toolbar-right,
   #screenshot-lightbox.lb-idle:not(.lb--stepped) .lb-counter {
     opacity: 0;
     pointer-events: none;
+    transition:
+      opacity var(--dur-3) var(--ease-out),
+      translate var(--dur-3) var(--ease-out);
   }
-  #screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-left, .lb-toolbar-right, .lb-counter),
-  #screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
-  #screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
-  #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
-    opacity: 1;
+  #screenshot-lightbox.lb-idle .lb-toolbar-right,
+  #screenshot-lightbox.lb-idle .lb-toolbar::before,
+  #screenshot-lightbox.lb-idle:not(.lb--stepped-game) .lb-caption,
+  #screenshot-lightbox.lb-idle:not(.lb--stepped) .lb-counter {
+    translate: 0 -4px;
   }
-  #screenshot-lightbox.lb-idle.lb-near-top :is(.lb-caption, .lb-toolbar-left, .lb-toolbar-right),
-  #screenshot-lightbox.lb-idle.lb-near-bottom .lb-vctrls,
-  #screenshot-lightbox.lb-idle.lb-near-left .lb-prev,
-  #screenshot-lightbox.lb-idle.lb-near-right .lb-next {
-    pointer-events: auto;
+  #screenshot-lightbox.lb-idle .lb-vctrls {
+    translate: 0 4px;
   }
-  #screenshot-lightbox.lb-idle:not(.lb-pointer),
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-video,
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-img,
-  #screenshot-lightbox.lb-idle:not(.lb-pointer) .lb-backdrop {
+  #screenshot-lightbox.lb-idle .lb-prev {
+    translate: -4px 0;
+  }
+  #screenshot-lightbox.lb-idle .lb-next {
+    translate: 4px 0;
+  }
+  #screenshot-lightbox.lb-idle,
+  #screenshot-lightbox.lb-idle :is(.lb-video, .lb-img, .lb-backdrop) {
     cursor: none;
   }
-  .lb-vc-btn {
-    background: none;
-    border: none;
-    color: #fff;
-    cursor: pointer;
-    padding: 4px;
-    min-width: 24px;
-    min-height: 24px;
+
+  /* A keyboard action's feedback in place of the chrome (lightbox.tsx's osdLb): the icon its
+     kind names, or a seek's time over a thin line. */
+  .lb-osd {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    translate: -50% -50%;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    flex-shrink: 0;
-    opacity: 0.9;
+    gap: 8px;
+    padding: 16px 20px;
+    border-radius: var(--radius-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-ui);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease-out);
   }
-  .lb-vc-btn:hover {
+  .lb-osd--show {
+    opacity: 1;
+    transition-duration: var(--dur-1);
+  }
+  .lb-osd .lucide {
+    width: 32px;
+    height: 32px;
+  }
+  .lb-osd:not([data-kind='play']) .lb-osd-play,
+  .lb-osd:not([data-kind='pause']) .lb-osd-pause,
+  .lb-osd:not([data-kind='mute']) .lb-osd-mute,
+  .lb-osd:not([data-kind='unmute']) .lb-osd-unmute,
+  .lb-osd:not([data-kind='seek']) :is(.lb-osd-time, .lb-osd-bar) {
+    display: none;
+  }
+  .lb-osd-bar {
+    width: 160px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(
+      to right,
+      var(--accent) calc(var(--lb-osd-progress, 0) * 100%),
+      rgb(255 255 255 / 0.3) 0
+    );
+  }
+  .lb-osd :is(.lb-osd-play, .lb-osd-pause) {
+    fill: currentColor;
+  }
+
+  /* The first open's one hint at the hidden controls (lightbox.tsx's showLbHint). */
+  .lb-hint {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    z-index: 2;
+    translate: -50% 0;
+    margin: 0;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: var(--fs-ui);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-3) var(--ease-out);
+  }
+  .lb-hint--show {
     opacity: 1;
   }
+
+  /* Round glass buttons: the toolbar's, the trailer's, ‹ ›. 44px under a coarse pointer, below. */
+  .lb-toolbar-right button,
   .lb-vc-btn,
-  .lb-toolbar :is(.lb-fullscreen, .lb-zoom) {
-    font-size: var(--fs-title);
+  .lb-btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: var(--fs-figure);
+  }
+  .lb-vc-btn {
+    font-size: 22px;
   }
   /* A two-state control draws both icons and shows its state's (lightbox.tsx's `lb-on`). */
   .lb-on > .lb-icon-off,
   :not(.lb-on) > .lb-icon-on {
     display: none;
   }
-  .lb-bigplay .lucide,
-  .lb-vc-play .lucide {
+  /* Solid play/pause glyphs; the replay arrow stays a line. */
+  :is(.lb-bigplay, .lb-vc-play) :is(.lucide-play, .lucide-pause) {
     fill: currentColor;
   }
-  .lb-vc-time,
-  .lb-vc-dur {
-    color: rgba(255, 255, 255, 0.85);
-    font-size: var(--fs-meta);
+  .lb-vc-time {
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    font-size: var(--fs-ui);
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
+    white-space: nowrap;
     user-select: none;
   }
+  /* The seek line: thin, thicker with its handle under the mouse, a finger or focus. */
   .lb-vc-scrub {
     -webkit-appearance: none;
     appearance: none;
-    flex: 1;
-    height: 3px;
+    width: 100%;
+    margin: 0;
+    height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.25);
+    background-color: transparent;
     cursor: pointer;
-    outline: none;
     border: none;
+    transition: height var(--dur-1) var(--ease-out);
+  }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active) {
+    height: 6px;
   }
   .lb-vc-scrub::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 0;
+    height: 14px;
     border-radius: 50%;
     background: #fff;
     cursor: pointer;
   }
   .lb-vc-scrub::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
+    width: 0;
+    height: 14px;
     border-radius: 50%;
     background: #fff;
     border: none;
     cursor: pointer;
   }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active)::-webkit-slider-thumb {
+    width: 14px;
+  }
+  .lb-vc-scrub:is(:hover, :focus-visible, :active)::-moz-range-thumb {
+    width: 14px;
+  }
+
+  /* When the browser refused autoplay with sound: it plays muted, and this says so until tapped. */
+  .lb-unmute {
+    position: absolute;
+    right: 16px;
+    bottom: 120px;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 20px;
+    font-size: var(--fs-ui);
+    cursor: pointer;
+  }
+  #screenshot-lightbox.lb--automuted .lb-unmute {
+    display: flex;
+  }
+
+  /* ‹ ›: at the screen's edges for a mouse; in the bottom band for a finger, below. */
   .lb-btn {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: #fff;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9)); /* bare glyph, readable over a bright picture */
-    font-size: 32px;
-    line-height: 1;
-    width: 48px;
-    height: 64px;
-    border-radius: var(--radius-3);
-    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
     z-index: 1;
-    transition:
-      background-color var(--dur-1) var(--ease-out),
-      opacity var(--dur-3) var(--ease-out);
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
-  .lb-btn:hover:not(:disabled) {
-    background: rgb(255 255 255 / 0.15);
-  }
+  /* One item: nothing to step to. */
   .lb-btn:disabled {
-    opacity: 0.25;
-    cursor: default;
+    display: none;
   }
   .lb-prev {
-    left: 12px;
+    left: 16px;
   }
   .lb-next {
-    right: 12px;
+    right: 16px;
   }
+
+  /* Caption and counter top-left (as photo viewers do), the buttons top-right; a phone stacks them. */
   .lb-toolbar {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
+    z-index: 1;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
-    z-index: 1;
+    padding: 16px;
     pointer-events: none;
   }
   .lb-caption,
-  .lb-toolbar-left,
   .lb-toolbar-right,
   .lb-counter {
-    transition: opacity var(--dur-3) var(--ease-out);
+    pointer-events: auto; /* a click on them doesn't fall through to the backdrop and close */
   }
-  .lb-caption {
+  .lb-caption,
+  .lb-counter {
+    height: 40px;
+    border-radius: 20px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: #fff;
+  }
+  .lb-caption {
+    min-width: 0;
+    gap: 2px;
+    padding: 0 14px 0 6px;
     font-size: var(--fs-body);
     font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-    /* A fixed width with the name filling it, so ↑/↓ stay put from game to game. */
-    flex: 0 1 28rem;
-    min-width: 0;
-    order: 1; /* between the left buttons and the counter, which .lb-toolbar-row lends the toolbar */
-    pointer-events: auto; /* a click on the name doesn't fall through to the backdrop and close */
   }
   .lb-caption-text {
-    flex: 1 1 0;
-    text-align: center;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* The ↑/↓ pair flanking the caption steps the *list*, the axis the edge ‹ › don't cover.
-   Sized down from the toolbar's own round buttons — these sit inside a line of text. */
-  .lb-toolbar .lb-caption button {
-    pointer-events: auto; /* .lb-toolbar turns them off; only its interactive groups opt back in */
+  .lb-caption-text {
+    margin-left: 6px;
+  }
+  .lb-caption-pos {
     flex: none;
-    width: 28px;
-    height: 28px;
+    margin-left: 8px;
+    font-size: var(--fs-ui);
+    font-weight: 400; /* not part of the title */
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  /* The ↑/↓ pair steps the *list*, the axis the edge ‹ › don't cover. Inside the caption's pill. */
+  .lb-caption button {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: var(--fs-title);
+    cursor: pointer;
   }
-  .lb-toolbar .lb-close {
-    font-size: var(--fs-figure);
-  }
-  .lb-toolbar-row {
-    display: contents; /* one row with the caption; a phone stacks them again */
+  .lb-caption button:hover {
+    background: rgb(255 255 255 / 0.15);
   }
   .lb-counter {
-    order: 2;
-    /* It shares the centred group with the caption: a steady width, fitting "Screenshot 88 of 88",
-     keeps the caption from shifting. */
-    min-width: 12em;
-    text-align: center;
+    flex: none;
+    padding: 0 14px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-ui);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
-  .lb-toolbar-right {
-    order: 3;
-  }
-  .lb-toolbar-left,
   .lb-toolbar-right {
     display: flex;
     align-items: center;
     gap: 8px;
-    pointer-events: auto;
-    /* Equal-width flanks, so what sits between them lands on the real centre — `space-between`
-     alone put it wherever the wider group left it. */
-    flex: 1 1 0;
-  }
-  .lb-toolbar-right {
-    justify-content: flex-end;
-  }
-  .lb-toolbar button {
-    background: none;
-    border: none;
-    color: #fff;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color var(--dur-1) var(--ease-out);
-    font-size: 22px;
-  }
-  .lb-toolbar button:hover {
-    background: rgb(255 255 255 / 0.15);
-  }
-  /* One pill, two counters — the list position beside the game name, the media position after it.
-   Same treatment because they answer the same question on different axes (↑/↓ vs ‹ ›); the pill
-   rather than a text-shadow because either can land over a bright screenshot. */
-  .lb-counter,
-  .lb-caption-pos {
-    color: rgb(255 255 255 / 0.8);
-    font-size: var(--fs-ui);
-    font-weight: 400; /* the caption around it is 600 — the counter is not part of the title */
-    white-space: nowrap;
-    flex: none;
-    background: rgb(0 0 0 / 0.55);
-    padding: 3px 10px;
-    border-radius: var(--radius-2);
+    margin-left: auto;
   }
 
-  @keyframes lb-enter-right {
+  /* The new item slides in from the side it was stepped toward (from where a swipe's peek was), fading in. */
+  @keyframes lb-enter-x {
     from {
-      transform: translateX(40px);
+      translate: var(--lb-enter-from) 0;
+      opacity: var(--lb-enter-opacity, 0);
+    }
+  }
+  @keyframes lb-enter-y {
+    from {
+      translate: 0 var(--lb-enter-from);
       opacity: 0;
     }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
   }
-  @keyframes lb-enter-left {
-    from {
-      transform: translateX(-40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
+  :is(.lb-img, .lb-video):is(.lb-anim-right, .lb-anim-left) {
+    animation: lb-enter-x var(--dur-3) var(--ease-out);
   }
-  /* The vertical pair: a game step (↑/↓ or a vertical swipe), not a media one. */
-  @keyframes lb-enter-bottom {
-    from {
-      transform: translateY(40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  :is(.lb-img, .lb-video):is(.lb-anim-bottom, .lb-anim-top) {
+    animation: lb-enter-y var(--dur-3) var(--ease-out);
   }
-  @keyframes lb-enter-top {
-    from {
-      transform: translateY(-40px);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+  :is(.lb-anim-right, .lb-anim-bottom):not([style*='--lb-enter-from']) {
+    --lb-enter-from: 24px;
   }
-  .lb-img.lb-anim-right {
-    animation: lb-enter-right var(--dur-2) var(--ease-out) forwards;
+  :is(.lb-anim-left, .lb-anim-top):not([style*='--lb-enter-from']) {
+    --lb-enter-from: -24px;
   }
-  .lb-img.lb-anim-left {
-    animation: lb-enter-left var(--dur-2) var(--ease-out) forwards;
+  /* Carried on from a swipe: already in sight under the finger, so no fade. */
+  [style*='--lb-enter-from'] {
+    --lb-enter-opacity: 1;
   }
-  .lb-img.lb-anim-bottom {
-    animation: lb-enter-bottom var(--dur-2) var(--ease-out) forwards;
-  }
-  .lb-img.lb-anim-top {
-    animation: lb-enter-top var(--dur-2) var(--ease-out) forwards;
-  }
-  #screenshot-lightbox.lb--loading::after {
+  /* After a moment only, so a cached picture never flashes it: a thin ring on a glass disc. */
+  #screenshot-lightbox:is(.lb--loading, .lb--buffering) .lb-surface::after {
     content: '';
     position: absolute;
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgb(255 255 255 / 0.2);
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgb(255 255 255 / 0.25);
     border-top-color: #fff;
     border-radius: 50%;
-    animation: spin 0.75s linear infinite;
+    box-shadow: 0 0 0 8px rgb(0 0 0 / 0.55);
+    background: rgb(0 0 0 / 0.55);
+    opacity: 0;
+    animation:
+      spin 0.75s linear infinite,
+      lb-appear var(--dur-1) 400ms forwards;
     z-index: 2;
     pointer-events: none;
+  }
+  @keyframes lb-appear {
+    to {
+      opacity: 1;
+    }
   }
   .lb-error {
     position: absolute;
@@ -3221,11 +3391,14 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    color: rgba(255, 255, 255, 0.85);
     text-align: center;
-    background: rgb(0 0 0 / 0.6);
     padding: 20px 24px;
     border-radius: var(--radius-3);
+  }
+  .lb-error-icon {
+    width: 24px;
+    height: 24px;
+    color: var(--warn);
   }
   .lb-error-msg {
     margin: 0;
@@ -3249,8 +3422,6 @@
     top: 50%;
     transform: translateY(-50%);
     z-index: 2;
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
     padding: 10px 16px;
     border-radius: 24px;
     font-size: var(--fs-body);
@@ -3275,12 +3446,10 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 2;
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
     border: none;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3292,13 +3461,30 @@
       visibility 0s var(--dur-1),
       background-color var(--dur-1);
   }
-  .lb-bigplay:hover {
-    background: rgb(0 0 0 / 0.8);
-  }
   .lb-bigplay svg {
     width: 32px;
     height: 32px;
+  }
+  .lb-bigplay .lucide-play {
     margin-left: 2px; /* the triangle's visual centre sits left of its box */
+  }
+  /* Ended: a "Replay" pill in place of play/pause — the arrow alone read as undo or refresh. */
+  #screenshot-lightbox:not(.lb--ended) .lb-bigplay-replay,
+  #screenshot-lightbox.lb--ended .lb-bigplay :is(.lb-icon-on, .lb-icon-off) {
+    display: none;
+  }
+  #screenshot-lightbox.lb--ended .lb-bigplay {
+    width: auto;
+    height: 48px;
+    gap: 8px;
+    padding: 0 20px 0 16px;
+    border-radius: 24px;
+    font-size: var(--fs-body);
+    font-weight: 600;
+  }
+  #screenshot-lightbox.lb--ended .lb-bigplay svg {
+    width: 22px;
+    height: 22px;
   }
   /* Delayed, so it doesn't flash up in the moment before autoplay starts. */
   #screenshot-lightbox.lb--paused .lb-bigplay {
@@ -3309,95 +3495,96 @@
       visibility 0s 0.3s,
       background-color var(--dur-1);
   }
+  /* Under a finger it's the trailer's play/pause, shown with the rest of the controls. */
+  @media (pointer: coarse) {
+    #screenshot-lightbox:not(.lb-idle):has(.lb-video) .lb-bigplay {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
   /* Until a trailer first plays, its large play button is the one control on it. */
   #screenshot-lightbox.lb--unstarted .lb-vctrls {
     display: none;
   }
 
-  /* Room for the toolbar above the media and a trailer's controls below it, so neither sits on the
-   picture — where the screen is tall enough to spare it (not a phone turned landscape). */
-  @media (min-width: 769px) and (min-height: 600px) {
-    .lb-img {
-      max-height: calc(100vh - 128px);
-    }
-    .lb-video {
-      height: calc(100vh - 128px);
-    }
-  }
-
-  /* After the base .lb-* rules, or they win at equal specificity. */
-  @media (max-width: 768px) {
-    /* Lightbox fills the full screen */
-    .lb-img {
-      max-width: 100vw;
-      max-height: 100%;
-      border-radius: 0;
-    }
-    /* In the band below the media, clear of a trailer's control bar: on the picture's edges they
-     covered it, and a swipe steps media anyway. */
+  /* A finger: 44px targets whatever the width, ‹ › in the bottom band (at the ends of a trailer's controls). */
+  @media (pointer: coarse) {
+    .lb-toolbar-right button,
+    .lb-vc-btn,
     .lb-btn {
-      top: auto;
-      bottom: 96px;
-      transform: none;
-      width: 48px;
-      height: 48px;
-      font-size: 24px;
+      width: 44px;
+      height: 44px;
     }
-    .lb-prev {
-      left: 16px;
+    .lb-caption,
+    .lb-counter {
+      height: 44px;
+      border-radius: 22px;
     }
-    .lb-next {
-      right: 16px;
-    }
-    /* The pointer-friendly way to change game on touch (a vertical swipe is the other) — so
-     back up to a thumb-sized target here. */
-    .lb-toolbar .lb-caption button {
+    .lb-caption button {
       width: 34px;
       height: 34px;
     }
-    /* Two rows: in portrait they sit in the black band above the media, and one would not fit. */
-    .lb-toolbar {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 6px;
+    .lb-btn {
+      top: auto;
+      bottom: 16px;
+      transform: none;
+      font-size: 24px;
     }
-    .lb-toolbar-row {
-      display: flex;
-      align-items: center;
+    #screenshot-lightbox:has(.lb-video) .lb-vc-row {
+      padding-inline: 60px;
     }
-    .lb-caption {
-      order: 0;
-      flex: none; /* the row's full width instead, which pins ↑/↓ to its ends */
-      padding: 0 44px;
+    /* Clears the seek line's tall hit area off ‹ ›, level with the row below it. */
+    .lb-vctrls {
+      gap: 22px;
     }
-    .lb-counter {
-      min-width: 0; /* alone between the flanks here, so its width moves nothing */
+    .lb-vc-time {
+      height: 44px;
+      border-radius: 22px;
     }
-    /* Thumb-sized trailer controls; the seek bar keeps its thin look inside a taller hit area. */
-    .lb-vc-btn {
-      min-width: 44px;
-      min-height: 44px;
-      justify-content: center;
-    }
-    .lb-vc-scrub {
-      height: 24px;
-      background-color: transparent;
-      background-size: 100% 3px;
+    /* The seek line keeps its thin look inside a finger-sized hit area, its handle always shown. */
+    .lb-vc-scrub,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active) {
+      height: 44px;
+      margin-block: -20px;
+      background-size: 100% 4px;
       background-position: center;
       background-repeat: no-repeat;
     }
-    .lb-vc-scrub::-webkit-slider-thumb {
+    .lb-vc-scrub::-webkit-slider-thumb,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active)::-webkit-slider-thumb {
       width: 18px;
       height: 18px;
     }
-    .lb-vc-scrub::-moz-range-thumb {
+    .lb-vc-scrub::-moz-range-thumb,
+    .lb-vc-scrub:is(:hover, :focus-visible, :active)::-moz-range-thumb {
       width: 18px;
       height: 18px;
     }
   }
+  /* Narrow: the buttons on the first row, the caption and counter below them. */
+  @media (max-width: 600px) {
+    .lb-toolbar-right {
+      order: -1;
+      width: 100%;
+      justify-content: flex-end;
+    }
+    .lb-caption {
+      flex: 0 1 auto;
+    }
+  }
+  @media (forced-colors: active) {
+    .lb-glass {
+      background: Canvas;
+      border: 1px solid CanvasText;
+    }
+    #screenshot-lightbox :is(button, input):focus-visible {
+      outline-color: Highlight;
+    }
+    .lb-vc-scrub {
+      appearance: auto;
+    }
+  }
 
-  /* ── The `?` shortcuts dialog (ShortcutsModal.tsx). The <dialog> is only a shell, its UA box and
-     backdrop reset, kept displayed while its backdrop and box fade out. ── */
   .shortcuts-dialog {
     width: 100%;
     height: 100%;

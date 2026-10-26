@@ -9,7 +9,28 @@ export function loadHlsModule(): Promise<any> {
   return (_hlsModulePromise ??= import('hls.js').then((m) => m.default));
 }
 
-export async function playHls(videoEl: HlsVideo, src: string | null | undefined, onError: () => void) {
+// `onMutedFallback`: when the browser refuses autoplay with sound, play muted and say so (the lightbox's
+// Unmute pill); without it a refused autoplay just doesn't start.
+function start(videoEl: HlsVideo, onMutedFallback?: () => void) {
+  // A refusal landing after a step off the trailer (stopHls bumps the token) is no longer this trailer's.
+  const token = videoEl._hlsToken;
+  const current = () => videoEl._hlsToken === token;
+  videoEl.play().catch((e: unknown) => {
+    if (!onMutedFallback || videoEl.muted || (e as Error)?.name !== 'NotAllowedError' || !current()) return;
+    videoEl.muted = true;
+    videoEl.play().then(
+      () => current() && onMutedFallback(),
+      () => {},
+    );
+  });
+}
+
+export async function playHls(
+  videoEl: HlsVideo,
+  src: string | null | undefined,
+  onError: () => void,
+  onMutedFallback?: () => void,
+) {
   if (!src) return;
   if (videoEl._hls) {
     videoEl._hls.destroy();
@@ -20,7 +41,7 @@ export async function playHls(videoEl: HlsVideo, src: string | null | undefined,
     // across shots — a property assignment overwrites rather than stacking.
     videoEl.onerror = onError;
     videoEl.src = src;
-    videoEl.play().catch(() => {});
+    start(videoEl, onMutedFallback);
     return;
   }
   // videoEl is reused across shots, and loading hls.js is async — guard against a stale
@@ -36,7 +57,7 @@ export async function playHls(videoEl: HlsVideo, src: string | null | undefined,
   });
   hls.loadSource(src);
   hls.attachMedia(videoEl);
-  hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
+  hls.on(Hls.Events.MANIFEST_PARSED, () => start(videoEl, onMutedFallback));
   videoEl._hls = hls;
 }
 

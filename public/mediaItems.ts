@@ -6,6 +6,7 @@ export interface MediaItem {
   hls?: string | null;
   thumb: string;
   shotId: string;
+  name?: string | null; // a trailer's, as Steam titles it
 }
 export function buildMediaItems(
   appid: number | string,
@@ -24,7 +25,13 @@ export function buildMediaItems(
   const screenshots = details?.screenshots || [];
   return [
     { type: 'image', main: bannerUrl, thumb: bannerUrl, shotId: 'banner' },
-    ...movies.map((m) => ({ type: 'video' as const, hls: m.hls, thumb: m.thumbnail, shotId: `v${m.id}` })),
+    ...movies.map((m) => ({
+      type: 'video' as const,
+      hls: m.hls,
+      thumb: m.thumbnail,
+      shotId: `v${m.id}`,
+      name: m.name,
+    })),
     ...screenshots.map((s) => ({ type: 'image' as const, main: s.full, thumb: s.thumbnail, shotId: `s${s.id}` })),
   ];
 }

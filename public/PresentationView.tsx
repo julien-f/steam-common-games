@@ -14,6 +14,9 @@ function PresentationView() {
   const [onAir, setOnAir] = createSignal<OnAir | null>(null);
   const [awake, setAwake] = createSignal(true);
   const [failed, setFailed] = createSignal(false);
+  const [loading, setLoading] = createSignal(false);
+  // A trailer muted for want of a first click in this window: the pill says a click gives it sound.
+  const [silenced, setSilenced] = createSignal(false);
   let root!: HTMLDivElement;
   let img!: HTMLImageElement;
   let video!: HlsVideo;
@@ -29,23 +32,45 @@ function PresentationView() {
     idleTimer = setTimeout(() => setAwake(false), IDLE_MS);
   }
 
+  // What was on screen fades out over the new media: a picture copied, as the DOM is never rebuilt.
+  function fadeOut() {
+    const src = !img.hidden ? img.currentSrc : !video.hidden ? video.poster : '';
+    if (!src) return;
+    const ghost = document.createElement('img');
+    ghost.className = 'pres-ghost';
+    ghost.src = src;
+    ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+    root.append(ghost);
+  }
+
   function show({ item }: OnAir) {
     setFailed(false);
-    // A late error from the previous media is dropped.
-    const fail = () => onAir()?.item === item && setFailed(true);
+    fadeOut();
+    // A late error or load from the previous media is dropped.
+    const current = () => onAir()?.item === item;
+    const fail = () => current() && (setLoading(false), setFailed(true));
     if (item.type === 'video') {
       img.hidden = true;
       video.hidden = false;
       video.poster = item.thumb;
+      setLoading(false);
       // Browsers refuse sound before a first click in this window (the main window's doesn't count).
       video.muted = !navigator.userActivation?.hasBeenActive;
+      setSilenced(video.muted);
       playHls(video, item.hls, fail);
     } else {
       stopHls(video);
+      setSilenced(false);
       video.hidden = true;
       img.hidden = false;
-      img.onerror = fail;
-      img.src = item.main!;
+      img.onerror = null; // a broken thumbnail isn't the picture failing: `full` says that
+      // The thumbnail stands in until the full picture has loaded.
+      img.src = item.thumb;
+      setLoading(true);
+      const full = new Image();
+      full.onload = () => current() && ((img.src = item.main!), setLoading(false));
+      full.onerror = fail;
+      full.src = item.main!;
     }
   }
 
@@ -66,6 +91,7 @@ function PresentationView() {
   // Its only control; the first click also lets the trailer on screen have its sound.
   function toggleFullscreen() {
     video.muted = false;
+    setSilenced(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     else root.requestFullscreen?.().catch(() => {});
     wake();
@@ -109,13 +135,22 @@ function PresentationView() {
   });
 
   return (
-    <div class="pres" classList={{ 'pres--awake': awake() }} ref={root} onPointerMove={wake} onClick={toggleFullscreen}>
+    <div
+      class="pres"
+      classList={{ 'pres--awake': awake(), 'pres--loading': loading() }}
+      ref={root}
+      onPointerMove={wake}
+      onClick={toggleFullscreen}
+    >
       <img class="pres-media" ref={img} alt="" hidden />
       <video class="pres-media" ref={video} playsinline hidden />
-      <Show when={onAir()}>{(game) => <p class="pres-caption">{game().name}</p>}</Show>
+      <Show when={onAir()}>{(game) => <p class="pres-caption pres-glass">{game().name}</p>}</Show>
+      <Show when={silenced()}>
+        <p class="pres-sound pres-glass">Click for sound</p>
+      </Show>
       <Show when={failed() && onAir()}>
         {(game) => (
-          <p class="pres-error" role="alert">
+          <p class="pres-error pres-glass" role="alert">
             Couldn't load this {game().item.type === 'video' ? 'video' : 'image'}.
           </p>
         )}

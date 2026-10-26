@@ -78,8 +78,9 @@ test('resolveSwipe: vertical asks for more distance than horizontal', () => {
   assert.equal(swipe({ axis: 'y', dy: -LB_SWIPE_X_DISTANCE }), null);
 });
 
-test('resolveSwipe: no list behind the game means no game step', () => {
+test('resolveSwipe: no list behind the game means no game step; down closes instead, as photo viewers do', () => {
   assert.equal(swipe({ axis: 'y', dy: -200, hasGameList: false }), null);
+  assert.equal(swipe({ axis: 'y', dy: LB_SWIPE_Y_DISTANCE, hasGameList: false }), 'close');
 });
 
 // ── resolveSwipe: flicks ──────────────────────────────────────────────────────

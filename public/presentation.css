@@ -38,15 +38,76 @@ body {
   display: none;
 }
 
+/* The lightbox's glass (components.css's .lb-glass): full-white text keeps 4.7:1 over a white picture. */
+.pres-glass {
+  margin: 0;
+  padding: 0.3em 0.7em;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+/* A new media fades in over the old one fading out (PresentationView's fadeOut). */
+.pres-media:not([hidden]) {
+  animation: pres-in 400ms ease-out;
+}
+.pres-ghost {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  animation: pres-out 400ms ease-out forwards;
+}
+@keyframes pres-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pres-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pres-media,
+  .pres-ghost {
+    animation-duration: 1ms;
+  }
+}
+
+/* The full picture still loading: a spinner, after a moment so a quick load never shows one. */
+.pres--loading::after {
+  content: '';
+  grid-area: 1 / 1;
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgb(255 255 255 / 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  opacity: 0;
+  animation:
+    pres-spin 0.75s linear infinite,
+    pres-appear 1ms 400ms forwards;
+}
+@keyframes pres-appear {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pres-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
 /* The game's name, on a change or a mouse move, then gone with the cursor. */
 .pres-caption {
   position: absolute;
   left: 4vw;
   bottom: 4vh;
-  margin: 0;
-  padding: 0.3em 0.7em;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 0.6);
   font-size: clamp(20px, 3vw, 48px);
   font-weight: 600;
   opacity: 0;
@@ -59,10 +120,14 @@ body {
 /* Over the poster or the black, until something else is presented. */
 .pres-error {
   grid-area: 1 / 1;
-  margin: 0;
-  padding: 0.3em 0.7em;
-  border-radius: 8px;
-  background: rgb(0 0 0 / 0.6);
   font-size: clamp(20px, 3vw, 48px);
   font-weight: 600;
+}
+
+/* A trailer muted for want of a first click here; stays until that click. */
+.pres-sound {
+  position: absolute;
+  right: 4vw;
+  bottom: 4vh;
+  font-size: clamp(16px, 2vw, 32px);
 }

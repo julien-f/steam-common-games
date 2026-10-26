@@ -1,13 +1,13 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
-import { present } from './presentation.ts';
+import { present, presented } from './presentation.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
 import { fmtTime } from './utils.ts';
-import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
+import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
 
@@ -23,6 +23,8 @@ import Minimize from 'lucide-solid/icons/minimize';
 import Pause from 'lucide-solid/icons/pause';
 import Play from 'lucide-solid/icons/play';
 import Rewind from 'lucide-solid/icons/rewind';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
+import RotateCcw from 'lucide-solid/icons/rotate-ccw';
 import Volume2 from 'lucide-solid/icons/volume-2';
 import VolumeX from 'lucide-solid/icons/volume-x';
 import X from 'lucide-solid/icons/x';
@@ -39,7 +41,7 @@ import ZoomIn from 'lucide-solid/icons/zoom-in';
 // reasoning `panel.tsx`'s own hero zoom-equivalent state would have gotten if this file had
 // any (it doesn't).
 const [lbGame, setLbGame] = createSignal<ReadonlyGame | null>(null);
-const [idx, setIdx] = createSignal(0);
+const [lbIdx, setIdx] = createSignal(0);
 // Derived from the open game on each read, not snapshotted at open time — the same shape, for
 // the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its details
 // have streamed in has nothing but a banner to offer, and gains its screenshots and videos
@@ -51,6 +53,9 @@ const shots = () => {
   const g = lbGame();
   return g ? buildMediaItems(g.appid, g.details?.meta) : [];
 };
+// Clamped on read: a refresh can shrink the list under a valid index (fewer screenshots), and
+// every read of `shots()[idx()]` (the render, the caption, the leave-memory) must stay in bounds.
+const idx = () => Math.max(0, Math.min(lbIdx(), shots().length - 1));
 const gameName = () => lbGame()?.name ?? '';
 // The game `renderLightbox` last drew, so a render can tell a game step from a media step.
 let lbRenderedAppid: number | undefined;
@@ -59,8 +64,7 @@ let lbZoom = 1,
   lbPanY = 0,
   lbLastDir = 0,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
-  lbCounterTimer: ReturnType<typeof setTimeout> | undefined,
-  lbPointerTimer: ReturnType<typeof setTimeout> | undefined;
+  lbCounterTimer: ReturnType<typeof setTimeout> | undefined;
 // Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s onload checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
@@ -102,6 +106,19 @@ const LB_SEEK_SECONDS = 5;
 const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
 
+// The viewer drives it by keyboard: no chrome then, only brief feedback (`osdLb`); a pointer or a touch ends it.
+let lbByKey = false;
+let lbChromeTapTimer: ReturnType<typeof setTimeout> | undefined;
+const LB_HINT_KEY = 'steam.isonoe.net:lightbox-hint-seen';
+// The viewer's own mute choice, kept across trailers and visits (a browser's refused sound isn't one).
+const LB_MUTED_KEY = 'steam.isonoe.net:lightbox-muted';
+let lbBufferTimer: ReturnType<typeof setTimeout> | undefined;
+// Whether the picture was last seen zoomed, so the zoom button resyncs only when that changes.
+let lbZoomShown = false;
+// Where a committed swipe left the item and its incoming neighbour, so the step carries on from there.
+let lbSwipeLeft: DOMRect | null = null;
+let lbSwipeEnterFrom: number | null = null;
+
 // No-ops until initLightbox sets them; nothing can open the lightbox before that.
 let _onLightboxParamChange: (shotId: string | null) => void = () => {};
 let _onGameNav: (dir: number) => void = () => {};
@@ -112,8 +129,6 @@ let _getGamePosition: () => { index: number; total: number } | null = () => null
 // picked by the same rule the re-point itself would have used.
 let _awaitingMedia: ShotKind | null = null;
 let _lbPrevFocus: Element | null = null;
-// How the viewer last interacted — see openLightbox's focus call.
-let lastInputWasKey = false;
 // One mount at a time: a second initLightbox (Vite hot-reloading AppShell) tears the first down —
 // its DOM and every listener it put on `document` — instead of mounting a duplicate beside it.
 let _lbTeardown: (() => void) | null = null;
@@ -148,10 +163,13 @@ export function initLightbox({
   _lbTeardown?.();
   const abort = new AbortController();
   _lbSignal = abort.signal;
+  document.addEventListener('keydown', (e) => e.key !== 'Tab' && (lbByKey = true), {
+    capture: true,
+    signal: _lbSignal,
+  });
+  document.addEventListener('pointerdown', () => (lbByKey = false), { capture: true, signal: _lbSignal });
   document.addEventListener('fullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', syncLightboxFullscreenBtn, { signal: _lbSignal });
-  document.addEventListener('keydown', () => (lastInputWasKey = true), { capture: true, signal: _lbSignal });
-  document.addEventListener('pointerdown', () => (lastInputWasKey = false), { capture: true, signal: _lbSignal });
   document.addEventListener('fullscreenchange', lockLbLandscape, { signal: _lbSignal });
   document.addEventListener('webkitfullscreenchange', lockLbLandscape, { signal: _lbSignal });
   screen.orientation?.addEventListener('change', lockLbLandscape, { signal: _lbSignal });
@@ -179,7 +197,7 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
 // here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
 // panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
 // the lightbox is covering. Whatever had focus in here keeps it, so holding ↓ on the caption
-// button doesn't walk focus away mid-click; the close button is the fallback, as on a real open.
+// button doesn't walk focus away mid-click; the surface is the fallback, as on a real open.
 // `dir` only drives the enter animation's direction — 0 (R, which has no direction) skips it.
 // A wrap past either end of the list enters from the other side, the cue that it went back round —
 // except after a swipe, where the new game follows the finger.
@@ -204,13 +222,30 @@ function stepGameFromLightbox(step: () => void, dir = 0) {
     lbLastAxis = 'x';
   }
   if (lb.contains(document.activeElement)) return;
-  ((before && lb.contains(before) ? before : lb.querySelector('.lb-close')) as HTMLElement).focus();
+  ((before && lb.contains(before) ? before : lbSurface(lb)) as HTMLElement).focus();
 }
 
 // ── Fullscreen button sync ─────────────────────────────────────────────────
 
-function webkitDoc(): Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void } {
-  return document as Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+type WebkitDoc = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+  webkitFullscreenEnabled?: boolean;
+};
+function webkitDoc(): WebkitDoc {
+  return document as WebkitDoc;
+}
+
+// An iPhone has no element fullscreen: only a <video>'s own, in the native player.
+type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+function canElementFullscreen() {
+  return !!(document.fullscreenEnabled || webkitDoc().webkitFullscreenEnabled);
+}
+
+// Shown only where it does something: element fullscreen, else a trailer the native player can take.
+function syncLbFullscreenShown(lb: HTMLElement) {
+  const native = lbShowingVideo() && !!(lbVideoEl as WebkitVideo).webkitEnterFullscreen;
+  lb.querySelector<HTMLElement>('.lb-fullscreen')!.style.display = canElementFullscreen() || native ? '' : 'none';
 }
 
 function isFullscreen() {
@@ -230,12 +265,17 @@ function syncLightboxFullscreenBtn() {
 }
 
 function toggleLbFullscreen(lb: HTMLElement) {
+  if (!canElementFullscreen()) {
+    if (lbShowingVideo()) (lbVideoEl as WebkitVideo).webkitEnterFullscreen?.();
+    return;
+  }
   if (isFullscreen()) {
     exitFullscreen();
   } else {
+    const surface = lbSurface(lb);
     (
-      lb.requestFullscreen?.() ??
-      (lb as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
+      surface.requestFullscreen?.() ??
+      (surface as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
     )?.catch?.(() => {});
   }
 }
@@ -246,16 +286,21 @@ function toggleLbFullscreen(lb: HTMLElement) {
 // unsupported (desktop, iOS) — nothing to do then.
 function lockLbLandscape() {
   const o = screen.orientation as ScreenOrientation & { lock?: (type: string) => Promise<void> };
-  if (!isFullscreen()) return;
+  if (!isFullscreen()) return o?.unlock?.(); // back to the phone's own rotation
   o?.lock?.('landscape').catch(() => {});
 }
 
 // ── Load errors (image/video) ──────────────────────────────────────────────
 
+function setLbLoading(lb: HTMLElement, on: boolean) {
+  lb.classList.toggle('lb--loading', on);
+  lbSurface(lb).ariaBusy = String(on);
+}
+
 function showLbError(msg: string) {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
-  lb.classList.remove('lb--loading');
+  setLbLoading(lb, false);
   const err = lb.querySelector<HTMLElement>('.lb-error')!;
   err.querySelector<HTMLElement>('.lb-error-msg')!.textContent = msg;
   err.style.display = 'flex';
@@ -277,8 +322,7 @@ function retryCurrentShot() {
   const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
-    const vid = lbVideoEl;
-    playHls(vid, shot.hls, showLbVideoError);
+    playLbTrailer(document.getElementById('screenshot-lightbox')!, shot);
   } else {
     // Cache-bust: a browser that already recorded this exact URL as failed
     // won't necessarily re-attempt the network request otherwise.
@@ -291,18 +335,19 @@ function loadLbImage(src: string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const token = ++lbImgToken;
-  lb.classList.add('lb--loading');
+  setLbLoading(lb, true);
   const full = new Image();
   full.onload = () => {
     if (token !== lbImgToken) return;
     img.src = src;
     img.style.opacity = '1';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
+    syncLbZoomBtn(lb);
   };
   full.onerror = () => {
     if (token !== lbImgToken) return;
     img.style.opacity = '0';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
     showLbError("Couldn't load this image.");
   };
   full.src = src;
@@ -326,6 +371,11 @@ function applyLbTransform() {
     lbPanY = Math.max(-maxY, Math.min(maxY, lbPanY));
     img.style.transform = `scale(${lbZoom}) translate(${lbPanX / lbZoom}px, ${lbPanY / lbZoom}px)`;
     img.style.cursor = 'grab';
+  }
+  // Only when zoom starts or ends: syncing reads layout, and this runs on every pan or pinch move.
+  if (lbZoom > 1 !== lbZoomShown) {
+    lbZoomShown = lbZoom > 1;
+    syncLbZoomBtn(img.closest('#screenshot-lightbox')!);
   }
 }
 
@@ -352,6 +402,13 @@ function toggleLbZoomAt(clientX: number, clientY: number) {
   else lbZoomTowardPoint(clientX, clientY);
 }
 
+// Shown only where zooming reveals more: a still drawn below its natural size.
+function syncLbZoomBtn(lb: HTMLElement) {
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const shrunk = lbShowingImage() && img.naturalWidth > img.offsetWidth + 1;
+  lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shrunk || lbZoom > 1 ? '' : 'none';
+}
+
 // The visible way to what double-click, double-tap and pinch do: 2x on the image's centre, or back.
 function toggleLbZoom() {
   if (!lbShowingImage()) return;
@@ -361,23 +418,22 @@ function toggleLbZoom() {
 
 // ── Video seeking (keyboard arrows + touch double-tap) ─────────────────────
 
-const LB_POINTER_ZONE = 120; // px from an edge within which the mouse brings back that edge's chrome
-const LB_TOUCH_SEEK_SECONDS = 10; // matches the common mobile-player convention (YouTube etc.)
+const LB_LONG_SEEK_SECONDS = 10; // a double-tap's and J/L's, as YouTube's
+const LB_PAN_STEP = 80; // px an arrow pans a zoomed picture
 
 function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
   if (!vid) return;
   vid.currentTime = Math.max(0, Math.min(vid.duration || Infinity, vid.currentTime + deltaSeconds));
-  showLbChrome();
-  schedHideLbChrome();
 }
 
 // Transient "⏪10s" / "10s⏩" flash shown on a touch double-tap seek. Each
 // side tracks its own hide timer (rather than one shared timer) so a
 // double-tap on one side can't be cut short by one on the other.
-function flashSeek(side: 'left' | 'right') {
+function flashSeek(side: 'left' | 'right', seconds: number) {
   const lb = document.getElementById('screenshot-lightbox');
   const el = lb?.querySelector<HTMLElement>(`.lb-seek-flash-${side}`);
   if (!el) return;
+  el.querySelector('.lb-seek-flash-n')!.textContent = `${seconds}s`;
   const flash = el as LbFlashEl;
   clearTimeout(flash._flashTimer);
   el.classList.add('lb-seek-flash--show');
@@ -385,7 +441,7 @@ function flashSeek(side: 'left' | 'right') {
 }
 
 function lbScrubGradient(pct: number) {
-  return `linear-gradient(to right, var(--accent) ${pct}%, rgba(255,255,255,0.25) ${pct}%)`;
+  return `linear-gradient(to right, var(--accent) ${pct}%, rgb(255 255 255 / 0.3) ${pct}%)`;
 }
 
 // Zeroes out the scrubber/time labels immediately so a newly-loaded video
@@ -395,8 +451,46 @@ function resetLbVc(vc: HTMLElement) {
   const scrub = vc.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
   scrub.value = String(0);
   scrub.style.backgroundImage = lbScrubGradient(0);
-  vc.querySelector<HTMLElement>('.lb-vc-time')!.textContent = '0:00';
-  vc.querySelector<HTMLElement>('.lb-vc-dur')!.textContent = '0:00';
+  syncLbTime(vc, 0, 0);
+}
+
+// Starts a trailer at the viewer's own mute, falling back to muted (and saying so) where the browser refuses sound.
+function playLbTrailer(lb: HTMLElement, shot: MediaItem) {
+  lbVideoEl.muted = lbMutedChoice();
+  syncLbMuteBtn(lb);
+  lb.classList.remove('lb--automuted', 'lb--ended');
+  playHls(lbVideoEl, shot.hls, showLbVideoError, () => lb.classList.add('lb--automuted'));
+}
+
+function syncLbTime(vc: HTMLElement, at: number, duration: number) {
+  vc.querySelector('.lb-vc-time')!.textContent = `${fmtTime(at)} / ${fmtTime(duration)}`;
+  vc.querySelector('.lb-vc-scrub')!.setAttribute('aria-valuetext', `${fmtTime(at)} of ${fmtTime(duration)}`);
+}
+
+// The viewer's mute (the button, M, the Unmute pill): kept for the next trailers, unlike the browser's.
+function setLbMuted(muted: boolean) {
+  lbVideoEl.muted = muted;
+  document.getElementById('screenshot-lightbox')?.classList.remove('lb--automuted');
+  try {
+    localStorage.setItem(LB_MUTED_KEY, muted ? '1' : '0');
+  } catch {
+    // storage refused: the choice lasts this trailer
+  }
+}
+
+// Also called right after a render sets `muted`: a just-attached <video> may not report it in `volumechange`.
+function syncLbMuteBtn(lb: HTMLElement) {
+  const btn = lb.querySelector('.lb-vc-mute')!;
+  btn.classList.toggle('lb-on', lbVideoEl.muted);
+  btn.setAttribute('aria-label', lbVideoEl.muted ? 'Unmute' : 'Mute');
+}
+
+function lbMutedChoice(): boolean {
+  try {
+    return localStorage.getItem(LB_MUTED_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 // ── Chrome (toolbar/nav/video-controls) idle-hide ──────────────────────────
@@ -412,23 +506,85 @@ function showLbChrome() {
   clearTimeout(lbVcTimer);
 }
 
+function hideLbChrome() {
+  clearTimeout(lbVcTimer);
+  document.getElementById('screenshot-lightbox')?.classList.add('lb-idle');
+}
+
 function schedHideLbChrome() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   clearTimeout(lbVcTimer);
-  lbVcTimer = setTimeout(() => lb.classList.add('lb-idle'), 3000);
+  lbVcTimer = setTimeout(() => {
+    // A keyboard user's focused control stays in sight (WCAG 2.4.7), as does one under a mouse (touch leaves
+    // `:hover` stuck on the last tapped); checked again later.
+    const held = matchMedia('(hover: hover)').matches ? ':is(:focus-visible, :hover)' : ':focus-visible';
+    if (lb.querySelector(`:is(button, input)${held}`)) schedHideLbChrome();
+    else lb.classList.add('lb-idle');
+  }, 3000);
+}
+
+// Shows the chrome for a while — unless the viewer is on the keyboard, which only gets `osdLb`'s feedback.
+function revealLbChrome() {
+  if (lbByKey) return;
+  showLbChrome();
+  schedHideLbChrome();
+}
+
+// A keyboard action's feedback, in place of the chrome: play/pause/mute as an icon, a seek as the time and a line.
+function osdLb(kind: 'play' | 'pause' | 'mute' | 'unmute' | 'seek') {
+  const lb = document.getElementById('screenshot-lightbox');
+  const osd = lb?.querySelector<LbFlashEl>('.lb-osd');
+  if (!osd) return;
+  osd.dataset.kind = kind;
+  if (kind === 'seek') {
+    const vid = lbVideoEl;
+    osd.querySelector('.lb-osd-time')!.textContent = `${fmtTime(vid.currentTime)} / ${fmtTime(vid.duration || 0)}`;
+    osd.style.setProperty('--lb-osd-progress', String(vid.duration ? vid.currentTime / vid.duration : 0));
+  }
+  osd.classList.add('lb-osd--show');
+  clearTimeout(osd._flashTimer);
+  osd._flashTimer = setTimeout(() => osd.classList.remove('lb-osd--show'), 1000);
 }
 
 // With the chrome idle, a step flashes only the counter, plus the game's name on a game step.
 function flashLbCounter(lb: HTMLElement, gameChanged: boolean) {
-  if (!lb.classList.contains('lb-idle')) return;
+  if (!lb.classList.contains('lb-idle') || lbRenderedAppid === undefined) return; // a step, not the open
   lb.classList.add('lb--stepped');
   lb.classList.toggle('lb--stepped-game', gameChanged);
   clearTimeout(lbCounterTimer);
   lbCounterTimer = setTimeout(() => lb.classList.remove('lb--stepped', 'lb--stepped-game'), 1500);
 }
 
+// ── First-open hint ────────────────────────────────────────────────────────
+
+// The one hint at what the hidden controls do, on this device's first open; any action, or 4 s, ends it.
+function showLbHint(lb: HTMLElement) {
+  try {
+    if (localStorage.getItem(LB_HINT_KEY)) return;
+    localStorage.setItem(LB_HINT_KEY, '1');
+  } catch {
+    return; // storage refused: better no hint than one on every open
+  }
+  const hint = lb.querySelector<HTMLElement>('.lb-hint')!;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const games = untrack(() => _getGamePosition()) ? (touch ? 'swipe ↕ games · ' : '↑↓ games · ') : '';
+  hint.textContent = games + (touch ? 'swipe ↔ media' : '←→ media');
+  hint.classList.add('lb-hint--show');
+  const end = () => {
+    hint.classList.remove('lb-hint--show');
+    abort.abort();
+  };
+  const abort = new AbortController();
+  for (const type of ['keydown', 'pointerdown']) lb.addEventListener(type, end, { signal: abort.signal });
+  setTimeout(end, 4000);
+}
+
 // ── Focus helpers ──────────────────────────────────────────────────────────
+
+function lbSurface(lb: HTMLElement): HTMLElement {
+  return lb.querySelector<HTMLElement>('.lb-surface')!;
+}
 
 // Rendered ones only: the trap's wrap landing on a CSS-hidden button (‹ › with one item) loses focus.
 function getFocusable(lb: HTMLElement): HTMLElement[] {
@@ -449,77 +605,99 @@ function getFocusable(lb: HTMLElement): HTMLElement[] {
 // itself is produced and mounted, not how the rest of the file finds or manipulates it.
 function LightboxDom() {
   return (
-    <div id="screenshot-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
-      <div class="lb-backdrop" />
-      <button class="lb-btn lb-prev" aria-label="Previous screenshot">
-        <ChevronLeft />
-      </button>
-      <img class="lb-img" src="" alt="Screenshot" />
-      <video class="lb-video" playsinline />
-      <button class="lb-btn lb-next" aria-label="Next screenshot">
-        <ChevronRight />
-      </button>
-      <div class="lb-error" style={{ display: 'none' }} role="alert">
-        <p class="lb-error-msg" />
-        <button class="lb-error-retry">Retry</button>
-      </div>
-      <div class="lb-seek-flash lb-seek-flash-left" aria-hidden="true">
-        <Rewind /> {LB_TOUCH_SEEK_SECONDS}s
-      </div>
-      <div class="lb-seek-flash lb-seek-flash-right" aria-hidden="true">
-        {LB_TOUCH_SEEK_SECONDS}s <FastForward />
-      </div>
-      <button class="lb-bigplay" aria-label="Play trailer">
-        <Play />
-      </button>
-      <div class="lb-vctrls" style={{ display: 'none' }}>
-        {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
-        <button class="lb-vc-btn lb-vc-play" aria-label="Play">
+    // A modal <dialog>: the page behind is inert. Fullscreen goes on `.lb-surface`, as a dialog can't be fullscreen.
+    <dialog id="screenshot-lightbox" aria-labelledby="lb-caption-text lb-title">
+      <div class="lb-surface" tabindex="-1" autofocus>
+        <span id="lb-title" hidden>
+          media viewer
+        </span>
+        <div class="lb-backdrop" />
+        <button class="lb-btn lb-glass lb-prev" aria-label="Previous screenshot">
+          <ChevronLeft />
+        </button>
+        <img class="lb-img" src="" alt="Screenshot" />
+        {/* The neighbour a horizontal swipe drags in beside the item. */}
+        <img class="lb-peek" alt="" aria-hidden="true" />
+        <video class="lb-video" playsinline />
+        <button class="lb-btn lb-glass lb-next" aria-label="Next screenshot">
+          <ChevronRight />
+        </button>
+        <div class="lb-error lb-glass" style={{ display: 'none' }} role="alert">
+          <TriangleAlert class="lb-error-icon" />
+          <p class="lb-error-msg" />
+          <button class="lb-error-retry">Retry</button>
+        </div>
+        <div class="lb-seek-flash lb-glass lb-seek-flash-left" aria-hidden="true">
+          <Rewind /> <span class="lb-seek-flash-n" />
+        </div>
+        <div class="lb-seek-flash lb-glass lb-seek-flash-right" aria-hidden="true">
+          <span class="lb-seek-flash-n" /> <FastForward />
+        </div>
+        {/* Shown while a trailer isn't playing; under a finger, also with the controls, as their play/pause. */}
+        <button class="lb-bigplay lb-glass" aria-label="Play trailer">
           <Play class="lb-icon-off" />
           <Pause class="lb-icon-on" />
+          <RotateCcw class="lb-bigplay-replay" />
+          <span class="lb-bigplay-replay">Replay</span>
         </button>
-        <span class="lb-vc-time">0:00</span>
-        <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
-        <span class="lb-vc-dur">0:00</span>
-        <button class="lb-vc-btn lb-vc-mute" aria-label="Mute">
-          <Volume2 class="lb-icon-off" />
-          <VolumeX class="lb-icon-on" />
+        <button class="lb-unmute lb-glass">
+          <VolumeX /> Unmute
         </button>
-      </div>
-      <div class="lb-toolbar">
-        {/* The caption doubles as the list stepper: ↑/↓ flanking "<game> · 14 of 343" put the
-            control on the thing it changes, and cover the axis the edge ‹ › don't (they step
-            media within one game). Both buttons are hidden when there's no list to page
-            through — see `_getGamePosition`. */}
-        <div class="lb-caption">
-          <button class="lb-game-prev" aria-label="Previous game">
-            <ChevronUp />
-          </button>
-          <span class="lb-caption-text" />
-          <span class="lb-caption-pos" />
-          <button class="lb-game-next" aria-label="Next game">
-            <ChevronDown />
-          </button>
+        {/* The seek line across the top, the buttons and time below it (YouTube's). */}
+        <div class="lb-vctrls" style={{ display: 'none' }}>
+          <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
+          <div class="lb-vc-row">
+            {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
+            <button class="lb-vc-btn lb-glass lb-vc-play" aria-label="Play">
+              <Play class="lb-icon-off" />
+              <Pause class="lb-icon-on" />
+            </button>
+            <button class="lb-vc-btn lb-glass lb-vc-mute" aria-label="Mute">
+              <Volume2 class="lb-icon-off" />
+              <VolumeX class="lb-icon-on" />
+            </button>
+            <span class="lb-vc-time lb-glass">0:00 / 0:00</span>
+          </div>
         </div>
-        <div class="lb-toolbar-row">
-          <div class="lb-toolbar-left">
-            <button class="lb-fullscreen" aria-label="Enter fullscreen">
+        <div class="lb-toolbar">
+          {/* The list stepper, on the thing it changes; ↑/↓ first, so they stay put whatever the name's length. */}
+          <div class="lb-caption lb-glass">
+            <button class="lb-game-prev" aria-label="Previous game">
+              <ChevronUp />
+            </button>
+            <button class="lb-game-next" aria-label="Next game">
+              <ChevronDown />
+            </button>
+            <span class="lb-caption-text" id="lb-caption-text" />
+            <span class="lb-caption-pos" />
+          </div>
+          {/* Its full wording ("Screenshot 3 of 12") is the status line's, below. */}
+          <div class="lb-counter lb-glass" aria-hidden="true" />
+          <div class="lb-toolbar-right">
+            <button class="lb-fullscreen lb-glass" aria-label="Enter fullscreen">
               <Maximize class="lb-icon-off" />
               <Minimize class="lb-icon-on" />
             </button>
-          </div>
-          <div class="lb-counter" aria-live="polite" aria-atomic="true" />
-          <div class="lb-toolbar-right">
-            <button class="lb-zoom" aria-label="Zoom" aria-pressed="false">
+            <button class="lb-zoom lb-glass" aria-label="Zoom" aria-pressed="false">
               <ZoomIn />
             </button>
-            <button class="lb-close" aria-label="Close lightbox">
+            <button class="lb-close lb-glass" aria-label="Close lightbox">
               <X />
             </button>
           </div>
         </div>
+        <p class="lb-status visually-hidden" role="status" />
+        <div class="lb-osd lb-glass" aria-hidden="true">
+          <Play class="lb-osd-play" />
+          <Pause class="lb-osd-pause" />
+          <VolumeX class="lb-osd-mute" />
+          <Volume2 class="lb-osd-unmute" />
+          <span class="lb-osd-time" />
+          <span class="lb-osd-bar" />
+        </div>
+        <p class="lb-hint lb-glass" aria-hidden="true" />
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -532,7 +710,21 @@ function LightboxDom() {
 // triggered by the `shots`/`idx`/`gameName` signals above), not in these handlers.
 
 function wireButtons(lb: HTMLElement) {
-  lb.querySelector('.lb-backdrop')!.addEventListener('click', closeLightbox);
+  // Esc, or Android's Back: closed the same way as from ×. `close` covers a dialog the browser
+  // closed itself, when it won't let `cancel` be cancelled (no user activation since the last one).
+  lb.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeLightbox();
+  });
+  lb.addEventListener('close', closeLightboxNow); // already closed: nothing left to morph from
+  // A click, not a drag that ended there (panning a zoomed picture past its edge).
+  const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
+  let downX = 0,
+    downY = 0;
+  backdrop.addEventListener('pointerdown', (e) => ((downX = e.clientX), (downY = e.clientY)));
+  backdrop.addEventListener('click', (e) => {
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) < 5) closeLightbox();
+  });
   lb.querySelector('.lb-close')!.addEventListener('click', closeLightbox);
   lb.querySelector('.lb-error-retry')!.addEventListener('click', retryCurrentShot);
   lb.querySelector('.lb-prev')!.addEventListener('click', () => stepLightbox(-1));
@@ -548,7 +740,13 @@ function wireKeyboard(lb: HTMLElement) {
     'keydown',
     (e) => {
       if (!isLightboxOpen()) return;
+      // A dialog over this one (the shortcuts) has the keyboard.
+      if ([...document.querySelectorAll('dialog[open]')].some((d) => d !== lb)) return;
+      // Ctrl/⌘/Alt+key is the browser's (reload, find, print); Shift is part of some bindings.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const onScrub = (e.target as HTMLElement | null)?.classList.contains('lb-vc-scrub');
+      // The keyboard gets no chrome; Tab, moving focus onto it, does — and keeps it while focus is on a control.
+      if (e.key !== 'Tab' && e.key !== 'Shift' && !(e.target as Element).closest('button, input')) hideLbChrome();
 
       // Focus trap
       if (e.key === 'Tab') {
@@ -574,21 +772,35 @@ function wireKeyboard(lb: HTMLElement) {
 
       const vid = lbShowingVideo() ? lbVideoEl : null;
 
-      if ((!onScrub || e.shiftKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      // A zoomed picture: the arrows pan it, and Esc zooms back out before it closes anything.
+      if (lbZoom > 1 && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const [dx, dy] = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key]!;
+        lbPanX += dx * LB_PAN_STEP;
+        lbPanY += dy * LB_PAN_STEP;
+        applyLbTransform();
+        return;
+      }
+      if (lbZoom > 1 && e.key === 'Escape') {
+        e.preventDefault(); // or the dialog's `cancel` would close it too
+        resetLbZoom();
+        return;
+      }
+      // ←/→ always step, a trailer playing or not; seeking is Shift+←/→ and J/L (YouTube's).
+      if (!onScrub && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
         const dir = e.key === 'ArrowRight' ? 1 : -1;
-        // While a video is playing, bare arrows seek it in place so the user
-        // isn't yanked to the next screenshot mid-scrub; Shift+arrow always
-        // forces media navigation instead, as an explicit escape hatch — even
-        // when focus is on the scrub bar itself, whose native range-input
-        // behavior would otherwise consume a bare arrow key to nudge its value.
-        if (vid && !vid.paused && !e.shiftKey) {
+        if (!e.shiftKey) stepLightbox(dir);
+        else if (vid) {
           seekVideo(vid, dir * LB_SEEK_SECONDS);
-        } else {
-          stepLightbox(dir);
+          osdLb('seek');
         }
       }
-      if (!onScrub && (e.key === 'Home' || e.key === 'End') && shots().length > 1) {
+      if (vid && ['j', 'J', 'l', 'L'].includes(e.key)) {
+        seekVideo(vid, (e.key.toLowerCase() === 'l' ? 1 : -1) * LB_LONG_SEEK_SECONDS);
+        osdLb('seek');
+      }
+      if (!onScrub && (e.key === 'Home' || e.key === 'End')) {
         e.preventDefault();
         gotoLightbox(e.key === 'Home' ? 0 : shots().length - 1);
       }
@@ -603,8 +815,8 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         stepGameFromLightbox(_onGameRandom);
       }
-      // Presents it instead: the presentation window stands in for the lightbox. Ctrl/⌘+P prints.
-      if ((e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Presents it instead: the presentation window stands in for the lightbox.
+      if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         // panelKeyboard.ts's P would present again once the lightbox is closed.
         e.stopImmediatePropagation();
@@ -617,12 +829,15 @@ function wireKeyboard(lb: HTMLElement) {
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
       if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
       if (vid) {
-        if (e.key === ' ' && !onScrub) {
+        // A focused button takes Space as its own press.
+        if (e.key === ' ' && !onScrub && !(e.target as HTMLElement).closest('button')) {
           e.preventDefault();
+          osdLb(vid.paused ? 'play' : 'pause');
           vid.paused ? vid.play().catch(() => {}) : vid.pause();
         }
         if (e.key === 'm' || e.key === 'M') {
-          vid.muted = !vid.muted;
+          setLbMuted(!vid.muted);
+          osdLb(vid.muted ? 'mute' : 'unmute');
         }
       }
     },
@@ -631,19 +846,43 @@ function wireKeyboard(lb: HTMLElement) {
 }
 
 function wireMouseHandlers(lb: HTMLElement) {
+  const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  // A trackpad's sideways swipe steps once per gesture: the gesture ends after a pause in its events.
+  let swipeDx = 0,
+    swiped = false,
+    swipeEnd: ReturnType<typeof setTimeout> | undefined;
   lb.addEventListener(
     'wheel',
     (e) => {
-      if (!lbShowingImage()) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        e.preventDefault();
+        clearTimeout(swipeEnd);
+        swipeEnd = setTimeout(() => ((swipeDx = 0), (swiped = false)), 300);
+        if (lbZoom > 1) {
+          lbPanX -= e.deltaX;
+          applyLbTransform();
+        } else if (!swiped && Math.abs((swipeDx += e.deltaX)) > 40) {
+          swiped = true;
+          stepLightbox(Math.sign(swipeDx), true);
+        }
+        return;
+      }
+      // Over the picture only (a wheel elsewhere is no zoom), toward the cursor: the point under it stays put.
+      if (e.target !== lbImg) return;
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-      lbZoom = Math.max(1, Math.min(4, lbZoom * factor));
+      const z0 = lbZoom;
+      const z1 = Math.max(1, Math.min(4, z0 * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      const rect = lbImg.getBoundingClientRect();
+      const dx = e.clientX - (rect.left + rect.width / 2 - lbPanX);
+      const dy = e.clientY - (rect.top + rect.height / 2 - lbPanY);
+      lbPanX = dx - (z1 / z0) * (dx - lbPanX);
+      lbPanY = dy - (z1 / z0) * (dy - lbPanY);
+      lbZoom = z1;
       applyLbTransform();
     },
     { passive: false },
   );
 
-  const lbImg = lb.querySelector<HTMLImageElement>('.lb-img')!;
   let lbDragging = false,
     lbDragStartX = 0,
     lbDragStartY = 0,
@@ -695,6 +934,21 @@ function setLbDrag(el: HTMLElement, x: number, y: number) {
   el.style.transform = `translate(${x}px, ${y}px)`;
 }
 
+// The neighbour following the finger in from the side it's dragged toward, a screen's width away.
+function setLbPeek(x: number) {
+  const peek = document.querySelector<HTMLImageElement>('#screenshot-lightbox .lb-peek')!;
+  const list = shots();
+  const next = list[(idx() + (x < 0 ? 1 : -1) + list.length) % list.length];
+  const src = next.type === 'video' ? next.thumb : next.thumb || next.main!;
+  if (peek.getAttribute('src') !== src) peek.src = src;
+  peek.style.transform = `translateX(${x + (x < 0 ? innerWidth : -innerWidth)}px)`;
+  peek.classList.add('lb-peek--on');
+}
+
+function clearLbPeek() {
+  document.querySelector('#screenshot-lightbox .lb-peek')!.classList.remove('lb-peek--on');
+}
+
 // `animate`: a swipe that didn't commit eases back. A committed one clears instantly instead —
 // `renderLightbox`'s own enter animation takes the element over from there.
 function clearLbDrag(el: HTMLElement, animate: boolean) {
@@ -710,8 +964,16 @@ function wireTouchHandlers(lb: HTMLElement) {
   let lbX = 0,
     lbY = 0,
     lbActive = false;
+  // A pinch keeps the picture's point between the fingers under them: `pinchPoint` is that point,
+  // in the unzoomed picture's coordinates from its centre.
   let pinchStartDist = 0,
-    pinchStartZoom = 1;
+    pinchStartZoom = 1,
+    pinchCenterX = 0,
+    pinchCenterY = 0,
+    pinchPointX = 0,
+    pinchPointY = 0;
+  // Each tap past a double-tap seek on the same side seeks again, adding up (10 s, 20 s, 30 s).
+  let seekStreak: { side: 'left' | 'right'; total: number; until: number } | null = null;
   let touchPanning = false,
     touchPanStartX = 0,
     touchPanStartY = 0,
@@ -739,12 +1001,17 @@ function wireTouchHandlers(lb: HTMLElement) {
           e.touches[1].clientY - e.touches[0].clientY,
         );
         pinchStartZoom = lbZoom;
+        const rect = lb.querySelector('.lb-img')!.getBoundingClientRect();
+        pinchCenterX = rect.left + rect.width / 2 - lbPanX;
+        pinchCenterY = rect.top + rect.height / 2 - lbPanY;
+        pinchPointX = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - pinchCenterX - lbPanX) / lbZoom;
+        pinchPointY = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - pinchCenterY - lbPanY) / lbZoom;
         lbActive = false;
         e.preventDefault();
       } else if (e.touches.length === 1) {
         // A touch starting on the chrome is operating it, not swiping the media behind it —
         // dragging the video scrubber sideways otherwise steps to the next shot as well.
-        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn, .lb-bigplay')) {
+        if ((e.target as Element).closest('.lb-vctrls, .lb-toolbar, .lb-btn, .lb-bigplay, .lb-unmute')) {
           lbActive = false;
           return;
         }
@@ -777,6 +1044,8 @@ function wireTouchHandlers(lb: HTMLElement) {
           e.touches[1].clientY - e.touches[0].clientY,
         );
         lbZoom = Math.max(1, Math.min(4, (pinchStartZoom * dist) / pinchStartDist));
+        lbPanX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - pinchCenterX - lbZoom * pinchPointX;
+        lbPanY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - pinchCenterY - lbZoom * pinchPointY;
         applyLbTransform();
         e.preventDefault();
       } else if (e.touches.length === 1 && touchPanning) {
@@ -793,8 +1062,10 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (!el) return;
         // Nothing to step to on this axis: the media still follows the finger, damped, so the
         // gesture reads as resistance rather than as a step that silently didn't happen.
-        const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
+        const free = dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList || dy > 0; // down closes
+        const slack = free ? 1 : LB_SWIPE_RESISTANCE;
         setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
+        if (dragAxis === 'x' && dragMediaCount > 1) setLbPeek(dx);
         e.preventDefault();
       }
     },
@@ -822,8 +1093,15 @@ function wireTouchHandlers(lb: HTMLElement) {
         });
         dragAxis = null;
         const el = lbMediaEl();
+        if (action === 'media-prev' || action === 'media-next') {
+          lbSwipeLeft = el?.getBoundingClientRect() ?? null;
+          lbSwipeEnterFrom = dx + (dx < 0 ? innerWidth : -innerWidth);
+        }
+        clearLbPeek();
         if (el) clearLbDrag(el, !action);
-        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1, true);
+        if (action === 'close') closeLightbox();
+        else if (action === 'media-prev' || action === 'media-next')
+          stepLightbox(action === 'media-next' ? 1 : -1, true);
         else if (action) {
           stepGameNav(action === 'game-next' ? 1 : -1, true);
         }
@@ -832,28 +1110,41 @@ function wireTouchHandlers(lb: HTMLElement) {
       const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
       const showingImg = lbShowingImage();
       const showingVid = lbShowingVideo();
+      if (isTap && showingVid && seekStreak && Date.now() < seekStreak.until) {
+        const frac = (endX - lb.getBoundingClientRect().left) / lb.getBoundingClientRect().width;
+        const side = frac < 1 / 3 ? 'left' : frac > 2 / 3 ? 'right' : null;
+        if (side === seekStreak.side) {
+          e.preventDefault();
+          clearTimeout(lbChromeTapTimer);
+          seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+          seekStreak.total += LB_LONG_SEEK_SECONDS;
+          seekStreak.until = Date.now() + 600;
+          flashSeek(side, seekStreak.total);
+          return;
+        }
+      }
+      seekStreak = null;
       if (isTap && (showingImg || showingVid)) {
         const now = Date.now();
         const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
         if (now - lbLastTapTime < LB_DOUBLE_TAP_MS && tapDist < LB_DOUBLE_TAP_DIST) {
           lbLastTapTime = 0; // consume, so a 3rd quick tap starts a fresh pair rather than re-triggering
           if (showingImg) {
+            clearTimeout(lbChromeTapTimer);
             // Or the browser follows up with a dblclick, whose handler would toggle the zoom back.
             e.preventDefault();
             toggleLbZoomAt(endX, endY);
           } else {
-            // Video: double-tap the left/right third to seek, YouTube-style.
-            // The middle third is left alone — a plain single tap already
-            // toggles play/pause via the video's own 'click' listener.
+            // Video: double-tap the left/right third to seek, YouTube-style; the middle third is left alone.
             const rect = lb.getBoundingClientRect();
             const frac = (endX - rect.left) / rect.width;
-            const vid = lbVideoEl;
-            if (frac < 1 / 3) {
-              seekVideo(vid, -LB_TOUCH_SEEK_SECONDS);
-              flashSeek('left');
-            } else if (frac > 2 / 3) {
-              seekVideo(vid, LB_TOUCH_SEEK_SECONDS);
-              flashSeek('right');
+            const side = frac < 1 / 3 ? 'left' : frac > 2 / 3 ? 'right' : null;
+            if (side) {
+              clearTimeout(lbChromeTapTimer); // the first tap's toggle of the controls
+              e.preventDefault();
+              seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+              seekStreak = { side, total: LB_LONG_SEEK_SECONDS, until: Date.now() + 600 };
+              flashSeek(side, LB_LONG_SEEK_SECONDS);
             }
           }
         } else {
@@ -873,6 +1164,7 @@ function wireTouchHandlers(lb: HTMLElement) {
       touchPanning = false;
       if (dragAxis) {
         dragAxis = null;
+        clearLbPeek();
         const el = lbMediaEl();
         if (el) clearLbDrag(el, true);
       }
@@ -885,8 +1177,6 @@ function wireVideoControls(lb: HTMLElement) {
   const vid2 = lbVideoEl;
   const vc2 = lb.querySelector<HTMLElement>('.lb-vctrls')!;
   const scrub = vc2.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
-  const timEl = vc2.querySelector<HTMLElement>('.lb-vc-time')!;
-  const durEl = vc2.querySelector<HTMLElement>('.lb-vc-dur')!;
   const playBtn = vc2.querySelector<HTMLElement>('.lb-vc-play')!;
   const muteBtn = vc2.querySelector<HTMLElement>('.lb-vc-mute')!;
 
@@ -897,15 +1187,27 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('timeupdate', () => {
     if (!vid2.duration) return;
     scrub.value = String(vid2.currentTime / vid2.duration);
-    timEl.textContent = fmtTime(vid2.currentTime);
+    syncLbTime(vc2, vid2.currentTime, vid2.duration);
     updateScrubBg();
   });
-  vid2.addEventListener('durationchange', () => {
-    durEl.textContent = fmtTime(vid2.duration);
+  vid2.addEventListener('durationchange', () => syncLbTime(vc2, vid2.currentTime, vid2.duration || 0));
+  // Stalled: a spinner, after a moment so a brief wait doesn't flash one.
+  const buffered = () => {
+    clearTimeout(lbBufferTimer);
+    lb.classList.remove('lb--buffering');
+  };
+  vid2.addEventListener('waiting', () => {
+    clearTimeout(lbBufferTimer);
+    lbBufferTimer = setTimeout(() => lb.classList.add('lb--buffering'), 400);
   });
+  for (const type of ['playing', 'pause', 'emptied']) vid2.addEventListener(type, buffered);
+  lb.querySelector('.lb-unmute')!.addEventListener('click', () => setLbMuted(false));
   vid2.addEventListener('play', () => {
     playBtn.classList.add('lb-on');
     playBtn.setAttribute('aria-label', 'Pause');
+    bigPlay.classList.add('lb-on');
+    bigPlay.setAttribute('aria-label', 'Pause trailer');
+    lb.classList.remove('lb--ended');
     document.getElementById('screenshot-lightbox')?.classList.remove('lb--unstarted');
     syncLbPaused();
     schedHideLbChrome();
@@ -913,22 +1215,23 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('pause', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
+    bigPlay.classList.remove('lb-on');
+    bigPlay.setAttribute('aria-label', 'Play trailer');
     syncLbPaused();
     if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
-    showLbChrome();
-    schedHideLbChrome();
+    revealLbChrome();
   });
+  // Stays on its last frame, offering a replay: no moving on by itself.
   vid2.addEventListener('ended', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
+    bigPlay.classList.remove('lb-on');
+    bigPlay.setAttribute('aria-label', 'Replay trailer');
+    lb.classList.add('lb--ended');
     syncLbPaused();
-    showLbChrome();
-    schedHideLbChrome();
+    revealLbChrome();
   });
-  vid2.addEventListener('volumechange', () => {
-    muteBtn.classList.toggle('lb-on', vid2.muted);
-    muteBtn.setAttribute('aria-label', vid2.muted ? 'Unmute' : 'Mute');
-  });
+  vid2.addEventListener('volumechange', () => syncLbMuteBtn(lb));
 
   scrub.addEventListener('input', () => {
     if (vid2.duration) vid2.currentTime = Number(scrub.value) * vid2.duration;
@@ -940,7 +1243,8 @@ function wireVideoControls(lb: HTMLElement) {
   playBtn.addEventListener('click', () => {
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
-  lb.querySelector('.lb-bigplay')!.addEventListener('click', () => vid2.play().catch(() => {}));
+  const bigPlay = lb.querySelector<HTMLElement>('.lb-bigplay')!;
+  bigPlay.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
   // Screen locked, app or tab switched: stop rather than play on unseen. Not resumed on return —
   // the large play button is there, and sound starting by itself on unlock would surprise.
   document.addEventListener(
@@ -950,31 +1254,19 @@ function wireVideoControls(lb: HTMLElement) {
     },
     { signal: _lbSignal },
   );
-  muteBtn.addEventListener('click', () => {
-    vid2.muted = !vid2.muted;
-  });
+  muteBtn.addEventListener('click', () => setLbMuted(!vid2.muted));
 
-  vid2.addEventListener('click', () => {
-    // A tap on a trailer whose controls had idled out only brings them back, as phone players do.
-    if (tapRevealedChrome) return;
-    vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
-  });
+  // A click plays or pauses; a finger's tap toggles the controls instead (below, which cancels its click).
+  vid2.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
 
-  // Once the chrome has idled out, the mouse brings back only the part it nears — the toolbar
-  // at the top, an arrow at its edge, a trailer's controls at the bottom — and the cursor.
-  const pointerZones = ['lb-pointer', 'lb-near-top', 'lb-near-bottom', 'lb-near-left', 'lb-near-right'];
+  // Any mouse move brings it all back (as video players do); leaving the window hides it at once.
   lb.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
-    lb.classList.add('lb-pointer');
-    lb.classList.toggle('lb-near-top', e.clientY < LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-bottom', e.clientY > innerHeight - LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-left', e.clientX < LB_POINTER_ZONE);
-    lb.classList.toggle('lb-near-right', e.clientX > innerWidth - LB_POINTER_ZONE);
-    clearTimeout(lbPointerTimer);
-    lbPointerTimer = setTimeout(() => lb.classList.remove(...pointerZones), 3000);
+    lbByKey = false;
+    revealLbChrome();
   });
-  lb.addEventListener('mouseleave', () => lb.classList.remove(...pointerZones));
-  // A tap brings the chrome back; a swipe steps media without it.
+  lb.addEventListener('mouseleave', () => isLightboxOpen() && hideLbChrome()); // not the close's own
+  // A tap toggles the chrome; a swipe steps media without it.
   let tapRevealedChrome = false;
   let tapX = 0,
     tapY = 0;
@@ -991,11 +1283,21 @@ function wireVideoControls(lb: HTMLElement) {
     'touchend',
     (e) => {
       const t = e.changedTouches[0];
+      // Already taken by wireTouchHandlers' own touchend: a double-tap's zoom or seek, a seek streak.
+      if (e.defaultPrevented) return;
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
-      showLbChrome();
-      schedHideLbChrome();
+      if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
+      if (lbShowingVideo()) e.preventDefault(); // its click would play or pause: the centre button does
+      if (lb.classList.contains('lb--unstarted')) return void lbVideoEl.play().catch(() => {});
+      if (tapRevealedChrome) return revealLbChrome();
+      clearTimeout(lbChromeTapTimer);
+      // A trailer's middle third hides at once; elsewhere a tap waits out a possible second one (a zoom, a seek).
+      const rect = lb.getBoundingClientRect();
+      const frac = (t.clientX - rect.left) / rect.width;
+      if (lbShowingVideo() && frac >= 1 / 3 && frac <= 2 / 3) hideLbChrome();
+      else lbChromeTapTimer = setTimeout(hideLbChrome, LB_DOUBLE_TAP_MS);
     },
-    { passive: true },
+    { passive: false },
   );
 }
 
@@ -1025,6 +1327,7 @@ function mountLightboxDom(): () => void {
   wireMouseHandlers(lb);
   wireTouchHandlers(lb);
   wireVideoControls(lb);
+  window.addEventListener('resize', () => isLightboxOpen() && syncLbZoomBtn(lb), { signal: _lbSignal });
   return dispose;
 }
 
@@ -1047,16 +1350,17 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
   // A deliberate open supersedes any pending "take the media when it lands" latch.
   _awaitingMedia = null;
   lbShotChosen = true;
-  const lb = document.getElementById('screenshot-lightbox')!;
-  lb.classList.add('open');
-  document.body.classList.add('lb-open');
-  if (!isMorphUpdating()) focusLbClose(lb);
+  const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
+  // Focuses the surface (`autofocus`): the shortcuts work from there, and nothing shows a ring.
+  if (!lb.open) {
+    lb.showModal();
+    if (lbByKey)
+      hideLbChrome(); // opened from the keyboard: nothing on the media
+    else revealLbChrome();
+    showLbHint(lb);
+  }
+  document.body.classList.add('lb-open'); // a modal dialog doesn't stop the page scrolling
   _onLightboxParamChange(newShots[idx()].shotId);
-}
-
-// A ring on × after a tap reads as a stray highlight; it's for whoever opened this by keyboard.
-function focusLbClose(lb: HTMLElement) {
-  lb.querySelector<HTMLElement>('.lb-close')!.focus({ focusVisible: lastInputWasKey });
 }
 
 // The panel hero's picture, clicked, morphs into the lightbox's; the backdrop and the chrome fade in around it.
@@ -1069,7 +1373,7 @@ export function openLightboxFrom(from: HTMLImageElement, game: Game, idxOrShotId
     to: () => lb.querySelector<HTMLElement>('.lb-img'),
     ready: (img) => loadedWhen(lb, 'lb--loading', img as HTMLImageElement),
     focus: () => {
-      if (isLightboxOpen() && !lb.contains(document.activeElement)) focusLbClose(lb);
+      if (isLightboxOpen() && !lb.contains(document.activeElement)) lbSurface(lb).focus();
     },
     start: () => {
       lb.classList.add('lb-morph');
@@ -1123,38 +1427,67 @@ export function repointLightboxGame(game: ReadonlyGame) {
   _onLightboxParamChange(next[target].shotId);
 }
 
+// Shrinks a still back into the panel hero's picture when it's on screen; else the dialog fades (CSS).
 export function closeLightbox() {
+  if (!isLightboxOpen()) return; // the `close` event that follows our own close()
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const hero = document.querySelector<HTMLImageElement>('#panel-hero .panel-hero-img');
+  const heroShown = hero?.checkVisibility() && hero.getBoundingClientRect().bottom > 0;
+  if (!lbShowingImage() || !heroShown || presented()) return closeLightboxNow();
+  const backdrop = lb.querySelector<HTMLElement>('.lb-backdrop')!;
+  morph({
+    from: img,
+    update: closeLightboxNow,
+    to: () => hero,
+    ready: (to) => (to as HTMLImageElement).decode(),
+    focus: () => {},
+    start: () => {
+      backdrop.style.viewTransitionName = 'lb-backdrop';
+      lb.style.viewTransitionName = 'lb-chrome';
+    },
+    finish: () => {
+      backdrop.style.viewTransitionName = '';
+      lb.style.viewTransitionName = '';
+    },
+  });
+}
+
+function closeLightboxNow() {
+  if (!isLightboxOpen()) return;
   setLbGame(null);
   _awaitingMedia = null;
   clearTimeout(lbVcTimer);
-  const lb = document.getElementById('screenshot-lightbox')!;
+  const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
   stopHls(lbVideoEl);
   detachLbVideo();
+  lb.close();
+  setLbLoading(lb, false);
   lb.classList.remove(
-    'open',
-    'lb--loading',
     'lb-idle',
     'lb--paused',
     'lb--unstarted',
     'lb--stepped',
     'lb--stepped-game',
-    'lb-pointer',
+    'lb--automuted',
+    'lb--ended',
+    'lb--buffering',
   );
   lbRenderedAppid = undefined;
+  clearTimeout(lbStatusTimer);
+  lb.querySelector('.lb-status')!.textContent = '';
   document.body.classList.remove('lb-open');
   if (isFullscreen()) exitFullscreen();
   _onLightboxParamChange(null);
   popOverlayEntry('lightbox');
-  (_lbPrevFocus as HTMLElement | null)?.focus();
+  if (_lbPrevFocus?.isConnected) (_lbPrevFocus as HTMLElement).focus();
+  else document.querySelector<HTMLElement>('#panel-hero .panel-hero-open')?.focus();
   _lbPrevFocus = null;
 }
 
-// The browser's own Escape exits fullscreen first; the lightbox stays open then.
-export function lightboxHandleEscape() {
-  if (!isFullscreen()) closeLightbox();
-}
-
 function stepLightbox(dir: number, swipe = false) {
+  // A lone Cover (media still streaming): no step, so no pick that would cancel the latch.
+  if (shots().length <= 1) return;
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
   _awaitingMedia = null;
@@ -1189,16 +1522,27 @@ function gotoLightbox(target: number) {
 // counter says nothing about. Split out because it's the one part reading the host's list
 // position: that read must stay tracked for the position to follow a list still streaming in,
 // and must not drag a full image reload along with it each time. Two text writes, no media.
+// One status line, debounced so holding → doesn't queue every step; it names the game only when it changes.
+let lbStatusTimer: ReturnType<typeof setTimeout> | undefined;
+let lbStatusGame = '';
+function announceLb(lb: HTMLElement, game: string, media: string) {
+  if (game) lbStatusGame = game;
+  clearTimeout(lbStatusTimer);
+  lbStatusTimer = setTimeout(() => {
+    lb.querySelector('.lb-status')!.textContent = lbStatusGame + media;
+    lbStatusGame = '';
+  }, 300);
+}
+
 function renderLbCaption() {
   const lb = document.getElementById('screenshot-lightbox');
   if (!lb) return;
   const name = gameName();
   const pos = _getGamePosition();
   const caption = lb.querySelector<HTMLElement>('.lb-caption')!;
-  // The two counters wear the same pill (`.lb-counter` is the other), one per axis, so they read
-  // as a pair and neither is mistaken for part of the title beside it.
+  // "game", or it couldn't be told from the media counter beside it.
   const posEl = caption.querySelector<HTMLElement>('.lb-caption-pos')!;
-  posEl.textContent = pos ? `Game ${pos.index + 1} of ${pos.total}` : '';
+  posEl.textContent = pos ? `game ${pos.index + 1} / ${pos.total}` : '';
   posEl.style.display = pos ? '' : 'none';
   caption.querySelector<HTMLElement>('.lb-caption-text')!.textContent = name;
   caption.style.display = name || pos ? '' : 'none';
@@ -1217,14 +1561,38 @@ function renderLbCaption() {
 // adjacent shots) or a side effect (network fetches, timers) — the same imperative style the
 // original file used, now just re-triggered by a Solid effect instead of being called
 // manually after mutating plain module variables.
+// The item stepped from fades out where it was (where a swipe left it) while the new one enters.
+function fadeOutLbItem(lb: HTMLElement) {
+  const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
+  const rect = lbSwipeLeft ?? img.getBoundingClientRect();
+  lbSwipeLeft = null;
+  if (!lbShowingImage() || img.style.opacity === '0' || !img.src || !rect.width) return;
+  const ghost = img.cloneNode() as HTMLImageElement;
+  ghost.className = 'lb-ghost';
+  ghost.removeAttribute('style');
+  Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
+  ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+  lbSurface(lb).append(ghost);
+}
+
+// Named for the side the new item comes in from, the one stepped toward: the next media from the
+// right, the next game from the bottom; after a swipe, from where its peek was under the finger.
+function enterLbItem(el: HTMLElement, base: string, dir: number, axis: SwipeAxis) {
+  el.style.removeProperty('--lb-enter-from');
+  if (dir === 0) {
+    el.className = base;
+    return;
+  }
+  if (lbSwipeEnterFrom !== null) el.style.setProperty('--lb-enter-from', `${lbSwipeEnterFrom}px`);
+  lbSwipeEnterFrom = null;
+  const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : dir > 0 ? 'right' : 'left';
+  el.className = `${base} lb-anim-${from}`;
+  el.addEventListener('animationend', () => (el.className = base), { once: true });
+}
+
 function renderLightbox() {
   const list = shots();
-  // Defensively clamped, same idiom panel.tsx's own hero index uses. Every *write* path
-  // (openLightbox's batch(), stepLightbox's modulo, gotoLightbox's explicit target) keeps idx()
-  // in bounds on its own, but the list itself is derived now and can shrink underneath a
-  // perfectly valid index — a ↻ Refresh whose new details carry fewer screenshots than the
-  // previous ones did is enough.
-  const i = Math.max(0, Math.min(idx(), list.length - 1));
+  const i = idx();
   const name = gameName();
   const lb = document.getElementById('screenshot-lightbox')!;
   const shot = list[i];
@@ -1237,7 +1605,9 @@ function renderLightbox() {
   lbLastAxis = 'x';
   resetLbZoom();
   const appid = lbGame()?.appid;
-  flashLbCounter(lb, appid !== lbRenderedAppid);
+  const gameChanged = appid !== lbRenderedAppid;
+  if (dir !== 0) fadeOutLbItem(lb);
+  flashLbCounter(lb, gameChanged);
   lbRenderedAppid = appid;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
@@ -1251,44 +1621,30 @@ function renderLightbox() {
   const pos = untrack(() => _getGamePosition());
   const label =
     `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
-  lb.querySelector<HTMLElement>('.lb-zoom')!.style.display = shot.type === 'video' ? 'none' : '';
   if (shot.type === 'video') {
     img.style.display = 'none';
-    lb.classList.remove('lb--loading');
+    setLbLoading(lb, false);
     attachLbVideo();
     lb.classList.add('lb--unstarted');
     vid.poster = shot.thumb || '';
-    vid.setAttribute('aria-label', label);
+    enterLbItem(vid, 'lb-video', dir, axis);
+    vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
     vc.style.display = '';
     resetLbVc(vc);
-    playHls(vid, shot.hls, showLbVideoError);
+    playLbTrailer(lb, shot);
     syncLbPaused();
     schedHideLbChrome();
   } else {
     stopHls(vid);
     detachLbVideo();
-    lb.classList.remove('lb--unstarted');
+    lb.classList.remove('lb--unstarted', 'lb--automuted', 'lb--ended', 'lb--buffering');
     syncLbPaused();
     vc.style.display = 'none';
     img.style.display = 'block';
     img.alt = label;
     img.onload = null;
     img.onerror = null;
-    if (dir !== 0) {
-      // Named for the side the new shot comes in from, which is the one swiped toward: the
-      // next media enters from the right, the next game from the bottom.
-      const from = axis === 'y' ? (dir > 0 ? 'bottom' : 'top') : dir > 0 ? 'right' : 'left';
-      img.className = `lb-img lb-anim-${from}`;
-      img.addEventListener(
-        'animationend',
-        () => {
-          img.className = 'lb-img';
-        },
-        { once: true },
-      );
-    } else {
-      img.className = 'lb-img';
-    }
+    enterLbItem(img, 'lb-img', dir, axis);
     // Show a degraded placeholder (the thumbnail, already loaded/cached from
     // the hero carousel) instead of leaving the *previous* shot on screen
     // while the full-size image loads. The banner shot has no separate
@@ -1303,7 +1659,16 @@ function renderLightbox() {
     loadLbImage(shot.main!);
     schedHideLbChrome();
   }
-  lb.querySelector('.lb-counter')!.textContent = mediaLabel(list, i);
+  syncLbZoomBtn(lb);
+  syncLbFullscreenShown(lb);
+  const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
+  counter.textContent = `${i + 1} / ${list.length}`;
+  counter.style.display = list.length > 1 ? '' : 'none';
+  announceLb(
+    lb,
+    gameChanged && name ? `${name}, ${pos ? `game ${pos.index + 1} of ${pos.total}, ` : ''}` : '',
+    mediaLabel(list, i),
+  );
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
   // Preload prev and next images so navigation feels instant; for a video,
@@ -1356,7 +1721,8 @@ createRoot(() => {
   // lands, take it. Created *before* the render effect below so it runs first within the same
   // flush — the render then happens once, on the shot actually wanted, rather than painting the
   // banner and immediately replacing it. Deliberately one-shot and cancelled by any viewer
-  // input (`stepLightbox`/`gotoLightbox`/a fresh open/close), so it can never move an image
+  // input that moves the media (a step `stepLightbox`/`gotoLightbox` takes — not one on a lone
+  // Cover, with nothing to step to — or a fresh open/close), so it can never move an image
   // out from under someone who is looking at it.
   createEffect(() => {
     const list = shots();

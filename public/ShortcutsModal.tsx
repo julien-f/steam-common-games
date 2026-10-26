@@ -51,8 +51,9 @@ const SHORTCUT_SECTIONS: Section[] = [
   {
     title: 'Lightbox',
     rows: [
-      { keys: ['←', '→'], label: 'Previous / next screenshot (seeks −5s / +5s instead while a video plays)' },
-      { keys: ['Shift', '←', '→'], label: 'Previous / next screenshot, even during video playback' },
+      { keys: ['←', '→'], label: 'Previous / next media (pans a zoomed screenshot)' },
+      { keys: ['Shift', '←', '→'], label: 'Seek the video −5s / +5s' },
+      { keys: ['J', 'L'], label: 'Seek the video −10s / +10s' },
       { keys: ['↑', '↓'], label: 'Previous / next game' },
       { keys: ['R'], label: 'Pick a random game from the list' },
       { keys: ['F'], label: 'Toggle fullscreen' },
@@ -60,7 +61,7 @@ const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['Space'], label: 'Play / pause video' },
       { keys: ['M'], label: 'Mute / unmute video' },
       { keys: ['P'], label: 'Present this media on a second screen' },
-      { keys: ['Esc'], label: 'Close lightbox' },
+      { keys: ['Esc'], label: 'Zoom back out, else close the lightbox' },
     ],
   },
 ];

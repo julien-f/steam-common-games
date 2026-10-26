@@ -37,7 +37,8 @@ export interface GameMeta {
   capsule: string;
   thumb: string | null; // the game tables' larger capsule; `capsule` is its fallback
   banner: string;
-  movies: { id: number; thumbnail: string; hls: string | null }[];
+  // `name`: absent from details cached before it was kept.
+  movies: { id: number; name?: string | null; thumbnail: string; hls: string | null }[];
   screenshots: { id: number; thumbnail: string; full: string }[];
   dlc: number[];
   fullgame: { appid: number; name: string | null } | null;

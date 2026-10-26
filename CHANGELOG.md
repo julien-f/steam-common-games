@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Why these? opens each figure's games in place, with their art and hours, and story games against their main story's length
 - A comparison shows each player as a card with avatar and archetype, and what they share with game art
 - Suggested views show only the columns that matter to them, the one they sort or filter on first
+- The screenshot and trailer viewer gives the screen to the media: its controls show only for the mouse or a tap, it follows photo and video players' keys and gestures, and trailers remember muting and offer a replay.
 
 ### Fixed
 

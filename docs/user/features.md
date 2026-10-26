@@ -135,16 +135,20 @@ Clicking any row opens a detail panel beside the table — not over it, so the l
 
 Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 
-- **← / →** step through the game's media (while a video plays they seek 5 s; **Shift** keeps them stepping), **↑ / ↓** move to the previous or next game in the list.
-- **R** jumps to a random game, **Home / End** to the first or last media, **Esc** closes.
-- **F** toggles fullscreen; **Z**, a double-click or a pinch zooms a screenshot; **Space** plays or pauses a video and **M** mutes it; **P** presents it instead, closing the lightbox ([below](#presenting-on-a-second-screen)).
-- On touch, swipe sideways for media and up or down for games; a double-tap on a video's left or right third seeks 10 s.
+- **← / →** step through the game's media, **↑ / ↓** move to the previous or next game in the list; on a zoomed screenshot, the arrows pan it instead.
+- **R** jumps to a random game, **Home / End** to the first or last media, **Esc** zooms back out, else closes. **?** lists the shortcuts over it.
+- On a video, **Shift + ← / →** seek 5 s and **J / L** 10 s.
+- **F** toggles fullscreen (on an iPhone, which can't, a trailer opens in its own player); **Z**, a double-click, a pinch or the mouse wheel over it zooms a screenshot (toward the cursor); a trackpad's sideways swipe steps the media; **Space** plays or pauses a video and **M** mutes it; **P** presents it instead, closing the lightbox ([below](#presenting-on-a-second-screen)).
+- On touch, swipe sideways for media and up or down for games (down closes where there's no list to page); a tap shows or hides the controls, whose centre button plays or pauses a video; a double-tap on a video's left or right third seeks 10 s, each further tap 10 s more.
+- Trailers play with sound where the browser allows it; where it doesn't, muted, with an **Unmute** button. Muting is remembered for the next trailers, and one that ends offers a replay.
+- Its controls show when the mouse moves or on a tap, and stay out of the way otherwise; used from the keyboard, nothing but the media shows, plus a brief counter after each step. The first time, a hint says what the arrows do.
+- The media fills the screen, its controls over it: the game's name and its place in the list top-left, then which media of the game (`3 / 12`); the Zoom button only when a screenshot is shown smaller than its real size.
 
 ### Presenting on a second screen
 
 A lightbox on another screen, for showing trailers and screenshots to the people in the room while you keep browsing on yours.
 
-- **P** (or the cast button among the panel's links) presents the media the panel shows, opening the presentation window first. Drag it to the other screen; a click (or **F**) there toggles fullscreen, its only control. Browsers play sound only after a first click in that window, so a trailer presented before it starts muted and gets its sound with that click.
+- **P** (or the cast button among the panel's links) presents the media the panel shows, opening the presentation window first. Drag it to the other screen; a click (or **F**) there toggles fullscreen, its only control. Browsers play sound only after a first click in that window, so a trailer presented before it starts muted, a **Click for sound** label saying so, and gets its sound with that click. Each new media fades in over the last, its thumbnail standing in while a screenshot loads.
 - While presenting, opening a media from the panel (a click on its picture, or **Enter**) presents it instead of opening the lightbox. Browsing the panel's media changes nothing on the other screen.
 - A screenshot stays up and a trailer plays once, until you present something else. One that fails to load says so there.
 - The nav bar names the game presented, and its × stops presenting; closing the tab that presents closes it too.
