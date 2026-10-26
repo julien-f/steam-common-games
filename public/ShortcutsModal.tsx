@@ -60,7 +60,7 @@ const SHORTCUT_SECTIONS: Section[] = [
       { keys: ['Z'], label: 'Zoom the screenshot in / out' },
       { keys: ['Space'], label: 'Play / pause video' },
       { keys: ['M'], label: 'Mute / unmute video' },
-      { keys: ['P'], label: 'Present this media on a second screen (the nav chip then plays, pauses and stops it)' },
+      { keys: ['P'], label: 'Put it on the second screen, then steer it from here; again: browse privately' },
       { keys: ['Esc'], label: 'Zoom back out, else close the lightbox' },
     ],
   },

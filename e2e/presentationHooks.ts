@@ -6,9 +6,8 @@ import { PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
 export interface PresentationHooks {
   // A window nobody has clicked yet (Playwright's popups sometimes report one already activated).
   neverActivated?: boolean;
-  // Trailers "play" without a stream (none in the fixtures, no H.264 decoder in Playwright's
-  // Chromium): HLS taken as native, play()/pause() only flipping `paused` and firing their events, a
-  // 90 s `duration`, seeks firing `seeking`/`seeked`; `window.presTest.stall()`/`resume()` fire `waiting`/`playing`.
+  // Trailers "play" without a stream (Playwright's Chromium has no H.264): play/pause/seek only fire their
+  // events, `duration` 90 s; `window.presTest.stall()`/`resume()` fire `waiting`/`playing`.
   fakePlayback?: boolean;
   // A browser refusing a trailer's sound until a click in that window.
   refusedSound?: boolean;

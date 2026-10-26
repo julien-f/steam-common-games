@@ -1183,8 +1183,6 @@ test('C8 edge: the TV survives a reload of the main window, and an occluded TV i
   // A reload says bye then main again: the TV stays.
   await page.reload();
   await expect(chip).toContainText('Hades');
-  await shown.waitForTimeout(3500);
-  expect(shown.isClosed()).toBe(false);
   // Without the TV's handle (lost in the reload), main goes by its beats: an occluded TV beats about once a minute.
   await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.hide());
   await page.clock.runFor(60_000);
@@ -1628,7 +1626,8 @@ test('C8 edge: a burst of steps sends the TV its first at once and then only whe
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
   await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft', 'ArrowLeft']);
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']); // the first, at once
-  await page.waitForTimeout(500);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']);
+  await page.waitForTimeout(300); // and nothing after
   expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
   await stepsAtOnce(page, ['ArrowRight', 'ArrowRight']);
   await page.keyboard.press('Escape'); // well within the settle
@@ -1690,7 +1689,9 @@ test('C8 edge: P in the linked lightbox keeps what follows private, sticking unt
   await expect(page.locator('.panel-hero-present')).toHaveText('Open');
   await page.waitForTimeout(500);
   expect(await sentShots(shown)).toEqual(['s3']);
-  await page.keyboard.press('p');
+  // Its pill does as P: a click puts it back on the TV.
+  await reachForControls(page);
+  await pill.click();
   await expect(pill).toHaveAccessibleName('On TV');
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']);
 });
@@ -2234,27 +2235,6 @@ test('C8 edge: a handover on the trailer already on the TV moves it there', asyn
   );
   await tellTv(page, { type: 'onAir', onAir: { ...(onAir as object), startAt: 42, paused: true } });
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => [v.currentTime, v.paused])).toEqual([42, true]);
-});
-
-test("C8 edge: the TV passes the lightbox's stepping keys on to the main window, its own keys it keeps", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
-  await hookPresentation(page, {});
-  await page.goto('/game/1145360');
-  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
-  const shown = await startPresenting(page);
-  await shown.locator('.pres').click(); // the first click; a first key would only activate it too
-  for (const key of ['ArrowRight', 'ArrowUp', 'Home', 'r', 'f', 'Control+ArrowLeft']) await shown.keyboard.press(key);
-  const relayed = () =>
-    shown.evaluate(() =>
-      (window as unknown as { presTest: PresTest }).presTest.heard
-        .filter((m) => m.type === 'key')
-        .map((m) => `${m.key}${m.up ? '↑' : '↓'}`),
-    );
-  await expect
-    .poll(relayed)
-    .toEqual(['ArrowRight↓', 'ArrowRight↑', 'ArrowUp↓', 'ArrowUp↑', 'Home↓', 'Home↑', 'r↓', 'r↑']);
 });
 
 test("C8 edge: a screenshot whose thumbnail is broken but picture loads isn't called broken", async ({

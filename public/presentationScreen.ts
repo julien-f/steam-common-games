@@ -11,7 +11,7 @@ export interface ScreenDetailed {
   availWidth: number;
   availHeight: number;
 }
-export interface ScreenDetails {
+interface ScreenDetails {
   screens: ScreenDetailed[];
   currentScreen: ScreenDetailed;
 }
@@ -19,10 +19,6 @@ type Placing = Window & { getScreenDetails?: () => Promise<ScreenDetails> };
 type Screened = Screen & { isExtended?: boolean };
 
 const KEY = 'steam.isonoe.net:presentation-screen';
-type Remembered = Pick<
-  ScreenDetailed,
-  'label' | 'left' | 'top' | 'availLeft' | 'availTop' | 'availWidth' | 'availHeight'
->;
 
 // Whether placing can be offered at all: another screen, and the API to reach it.
 export function canPlace(): boolean {
@@ -60,7 +56,7 @@ export function remember(s: ScreenDetailed): void {
   }
 }
 
-export function remembered(): Remembered | null {
+export function remembered(): ScreenDetailed | null {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? 'null');
   } catch {
