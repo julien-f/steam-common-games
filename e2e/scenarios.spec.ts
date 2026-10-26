@@ -1369,11 +1369,12 @@ test("C8 edge: a trailer the browser won't play with sound there says a click gi
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
-  const sound = shown.getByText('Click for sound');
-  await expect(sound).toBeVisible();
-  await expect(sound).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.55)'); // the lightbox's glass
+  const card = shown.locator('.pres-card');
+  await expect(card).toHaveText('Click for fullscreen and sound');
+  await expect(card).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.7)'); // the TV's glass, darker than the lightbox's
   await shown.locator('.pres').click();
-  await expect(sound).toBeHidden();
+  await expect(card).toBeHidden();
+  await expect(shown.getByText('Click for sound')).toBeHidden();
   expect(await shown.locator('video.pres-media').evaluate((v: HTMLVideoElement) => v.muted)).toBe(false);
   // The trailer fades out over the screenshot presented next (1 ms here, under reduced motion).
   await shown.evaluate(() => {
@@ -1389,6 +1390,29 @@ test("C8 edge: a trailer the browser won't play with sound there says a click gi
   await expect.poll(() => shown.evaluate(() => (window as unknown as { ghosts: number }).ghosts)).toBe(1);
   await expect(shown.locator('.pres-ghost')).toHaveCount(0);
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+});
+
+test('C8 edge: the tokens shared with the TV leave the app as it was', async ({ page }) => {
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(15, 20, 32)'); // --bg
+  await expect(page.locator('.lb-close')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.55)'); // --glass-bg
+  await expect(page.locator('.lb-close')).toHaveCSS('backdrop-filter', 'blur(12px) saturate(1.4)');
+});
+
+test('C8 edge: before its first click, the TV says what a click does; then never again', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  const card = shown.locator('.pres-card');
+  await expect(card).toHaveText('Click for fullscreen'); // a screenshot: no sound to give
+  await shown.locator('.pres').click();
+  await expect(card).toBeHidden();
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  await page.keyboard.press('p');
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%201');
+  await expect(card).toBeHidden();
 });
 
 test('C8 edge: a trailer the browser lets play with sound starts with it, no pill', async ({ page }, testInfo) => {

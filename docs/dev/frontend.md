@@ -127,7 +127,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `types.ts` — `Game`, `ReadonlyGame`, and the account/list interfaces; the single source of truth for row shape.
 - `utils.ts` — shared formatting/scoring helpers (`scoreColor`, `formatMoney`, `computeSteamdbRating`, `dealRecordTier`, `discountPct`, …).
 - `currency.ts` — approximate fixed exchange rates, for ordering and summing mixed-currency prices and their "≈" hint.
-- `style.css` — the stylesheet entry: declares the cascade layer order and imports `styles/*.css`, each partial wrapped in its own `@layer` (`reset` and `base`: elements, and the tokens in `base.css`'s `:root`; `layout`: the shell; `components`: everything else, one section per screen), except `styles/vendor-data-table.css` (the table library's overrides, unlayered, imported last; see [pitfalls.md](pitfalls.md)).
+- `style.css` — the stylesheet entry: declares the cascade layer order and imports `styles/*.css`, each partial wrapped in its own `@layer` (`reset` and `base`: elements, and the tokens in `tokens.css`, which `presentation.css` imports too; `layout`: the shell; `components`: everything else, one section per screen), except `styles/vendor-data-table.css` (the table library's overrides, unlayered, imported last; see [pitfalls.md](pitfalls.md)).
 
 ## Reactivity
 

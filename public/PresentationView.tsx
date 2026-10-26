@@ -2,6 +2,8 @@
 // (presentation.ts). Its DOM is never rebuilt, so fullscreen holds across sends (docs/dev/frontend.md#the-presentation-window).
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { render } from 'solid-js/web';
+import Cast from 'lucide-solid/icons/cast';
+import VolumeX from 'lucide-solid/icons/volume-x';
 import { playHls, stopHls } from './hlsPlayer.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
@@ -160,15 +162,17 @@ function PresentationView() {
     else root.requestFullscreen?.().catch(() => {});
   }
 
-  // The first click (or key) here enters fullscreen and gives sound; later ones never leave fullscreen
-  // (someone in the room clicking), double-click or F does.
+  // The first click (or key) here enters fullscreen and gives sound — the card says so until then;
+  // later ones never leave fullscreen (someone in the room clicking), double-click or F does.
   let activatedAt = 0;
+  const [activated, setActivated] = createSignal(false);
   function activate() {
     video.muted = false;
     setSilenced(false);
     needsClick = false;
     if (!activatedAt) {
       activatedAt = Date.now();
+      setActivated(true);
       if (!document.fullscreenElement) toggleFullscreen();
     }
     wake();
@@ -242,8 +246,17 @@ function PresentationView() {
       <img class="pres-media" ref={img} alt="" hidden />
       <video class="pres-media" ref={video} playsinline hidden />
       <Show when={onAir()}>{(game) => <p class="pres-caption pres-glass">{game().name}</p>}</Show>
-      <Show when={silenced()}>
-        <p class="pres-sound pres-glass">Click for sound</p>
+      <Show when={!activated()}>
+        <div class="pres-card pres-glass">
+          <Cast aria-hidden="true" />
+          <p>{silenced() ? 'Click for fullscreen and sound' : 'Click for fullscreen'}</p>
+        </div>
+      </Show>
+      <Show when={activated() && silenced()}>
+        <p class="pres-sound pres-glass">
+          <VolumeX aria-hidden="true" />
+          Click for sound
+        </p>
       </Show>
       <Show when={failed() && onAir()}>
         {(game) => (

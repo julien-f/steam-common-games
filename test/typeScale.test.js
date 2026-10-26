@@ -8,6 +8,7 @@ const path = require('node:path');
 const PUBLIC = path.join(__dirname, '../public');
 const sheets = [
   'style.css',
+  'presentation.css',
   ...fs
     .readdirSync(path.join(PUBLIC, 'styles'), { recursive: true })
     .filter((f) => f.endsWith('.css'))

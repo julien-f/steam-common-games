@@ -51,13 +51,13 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 ## Colour
 
-- Tokens only, from `styles/base.css`'s `:root`; `test/palette.test.js` checks their contrast pairs.
+- Tokens only, from `styles/tokens.css` (shared by the app and the presentation window); `test/palette.test.js` checks their contrast pairs. Glass over media: `--glass-bg`/`-blur`/`-edge` (the TV darkens `--glass-bg` for reading from a room).
 - The accent marks state (the current page or game, a pressed toggle, the active tab), a view's one primary action (`.btn-primary`) and the brand mark; never decoration. A second primary in a view drops to a secondary button.
 - Amber (`--warn`, `--owned`) warns: a source that didn't answer, a middling score, a game already owned.
 
 ## Type
 
-- Sizes come from the `--fs-*` scale in `styles/base.css`'s `:root` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS, not the table library's.
+- Sizes come from the `--fs-*` scale in `styles/tokens.css` (caps labels, meta and chips, tables and controls, prose, card titles, page titles, big figures); px sizes are for icon glyphs only. `test/typeScale.test.js` enforces it for the app's own CSS (the presentation window's `clamp()` TV sizes included), not the table library's.
 - Two weights: 400, and 600 for emphasis.
 - Two faces, the platform's own, so a page load downloads no font: `--font-sans` (a `system-ui` stack) for text; `--font-mono` (a `ui-monospace` stack) with tabular figures for a figure standing alone (`<time>`, `<output>`, `<data>`, a price, a score, a duration). Table cells stay in the text face, with tabular figures, since a cell can't be told numeric from CSS. A column of figures aligns to the end, so digits line up (data-table's default for `type: 'number'`); a number column whose cells read as text (Group fit's player, Looked up's "Latest") sets `align: 'start'`.
 - The face differs per platform: don't size a layout to one face's metrics or rely on a symbol glyph matching its neighbours (key caps: `Kbd.tsx`).
@@ -72,7 +72,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 ## Motion
 
-- Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/base.css`; motion explains a change (something opening, arriving, pressed), never decorates.
+- Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/tokens.css` (`--dur-4`: the TV's room-paced fades); motion explains a change (something opening, arriving, pressed), never decorates.
 - Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate.
 - Press feedback: buttons give to `scale: 0.98` while held, clickable rows to `0.995` (a full-width row would jump at 0.98), and both snap back on release, so a menu the click opens measures its trigger at full size.
 - An image fades in once loaded (`fadeInOnLoad`), so a row or the panel never flashes a half-drawn picture; a cached one shows at once.
