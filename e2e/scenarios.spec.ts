@@ -1428,11 +1428,12 @@ test('C1 edge: an empty player box highlights no suggestion until one is pointed
 test('C1 edge: ArrowDown steps through every player suggestion', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/');
-  for (const name of ['bob', 'carol']) {
+  for (const [i, name] of ['bob', 'carol'].entries()) {
     await page.getByPlaceholder('Steam name, profile URL, or 64-bit ID…').fill(name);
     await page.getByRole('button', { name: 'Look up', exact: true }).click();
+    // A Look up while the previous one resolves is ignored, and its end clears the field.
+    await expect(page.locator('.account-tiles li')).toHaveCount(i + 2);
   }
-  await expect(page.locator('.account-tiles li')).toHaveCount(3);
   await page.goto('/lists/compare');
   const box = page.locator('.compare-form').getByRole('combobox').nth(1);
   await box.focus();
