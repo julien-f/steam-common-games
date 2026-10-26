@@ -4,7 +4,7 @@
 // tracking the finger, moving the media element, and running the resolved action.
 
 export type SwipeAxis = 'x' | 'y';
-type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next';
+type SwipeAction = 'media-prev' | 'media-next' | 'game-prev' | 'game-next' | 'close';
 
 // Past this the gesture is a drag, not a tap — and the axis it locks onto is final. Matches
 // the lightbox's own tap threshold, so a gesture is never both.
@@ -50,5 +50,7 @@ export function resolveSwipe({
   if (!committed) return null;
   if (axis === 'x') return mediaCount > 1 ? (delta < 0 ? 'media-next' : 'media-prev') : null;
   // Content follows the finger, feed-style: dragging up brings the next game up from below.
-  return hasGameList ? (delta < 0 ? 'game-next' : 'game-prev') : null;
+  if (hasGameList) return delta < 0 ? 'game-next' : 'game-prev';
+  // No feed to page: down closes, as in photo viewers.
+  return delta > 0 ? 'close' : null;
 }

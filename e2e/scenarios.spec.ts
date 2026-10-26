@@ -4420,7 +4420,13 @@ test("F1 edge: on a phone, the tap that brings back a trailer's controls leaves 
   await page.locator('.lb-video').tap();
   await expect(lb).not.toHaveClass(/lb-idle/);
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
-  await page.locator('.lb-video').tap();
+  // A tap toggles the controls, as photo and video players do; the centre button plays and pauses.
+  const offCentre = { position: { x: 195, y: 250 } };
+  await page.locator('.lb-video').tap(offCentre);
+  await expect(lb).toHaveClass(/lb-idle/);
+  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
+  await page.locator('.lb-video').tap(offCentre);
+  await page.getByRole('button', { name: 'Pause trailer' }).tap();
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
 });
 
@@ -4442,16 +4448,55 @@ test('F1 edge: on a phone, a double-tap seek leaves the trailer playing', async 
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     }
   };
+  const time = () => page.locator('.lb-video').evaluate((v: HTMLVideoElement) => v.currentTime);
   await tap(2);
   await expect(page.locator('.lb-seek-flash-right')).toHaveClass(/lb-seek-flash--show/);
+  expect(await time()).toBe(10);
+  // Each further tap on that side adds 10 s more, as YouTube's do.
+  await tap(1);
+  await expect(page.locator('.lb-seek-flash-right')).toHaveText('20s');
+  expect(await time()).toBe(20);
   await page.clock.runFor(1000);
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
-  await tap(1); // controls shown: a lone tap still pauses, once no second tap came
-  await page.clock.runFor(1000);
-  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
-  await tap(2);
-  await page.clock.runFor(1000);
-  await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Play');
+});
+
+test('F1 edge: on a phone, a pinch zooms around the point between the fingers', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  const img = page.locator('#screenshot-lightbox .lb-img');
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  const before = (await img.boundingBox())!;
+  const mid = { x: before.x + before.width * 0.75, y: before.y + before.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  const fingers = (gap: number) => [
+    { x: mid.x - gap, y: mid.y },
+    { x: mid.x + gap, y: mid.y },
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: fingers(20) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: fingers(40) });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(img).toHaveAttribute('style', /scale\(2\)/);
+  const after = (await img.boundingBox())!;
+  // The same spot of the picture is still between the fingers.
+  expect(Math.abs((mid.x - after.x) / after.width - 0.75)).toBeLessThan(0.01);
+});
+
+test('F1 edge: on a phone, swiping down closes a lightbox with no list of games to page', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'touch only');
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/wishlist?game=1145360&shot=s1'); // Hades isn't on the wishlist: no game to page to
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb).toHaveAttribute('open');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 350 }] });
+  for (let y = 360; y <= 500; y += 20)
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 195, y }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(lb).not.toHaveAttribute('open');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
 });
 
 test('F1 edge: Back closes the open game, then leaves the list', async ({ page }) => {

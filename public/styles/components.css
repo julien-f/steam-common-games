@@ -2858,7 +2858,8 @@
   #screenshot-lightbox[open].lb-morph {
     transition: none;
   }
-  /* What goes fullscreen: a dialog can't. Focused on open, with no ring: the shortcuts act from it. */
+  /* What goes fullscreen: a dialog can't. Focused on open, with no ring: the shortcuts act from it.
+     The script handles every gesture on it; its controls keep the browser's taps. */
   .lb-surface {
     position: absolute;
     inset: 0;
@@ -2866,6 +2867,14 @@
     align-items: center;
     justify-content: center;
     outline: none;
+    touch-action: none;
+  }
+  .lb-surface :is(button, input) {
+    touch-action: manipulation;
+  }
+  /* No pull-to-refresh or rubber-band behind a swipe. */
+  html:has(#screenshot-lightbox[open]) {
+    overscroll-behavior: none;
   }
   ::view-transition-new(lb-backdrop),
   ::view-transition-new(lb-chrome) {
@@ -3397,6 +3406,13 @@
       opacity var(--dur-1) 0.3s,
       visibility 0s 0.3s,
       background-color var(--dur-1);
+  }
+  /* Under a finger it's the trailer's play/pause, shown with the rest of the controls. */
+  @media (pointer: coarse) {
+    #screenshot-lightbox:not(.lb-idle):has(.lb-video) .lb-bigplay {
+      opacity: 1;
+      visibility: visible;
+    }
   }
   /* Until a trailer first plays, its large play button is the one control on it. */
   #screenshot-lightbox.lb--unstarted .lb-vctrls {

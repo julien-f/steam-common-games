@@ -103,8 +103,6 @@ type LbFlashEl = HTMLElement & { _flashTimer?: ReturnType<typeof setTimeout> };
 const LB_SEEK_SECONDS = 5;
 const LB_DOUBLE_TAP_MS = 300;
 const LB_DOUBLE_TAP_DIST = 30;
-// A tap on a video's side third waits out a possible second tap (a seek) before playing or pausing.
-let lbVideoTapTimer: ReturnType<typeof setTimeout> | undefined;
 
 // The viewer drives it by keyboard: no chrome then, only brief feedback (`osdLb`); a pointer or a touch ends it.
 let lbByKey = false;
@@ -397,10 +395,11 @@ function seekVideo(vid: HTMLVideoElement | null, deltaSeconds: number) {
 // Transient "⏪10s" / "10s⏩" flash shown on a touch double-tap seek. Each
 // side tracks its own hide timer (rather than one shared timer) so a
 // double-tap on one side can't be cut short by one on the other.
-function flashSeek(side: 'left' | 'right') {
+function flashSeek(side: 'left' | 'right', seconds: number) {
   const lb = document.getElementById('screenshot-lightbox');
   const el = lb?.querySelector<HTMLElement>(`.lb-seek-flash-${side}`);
   if (!el) return;
+  el.querySelector('.lb-seek-flash-n')!.textContent = `${seconds}s`;
   const flash = el as LbFlashEl;
   clearTimeout(flash._flashTimer);
   el.classList.add('lb-seek-flash--show');
@@ -554,13 +553,15 @@ function LightboxDom() {
           <button class="lb-error-retry">Retry</button>
         </div>
         <div class="lb-seek-flash lb-glass lb-seek-flash-left" aria-hidden="true">
-          <Rewind /> {LB_LONG_SEEK_SECONDS}s
+          <Rewind /> <span class="lb-seek-flash-n" />
         </div>
         <div class="lb-seek-flash lb-glass lb-seek-flash-right" aria-hidden="true">
-          {LB_LONG_SEEK_SECONDS}s <FastForward />
+          <span class="lb-seek-flash-n" /> <FastForward />
         </div>
+        {/* Shown while a trailer isn't playing; under a finger, also with the controls, as their play/pause. */}
         <button class="lb-bigplay lb-glass" aria-label="Play trailer">
-          <Play />
+          <Play class="lb-icon-off" />
+          <Pause class="lb-icon-on" />
         </button>
         <div class="lb-vctrls" style={{ display: 'none' }}>
           {/* Two-state controls draw both icons; `lb-on` picks which shows. */}
@@ -866,8 +867,16 @@ function wireTouchHandlers(lb: HTMLElement) {
   let lbX = 0,
     lbY = 0,
     lbActive = false;
+  // A pinch keeps the picture's point between the fingers under them: `pinchPoint` is that point,
+  // in the unzoomed picture's coordinates from its centre.
   let pinchStartDist = 0,
-    pinchStartZoom = 1;
+    pinchStartZoom = 1,
+    pinchCenterX = 0,
+    pinchCenterY = 0,
+    pinchPointX = 0,
+    pinchPointY = 0;
+  // Each tap past a double-tap seek on the same side seeks again, adding up (10 s, 20 s, 30 s).
+  let seekStreak: { side: 'left' | 'right'; total: number; until: number } | null = null;
   let touchPanning = false,
     touchPanStartX = 0,
     touchPanStartY = 0,
@@ -895,6 +904,11 @@ function wireTouchHandlers(lb: HTMLElement) {
           e.touches[1].clientY - e.touches[0].clientY,
         );
         pinchStartZoom = lbZoom;
+        const rect = lb.querySelector('.lb-img')!.getBoundingClientRect();
+        pinchCenterX = rect.left + rect.width / 2 - lbPanX;
+        pinchCenterY = rect.top + rect.height / 2 - lbPanY;
+        pinchPointX = ((e.touches[0].clientX + e.touches[1].clientX) / 2 - pinchCenterX - lbPanX) / lbZoom;
+        pinchPointY = ((e.touches[0].clientY + e.touches[1].clientY) / 2 - pinchCenterY - lbPanY) / lbZoom;
         lbActive = false;
         e.preventDefault();
       } else if (e.touches.length === 1) {
@@ -933,6 +947,8 @@ function wireTouchHandlers(lb: HTMLElement) {
           e.touches[1].clientY - e.touches[0].clientY,
         );
         lbZoom = Math.max(1, Math.min(4, (pinchStartZoom * dist) / pinchStartDist));
+        lbPanX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - pinchCenterX - lbZoom * pinchPointX;
+        lbPanY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - pinchCenterY - lbZoom * pinchPointY;
         applyLbTransform();
         e.preventDefault();
       } else if (e.touches.length === 1 && touchPanning) {
@@ -949,7 +965,8 @@ function wireTouchHandlers(lb: HTMLElement) {
         if (!el) return;
         // Nothing to step to on this axis: the media still follows the finger, damped, so the
         // gesture reads as resistance rather than as a step that silently didn't happen.
-        const slack = (dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList) ? 1 : LB_SWIPE_RESISTANCE;
+        const free = dragAxis === 'x' ? dragMediaCount > 1 : dragHasGameList || dy > 0; // down closes
+        const slack = free ? 1 : LB_SWIPE_RESISTANCE;
         setLbDrag(el, dragAxis === 'x' ? dx * slack : 0, dragAxis === 'y' ? dy * slack : 0);
         e.preventDefault();
       }
@@ -979,7 +996,9 @@ function wireTouchHandlers(lb: HTMLElement) {
         dragAxis = null;
         const el = lbMediaEl();
         if (el) clearLbDrag(el, !action);
-        if (action === 'media-prev' || action === 'media-next') stepLightbox(action === 'media-next' ? 1 : -1, true);
+        if (action === 'close') closeLightbox();
+        else if (action === 'media-prev' || action === 'media-next')
+          stepLightbox(action === 'media-next' ? 1 : -1, true);
         else if (action) {
           stepGameNav(action === 'game-next' ? 1 : -1, true);
         }
@@ -988,6 +1007,20 @@ function wireTouchHandlers(lb: HTMLElement) {
       const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
       const showingImg = lbShowingImage();
       const showingVid = lbShowingVideo();
+      if (isTap && showingVid && seekStreak && Date.now() < seekStreak.until) {
+        const frac = (endX - lb.getBoundingClientRect().left) / lb.getBoundingClientRect().width;
+        const side = frac < 1 / 3 ? 'left' : frac > 2 / 3 ? 'right' : null;
+        if (side === seekStreak.side) {
+          e.preventDefault();
+          clearTimeout(lbChromeTapTimer);
+          seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+          seekStreak.total += LB_LONG_SEEK_SECONDS;
+          seekStreak.until = Date.now() + 600;
+          flashSeek(side, seekStreak.total);
+          return;
+        }
+      }
+      seekStreak = null;
       if (isTap && (showingImg || showingVid)) {
         const now = Date.now();
         const tapDist = Math.hypot(endX - lbLastTapX, endY - lbLastTapY);
@@ -999,22 +1032,16 @@ function wireTouchHandlers(lb: HTMLElement) {
             e.preventDefault();
             toggleLbZoomAt(endX, endY);
           } else {
-            // Video: double-tap the left/right third to seek, YouTube-style.
-            // The middle third is left alone — a plain single tap already
-            // toggles play/pause via the video's own 'click' listener.
+            // Video: double-tap the left/right third to seek, YouTube-style; the middle third is left alone.
             const rect = lb.getBoundingClientRect();
             const frac = (endX - rect.left) / rect.width;
-            const vid = lbVideoEl;
-            if (frac < 1 / 3 || frac > 2 / 3) {
-              clearTimeout(lbVideoTapTimer);
-              e.preventDefault(); // no click: it would play or pause
-            }
-            if (frac < 1 / 3) {
-              seekVideo(vid, -LB_LONG_SEEK_SECONDS);
-              flashSeek('left');
-            } else if (frac > 2 / 3) {
-              seekVideo(vid, LB_LONG_SEEK_SECONDS);
-              flashSeek('right');
+            const side = frac < 1 / 3 ? 'left' : frac > 2 / 3 ? 'right' : null;
+            if (side) {
+              clearTimeout(lbChromeTapTimer); // the first tap's toggle of the controls
+              e.preventDefault();
+              seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+              seekStreak = { side, total: LB_LONG_SEEK_SECONDS, until: Date.now() + 600 };
+              flashSeek(side, LB_LONG_SEEK_SECONDS);
             }
           }
         } else {
@@ -1067,6 +1094,8 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('play', () => {
     playBtn.classList.add('lb-on');
     playBtn.setAttribute('aria-label', 'Pause');
+    bigPlay.classList.add('lb-on');
+    bigPlay.setAttribute('aria-label', 'Pause trailer');
     document.getElementById('screenshot-lightbox')?.classList.remove('lb--unstarted');
     syncLbPaused();
     schedHideLbChrome();
@@ -1074,6 +1103,8 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('pause', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
+    bigPlay.classList.remove('lb-on');
+    bigPlay.setAttribute('aria-label', 'Play trailer');
     syncLbPaused();
     if (!lbShowingVideo()) return; // stopHls' own pause, on a close or a step off the trailer
     revealLbChrome();
@@ -1081,6 +1112,8 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('ended', () => {
     playBtn.classList.remove('lb-on');
     playBtn.setAttribute('aria-label', 'Play');
+    bigPlay.classList.remove('lb-on');
+    bigPlay.setAttribute('aria-label', 'Play trailer');
     syncLbPaused();
     revealLbChrome();
   });
@@ -1099,7 +1132,8 @@ function wireVideoControls(lb: HTMLElement) {
   playBtn.addEventListener('click', () => {
     vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
   });
-  lb.querySelector('.lb-bigplay')!.addEventListener('click', () => vid2.play().catch(() => {}));
+  const bigPlay = lb.querySelector<HTMLElement>('.lb-bigplay')!;
+  bigPlay.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
   // Screen locked, app or tab switched: stop rather than play on unseen. Not resumed on return —
   // the large play button is there, and sound starting by itself on unlock would surprise.
   document.addEventListener(
@@ -1113,16 +1147,8 @@ function wireVideoControls(lb: HTMLElement) {
     vid2.muted = !vid2.muted;
   });
 
-  vid2.addEventListener('click', (e) => {
-    // A tap on a trailer whose controls had idled out only brings them back, as phone players do.
-    if (tapRevealedChrome) return;
-    const toggle = () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause());
-    const rect = lb.getBoundingClientRect();
-    const frac = (e.clientX - rect.left) / rect.width;
-    if ((e as PointerEvent).pointerType === 'touch' && (frac < 1 / 3 || frac > 2 / 3)) {
-      lbVideoTapTimer = setTimeout(toggle, LB_DOUBLE_TAP_MS);
-    } else toggle();
-  });
+  // A click plays or pauses; a finger's tap toggles the controls instead (below, which cancels its click).
+  vid2.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
 
   // Any mouse move brings it all back (as video players do); leaving the window hides it at once.
   lb.addEventListener('pointermove', (e) => {
@@ -1131,7 +1157,7 @@ function wireVideoControls(lb: HTMLElement) {
     revealLbChrome();
   });
   lb.addEventListener('mouseleave', () => isLightboxOpen() && hideLbChrome()); // not the close's own
-  // A tap toggles the chrome (on a trailer, only brings it back: its own tap plays or pauses); a swipe steps media without it.
+  // A tap toggles the chrome; a swipe steps media without it.
   let tapRevealedChrome = false;
   let tapX = 0,
     tapY = 0;
@@ -1150,12 +1176,17 @@ function wireVideoControls(lb: HTMLElement) {
       const t = e.changedTouches[0];
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
       if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
-      if (lbShowingVideo() || tapRevealedChrome) return revealLbChrome();
-      // A still's tap waits out a possible second one (a zoom), which cancels it.
+      if (lbShowingVideo()) e.preventDefault(); // its click would play or pause: the centre button does
+      if (lb.classList.contains('lb--unstarted')) return void lbVideoEl.play().catch(() => {});
+      if (tapRevealedChrome) return revealLbChrome();
       clearTimeout(lbChromeTapTimer);
-      lbChromeTapTimer = setTimeout(hideLbChrome, LB_DOUBLE_TAP_MS);
+      // A trailer's middle third hides at once; elsewhere a tap waits out a possible second one (a zoom, a seek).
+      const rect = lb.getBoundingClientRect();
+      const frac = (t.clientX - rect.left) / rect.width;
+      if (lbShowingVideo() && frac >= 1 / 3 && frac <= 2 / 3) hideLbChrome();
+      else lbChromeTapTimer = setTimeout(hideLbChrome, LB_DOUBLE_TAP_MS);
     },
-    { passive: true },
+    { passive: false },
   );
 }
 
