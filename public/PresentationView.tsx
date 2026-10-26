@@ -3,6 +3,7 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { render } from 'solid-js/web';
 import Cast from 'lucide-solid/icons/cast';
+import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import VolumeX from 'lucide-solid/icons/volume-x';
 import { playHls, stopHls } from './hlsPlayer.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
@@ -10,11 +11,18 @@ import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
 import type { Control, FromPresentationBody, OnAir, ToPresentation } from './presentationProtocol.ts';
 
 const IDLE_MS = 3000;
+// The lower third's time on screen: long enough to read from a sofa when the game changes.
+const CAPTION_GAME_MS = 5000;
+const CAPTION_MEDIA_MS = 2000;
+const FADE_MS = 400; // --dur-4
 
 function PresentationView() {
   const main = new URLSearchParams(location.search).get('main');
   const [onAir, setOnAir] = createSignal<OnAir | null>(null);
+  // The cursor, on a mouse move; the caption has its own times (`showCaption`).
   const [awake, setAwake] = createSignal(true);
+  const [captioned, setCaptioned] = createSignal(false);
+  let captionTimer: ReturnType<typeof setTimeout> | undefined;
   const [failed, setFailed] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   // A trailer muted for want of a first click in this window: the pill says a click gives it sound.
@@ -56,13 +64,32 @@ function PresentationView() {
     idleTimer = setTimeout(() => setAwake(false), IDLE_MS);
   }
 
-  // What was on screen fades out over the new media: a picture copied, as the DOM is never rebuilt.
+  // After the cross-fade, so the two don't move at once.
+  function showCaption(ms: number) {
+    clearTimeout(captionTimer);
+    setCaptioned(false);
+    captionTimer = setTimeout(() => {
+      setCaptioned(true);
+      captionTimer = setTimeout(() => setCaptioned(false), ms);
+    }, FADE_MS);
+  }
+
+  // What was on screen fades out over the new media, copied (the DOM is never rebuilt): a trailer's
+  // current frame, not its poster — a cross-origin one taints the canvas, which still draws.
   function fadeOut() {
-    const src = !img.hidden ? img.currentSrc : !video.hidden ? video.poster : '';
-    if (!src) return;
-    const ghost = document.createElement('img');
+    let ghost: HTMLImageElement | HTMLCanvasElement;
+    if (!video.hidden && video.readyState >= 2) {
+      ghost = document.createElement('canvas');
+      ghost.width = video.videoWidth;
+      ghost.height = video.videoHeight;
+      ghost.getContext('2d')?.drawImage(video, 0, 0);
+    } else {
+      const src = !img.hidden ? img.currentSrc : !video.hidden ? video.poster : '';
+      if (!src) return;
+      ghost = document.createElement('img');
+      ghost.src = src;
+    }
     ghost.className = 'pres-ghost';
-    ghost.src = src;
     ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
     root.append(ghost);
   }
@@ -77,9 +104,12 @@ function PresentationView() {
     session.setActionHandler('pause', name ? () => video.pause() : null);
   }
 
-  function show({ name, item, startAt, paused }: OnAir) {
+  function show({ name, item, spoken, startAt, paused }: OnAir) {
     setFailed(false);
     fadeOut();
+    document.title = `${name} — Playshelf presentation`;
+    img.alt = `${name}, ${spoken}`;
+    video.setAttribute('aria-label', `${name}, ${spoken}`);
     claimMediaKeys(item.type === 'video' ? name : undefined, item.thumb);
     // A late error or load from the previous media is dropped.
     const current = () => onAir()?.item === item;
@@ -135,7 +165,12 @@ function PresentationView() {
   function receive(e: MessageEvent<ToPresentation>) {
     const msg = e.data;
     if (msg?.main !== main) return;
-    if (msg.type === 'close') window.close();
+    // Stopped: the TV fades to black rather than snapping to the desktop.
+    if (msg.type === 'close') {
+      closing = true;
+      root.classList.add('pres--closing');
+      setTimeout(() => window.close(), FADE_MS);
+    }
     if (msg.type === 'control') obey(msg.control);
     if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 3000);
     // The main window is back from a reload: tell it at once, before it opens a second window.
@@ -149,10 +184,12 @@ function PresentationView() {
       // P again on what's up: the caption says what it is; only an ended trailer starts over.
       if (same && !video.hidden && video.ended) video.play().catch(() => {});
       else if (!same) {
+        const gameChanged = shown?.appid !== msg.onAir.appid;
         setOnAir(msg.onAir);
         show(msg.onAir);
+        showCaption(gameChanged ? CAPTION_GAME_MS : CAPTION_MEDIA_MS);
       }
-      wake();
+      if (same) showCaption(CAPTION_MEDIA_MS);
       report();
     }
   }
@@ -175,7 +212,6 @@ function PresentationView() {
       setActivated(true);
       if (!document.fullscreenElement) toggleFullscreen();
     }
-    wake();
   }
   function onDoubleClick() {
     if (Date.now() - activatedAt > 500) toggleFullscreen(); // not the activating click's second half
@@ -186,6 +222,7 @@ function PresentationView() {
     if (document.visibilityState !== 'visible' || (wakeLock && !wakeLock.released)) return;
     try {
       wakeLock = (await navigator.wakeLock?.request('screen')) ?? null;
+      wakeLock?.addEventListener('release', () => void keepScreenOn()); // the system took it back
     } catch {
       // Refused (power saving, no HTTPS): the screen may dim, nothing else changes.
     }
@@ -199,10 +236,17 @@ function PresentationView() {
       () => (hadOpener && (!window.opener || window.opener.closed) ? window.close() : report()),
       HEARTBEAT_MS,
     );
+    // For a host who clicked into the TV: the lightbox's keys, no more (it has no other controls).
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return; // the browser's
       if (!activatedAt) return activate();
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+      if (video.hidden) return;
+      if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        void (video.paused ? video.play().catch(() => {}) : video.pause());
+      }
+      if (e.key === 'm' || e.key === 'M') video.muted = !video.muted;
     };
     const bye = () => {
       post({ type: 'bye' });
@@ -211,7 +255,14 @@ function PresentationView() {
     document.addEventListener('keydown', onKey);
     for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange'])
       video.addEventListener(type, reportPlayback);
-    video.addEventListener('ended', () => claimMediaKeys());
+    video.addEventListener('ended', () => {
+      claimMediaKeys();
+      showCaption(CAPTION_GAME_MS); // so the room knows what they just watched
+    });
+    // Stalled: the spinner (after a moment, by its own CSS delay).
+    video.addEventListener('waiting', () => setLoading(true));
+    for (const type of ['playing', 'pause', 'emptied']) video.addEventListener(type, () => setLoading(false));
+    document.addEventListener('fullscreenchange', keepScreenOn);
     // The chip's progress line: once a second is plenty.
     video.addEventListener('timeupdate', () => {
       if (Date.now() - lastTimeReport < 1000) return;
@@ -229,6 +280,7 @@ function PresentationView() {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', keepScreenOn);
       document.removeEventListener('visibilitychange', report);
+      document.removeEventListener('fullscreenchange', keepScreenOn);
       removeEventListener('pagehide', bye);
       channel.close();
     });
@@ -237,7 +289,7 @@ function PresentationView() {
   return (
     <div
       class="pres"
-      classList={{ 'pres--awake': awake(), 'pres--loading': loading() }}
+      classList={{ 'pres--awake': awake(), 'pres--loading': loading(), 'pres--failed': failed() }}
       ref={root}
       onPointerMove={wake}
       onClick={activate}
@@ -245,7 +297,15 @@ function PresentationView() {
     >
       <img class="pres-media" ref={img} alt="" hidden />
       <video class="pres-media" ref={video} playsinline hidden />
-      <Show when={onAir()}>{(game) => <p class="pres-caption pres-glass">{game().name}</p>}</Show>
+      {/* A TV channel's lower third: the game, and which of its media. */}
+      <Show when={onAir()}>
+        {(shown) => (
+          <p class="pres-caption pres-glass" classList={{ 'pres-caption--on': captioned() }}>
+            <span class="pres-caption-name">{shown().name}</span>
+            <span class="pres-caption-media">{shown().label}</span>
+          </p>
+        )}
+      </Show>
       <Show when={!activated()}>
         <div class="pres-card pres-glass">
           <Cast aria-hidden="true" />
@@ -261,6 +321,7 @@ function PresentationView() {
       <Show when={failed() && onAir()}>
         {(game) => (
           <p class="pres-error pres-glass" role="alert">
+            <TriangleAlert aria-hidden="true" />
             Couldn't load this {game().item.type === 'video' ? 'video' : 'image'}.
           </p>
         )}

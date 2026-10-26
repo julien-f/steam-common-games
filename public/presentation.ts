@@ -138,8 +138,9 @@ export function control(c: Control): void {
 // A new id for the next window: the closing one's last bye and heartbeat then go unheard.
 export function stopPresenting(): void {
   if (mainId) post({ main: mainId, type: 'close' });
-  // Still loading, it can't hear `close` yet.
-  win?.close();
+  // It fades out, then closes itself; a window still loading can't hear `close` yet, so it's closed here after the fade.
+  const opened = win;
+  setTimeout(() => opened?.close(), 600);
   win = null;
   forget();
   mainId = null;

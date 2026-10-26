@@ -1082,7 +1082,7 @@ test('C8.1-4,7-8: the presentation window shows only what is presented, stays fu
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   const chip = page.getByRole('banner').locator('.present-chip');
   await expect(chip).toContainText('Hades');
   await shown.keyboard.press('f');
@@ -1091,10 +1091,10 @@ test('C8.1-4,7-8: the presentation window shows only what is presented, stays fu
   await page.getByPlaceholder('Look up any game…').fill('Portal 2');
   await page.locator('.game-search-result', { hasText: 'Portal 2' }).first().click();
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
 
   await page.getByRole('button', { name: 'Present on second screen' }).click();
-  await expect(shown.locator('.pres-caption')).toHaveText('Portal 2');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Portal 2');
   await expect(chip).toContainText('Portal 2');
   expect(await shown.evaluate(() => !!document.fullscreenElement)).toBe(true);
 
@@ -1277,6 +1277,77 @@ test("C8 edge: the keyboard's play/pause key pauses the TV's trailer from anywhe
   expect(await shown.evaluate(() => (window as unknown as Keys).mediaKeys.play)).toBeNull();
 });
 
+test("C8 edge: the TV's lower third says the game and media a while, not on a mouse move; its title and labels too", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  const caption = shown.locator('.pres-caption');
+  await expect(caption).toHaveClass(/pres-caption--on/);
+  await expect(caption).toContainText('Cover');
+  expect(await shown.title()).toBe('Hades — Playshelf presentation');
+  await expect(shown.locator('img.pres-media')).toHaveAttribute('alt', 'Hades, Cover');
+  await expect(caption).not.toHaveClass(/pres-caption--on/, { timeout: 7000 }); // a new game: 5 s
+  await shown.mouse.move(200, 200);
+  await shown.mouse.move(220, 220);
+  await expect(shown.locator('.pres')).toHaveClass(/pres--awake/); // the cursor, only
+  await shown.waitForTimeout(600);
+  await expect(caption).not.toHaveClass(/pres-caption--on/);
+  // Another media of the same game: 2 s.
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  await page.keyboard.press('p');
+  await expect(caption).toHaveClass(/pres-caption--on/);
+  await expect(caption).toContainText('Screenshot 1 / 3');
+  await expect(caption).not.toHaveClass(/pres-caption--on/, { timeout: 3500 });
+});
+
+test('C8 edge: on the TV, Space and M play and mute a trailer; a stall spins, and stopping fades out', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await shown.locator('.pres').click(); // the first click: fullscreen and sound
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await shown.keyboard.press(' ');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await shown.keyboard.press('m');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  await tv.evaluate((v: HTMLVideoElement) => v.dispatchEvent(new Event('waiting')));
+  await expect(shown.locator('.pres')).toHaveClass(/pres--loading/);
+  // Under reduced motion (the tests' default), the spinner stands still.
+  expect(await shown.locator('.pres').evaluate((el) => getComputedStyle(el, '::after').animationName)).toBe('none');
+  await shown.evaluate(() => {
+    const w = window as unknown as { faded: boolean };
+    new MutationObserver(
+      () => (w.faded ||= document.querySelector('.pres')!.classList.contains('pres--closing')),
+    ).observe(document.querySelector('.pres')!, { attributeFilter: ['class'] });
+  });
+  const closed = shown.waitForEvent('close');
+  await page.getByRole('button', { name: 'Stop presenting Hades' }).click();
+  // Read during its 400 ms fade, before it closes itself.
+  expect(await shown.evaluate(() => (window as unknown as { faded: boolean }).faded)).toBe(true);
+  await closed;
+});
+
+test('C8 edge: in forced colours, the TV keeps its black and its text takes the system colours', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await shown.emulateMedia({ forcedColors: 'active' });
+  await expect(shown.locator('.pres')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+  await expect(shown.locator('.pres-card')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0.7)');
+});
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');
@@ -1285,7 +1356,7 @@ test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo)
   await page.keyboard.press('Control+p');
   expect(await chip.count()).toBe(0); // a snapshot: P would have shown it while handling the key
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
 });
 
 test('C8 edge: closing the presentation window drops the nav chip', async ({ page }, testInfo) => {
@@ -1293,7 +1364,7 @@ test('C8 edge: closing the presentation window drops the nav chip', async ({ pag
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades'); // mounted: its pagehide says bye
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades'); // mounted: its pagehide says bye
   const chip = page.getByRole('banner').locator('.present-chip');
   await expect(chip).toContainText('Hades');
   await shown.close();
@@ -1307,7 +1378,7 @@ test('C8.6: while presenting, opening a media from the panel presents it instead
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
   const picture = () => shown.locator('img.pres-media').getAttribute('src');
   expect(await picture()).toContain('header.jpg'); // browsing the panel moves nothing: still the Cover
@@ -1321,7 +1392,7 @@ test('C8 edge: closing the main window closes the presentation', async ({ page }
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   const closed = shown.waitForEvent('close', { timeout: HEARTBEAT_MS + 3000 });
   await page.close();
   await closed;
@@ -1435,7 +1506,7 @@ test('C8 edge: a click on the TV enters fullscreen, and no later click leaves it
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
-  await expect(shown.locator('.pres-caption')).toHaveText('Hades');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   const fullscreen = () => shown.evaluate(() => !!document.fullscreenElement);
   // A double-click as the first: its second half doesn't undo the first's fullscreen.
   await shown.locator('.pres').dblclick();

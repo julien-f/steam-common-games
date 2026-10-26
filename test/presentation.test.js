@@ -151,9 +151,12 @@ test('present: a media the game does not have sends nothing', async () => {
   assert.equal(p.presented().appid, 10);
 });
 
-test('Stop presenting before the window says hello closes it', () => {
+test('Stop presenting before the window says hello closes it, after the fade a ready one does itself', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   p.present(game(1), 'banner');
   p.stopPresenting();
+  assert.equal(closed, 0);
+  t.mock.timers.tick(600);
   assert.equal(closed, 1);
 });
 
