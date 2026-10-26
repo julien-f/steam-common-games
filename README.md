@@ -24,7 +24,7 @@ npm run build          # bundle the frontend to dist/
 npm start              # http://127.0.0.1:3000
 ```
 
-Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITAD_API_KEY` ([get one](https://isthereanydeal.com/apps/my/)) enables bundle browsing and price columns; everything else works without it. All settings and their defaults are documented in `default.env` — put overrides in `.env`.
+Get a Steam API key at <https://steamcommunity.com/dev/apikey>. An optional `ITAD_API_KEY` ([get one](https://isthereanydeal.com/apps/my/)) enables bundle browsing, price columns and the PC Game Pass list; everything else works without it. All settings and their defaults are documented in `default.env` — put overrides in `.env`.
 
 ## Development
 

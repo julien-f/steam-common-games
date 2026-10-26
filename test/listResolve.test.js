@@ -22,6 +22,7 @@ function makeFetchers(overrides = {}) {
     bundle: overrides.bundle ?? (async () => set()),
     recentGames: overrides.recentGames ?? (async () => set()),
     creator: overrides.creator ?? (async () => set()),
+    gamePass: overrides.gamePass ?? (async () => set()),
     getList: (id) => lists.get(id),
   };
 }
@@ -36,8 +37,9 @@ function dynamicList(id, op, sources) {
 
 // ── resolveRef: leaf kinds ───────────────────────────────────────────────────────────────────
 
-test('resolveRef: account-owned/account-wishlist/bundle/recent-games delegate to the matching fetcher', async () => {
+test('resolveRef: account-owned/account-wishlist/bundle/recent-games/game-pass delegate to the matching fetcher', async () => {
   const fetchers = makeFetchers({
+    gamePass: async () => set(7),
     accountOwned: async (id) => (id === 'acc1' ? set(1, 2) : set()),
     accountWishlist: async (id) => (id === 'acc1' ? set(3) : set()),
     bundle: async (id) => (id === 'b1' ? set(4, 5) : set()),
@@ -48,6 +50,7 @@ test('resolveRef: account-owned/account-wishlist/bundle/recent-games delegate to
   assert.deepEqual(await resolveRef({ kind: 'account-wishlist', accountId: 'acc1' }, fetchers), set(3));
   assert.deepEqual(await resolveRef({ kind: 'bundle', bundleId: 'b1' }, fetchers), set(4, 5));
   assert.deepEqual(await resolveRef({ kind: 'recent-games' }, fetchers), set(6));
+  assert.deepEqual(await resolveRef({ kind: 'game-pass' }, fetchers), set(7));
 });
 
 test('resolveRef: a leaf ref missing its id (accountId/bundleId) resolves to an empty set without calling the fetcher', async () => {

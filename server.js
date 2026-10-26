@@ -52,6 +52,7 @@ const {
   extractGameBundles,
 } = require('./lib/itad');
 const { withPickAndMix } = require('./lib/fanatical');
+const { catalogCacheKey, getGamePass } = require('./lib/gamepass');
 const {
   SESSION_COOKIE,
   STATE_COOKIE,
@@ -515,6 +516,11 @@ const bundlesByIdLimit = namedRateLimit('bundlesById', {
   max: BUNDLES_RATE_LIMIT_MAX * 2,
 });
 
+const gamePassLimit = namedRateLimit('gamePass', {
+  max: BUNDLES_RATE_LIMIT_MAX,
+  skip: (req) => !isForceRefresh(req) && isCached(catalogCacheKey(parseCountry(req))),
+});
+
 const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
   max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
@@ -903,6 +909,17 @@ app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, r
     res.json({ appids: Object.fromEntries(resolved), ...(failed.length && { failed }) });
   } catch (err) {
     sendRouteError(res, 'bundles-resolve', err);
+  }
+});
+
+// The Steam games in PC Game Pass for `country`'s catalog — see lib/gamepass.js.
+app.get('/api/game-pass', gamePassLimit, requireItad, async (req, res) => {
+  const country = parseCountry(req);
+  try {
+    const result = await getGamePass(country, { force: isForceRefresh(req) });
+    res.json({ ...result, fetchedAt: getCachedAt(catalogCacheKey(country)) ?? null });
+  } catch (err) {
+    sendRouteError(res, 'game-pass', err);
   }
 });
 

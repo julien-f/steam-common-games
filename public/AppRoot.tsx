@@ -39,6 +39,7 @@ render(
       <Route path="/lists/shared" component={ListRoute} />
       <Route path="/lists/developer" component={ListRoute} />
       <Route path="/lists/publisher" component={ListRoute} />
+      <Route path="/lists/game-pass" component={ListRoute} />
       <Route path="/lists/bundle/:bundleId" component={ListRoute} />
       <Route path="/lists/:listId" component={ListRoute} />
       <Route path="/lists/:listId/rank" component={RankRoute} />

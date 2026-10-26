@@ -93,6 +93,8 @@ function encodeSource(
       return `p:${escapeLeaf(ref.name)}`;
     case 'recent-games':
       return 'r';
+    case 'game-pass':
+      return 'x';
     case 'user': {
       const listId = ref.listId;
       if (!listId || visited.has(listId)) throw new EncodeError('cycle-or-too-deep');
@@ -173,6 +175,7 @@ export function inMemoryDynamicList(op: CombineOp, sources: ListRef[]): GameList
 
 function parseSource(token: string, synthetic: Map<string, GameList>, makeId: () => string): ListRef {
   if (token === 'r') return { kind: 'recent-games' };
+  if (token === 'x') return { kind: 'game-pass' };
   if (token.startsWith('o:')) return { kind: 'account-owned', accountId: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('w:')) return { kind: 'account-wishlist', accountId: decodeURIComponent(token.slice(2)) };
   if (token.startsWith('b:')) return { kind: 'bundle', bundleId: decodeURIComponent(token.slice(2)) };
