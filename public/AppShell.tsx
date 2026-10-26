@@ -174,7 +174,6 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
   function rejoinTv(): Promise<boolean> {
     const on = presented();
     if (!on) return Promise.resolve(false);
-    setPrivateMode(false);
     if (getPanelGame()?.appid !== on.appid) openGameGlobally(on.appid);
     return new Promise((resolve) =>
       createRoot((dispose) => {
@@ -184,7 +183,9 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           settled = true;
           clearTimeout(timeout);
           dispose();
-          if (!game) return resolve(false);
+          // Its details never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
+          if (!game || (!game.details && on.item.shotId !== 'banner')) return resolve(false);
+          setPrivateMode(false);
           const items = buildMediaItems(game.appid, game.details?.meta);
           const i = items.findIndex((s) => s.shotId === on.item.shotId);
           openLightbox(game, i >= 0 ? i : preferredShotIndex(items, on.item.type));

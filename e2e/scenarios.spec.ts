@@ -1836,6 +1836,9 @@ test('C8 edge: what the TV fails to load the linked lightbox says, and retries',
   );
   await lightbox.getByRole('button', { name: 'Retry' }).click();
   expect(await retried).toBe(true);
+  // A step away: no failure that isn't this item's.
+  await page.keyboard.press('ArrowRight');
+  await expect(lightbox.getByRole('alert')).toBeHidden();
 });
 
 test('C8 edge: a linked trailer goes back to the lightbox paused where the TV was, and back to the TV where the host was', async ({
@@ -1944,6 +1947,69 @@ test('C8 edge: hidden behind a fullscreen TV, the main window sends a key held t
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']); // the first at once, then on release
   await shown.waitForTimeout(300);
   expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
+});
+
+test('C8 edge: private, a trailer played here stops when a step lands on another, which waits for its own press', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await asPlayer(page, ALICE, { recentGames: [1145360, 105600] });
+  await page.goto('/game/1145360?shot=v1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await page.keyboard.press('p'); // private
+  const local = lightbox.locator('video');
+  await page.keyboard.press(' ');
+  await expect.poll(() => local.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await page.keyboard.press('ArrowDown'); // Terraria, landing on its trailer
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Terraria');
+  await expect.poll(() => local.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  expect(await local.evaluate((v: HTMLVideoElement) => v.getAttribute('src'))).toBeNull(); // unloaded
+  await page.keyboard.press(' ');
+  await expect
+    .poll(() => local.evaluate((v: HTMLVideoElement) => v.currentSrc || v.getAttribute('src')))
+    .toContain('105600');
+});
+
+test("C8 edge: a linked trailer's scrubber seeks the TV once when let go; a cancelled drag sends nothing and lets the TV's time back", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360?shot=v1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await reachForControls(page);
+  const scrub = lightbox.getByRole('slider', { name: 'Seek on TV' });
+  const box = (await scrub.boundingBox())!;
+  const seeks = () =>
+    shown.evaluate(
+      () =>
+        (window as unknown as { presTest: PresTest }).presTest.heard.filter(
+          (m) => (m.control as { seekTo?: number })?.seekTo != null,
+        ).length,
+    );
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => Math.round(v.currentTime / 9))).toBe(5); // ≈ 45 s of 90
+  expect(await seeks()).toBe(1);
+  await scrub.dispatchEvent('pointerdown');
+  await scrub.dispatchEvent('pointercancel');
+  await tv.evaluate((v: HTMLVideoElement) => (v.currentTime = 72)); // reported at once (seeked)
+  await expect.poll(() => scrub.evaluate((el: HTMLInputElement) => Math.round(Number(el.value) * 10))).toBe(8);
+  expect(await seeks()).toBe(1);
 });
 
 test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now on the TV', async ({
@@ -4500,8 +4566,8 @@ async function withTrailerStream(page: Page) {
       .map((line: string) => {
         if (!line.startsWith('data: ')) return line;
         const event = JSON.parse(line.slice(6));
-        if (event.appid !== 1145360) return line;
-        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: '/trailer.m3u8' }));
+        if (event.appid !== 1145360 && event.appid !== 105600) return line; // Hades, Terraria
+        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: `/trailer-${event.appid}.m3u8` }));
         return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, movies } })}`;
       })
       .join('\n\n');

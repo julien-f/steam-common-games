@@ -79,6 +79,8 @@ let lbRenderedOnTv = false;
 // A trailer held unstarted (private, or just unlinked): the first play loads it, from `lbHeldAt`.
 let lbHeld = false;
 let lbHeldAt = 0;
+// Its start, once the stream's metadata is in; dropped by the next render (a step before it loads).
+let lbHeldStart: (() => void) | null = null;
 // A linked trailer on screen: its controls drive the TV and mirror its `playback`.
 const [lbTvTrailer, setLbTvTrailer] = createSignal(false);
 // The TV's playhead as last reported, run on locally between its 1 s reports.
@@ -89,7 +91,6 @@ let lbScrubDragged = false;
 let lbScrubTarget: number | null = null;
 let lbScrubUntil = 0;
 let lbScrubTimer: ReturnType<typeof setTimeout> | undefined;
-let lbTvNeedsClick = false;
 // The present waiting out the settle (`LB_SETTLE_*`), whether the next one goes at once (just linked), and
 // until when steps are a burst: its first goes at once, the rest wait for where it stops.
 let lbTvTimer: ReturnType<typeof setTimeout> | undefined;
@@ -223,6 +224,9 @@ export function initLightbox({
   _lbTeardown = () => {
     abort.abort();
     stopRelay();
+    cancelLbTv();
+    clearInterval(lbTvTick);
+    clearTimeout(lbScrubTimer);
     dispose();
     _lbTeardown = null;
   };
@@ -311,7 +315,9 @@ function drawLbTvTime() {
 // Mirrors the TV's report on a linked item: its failure (stills too: the TV can fail where this didn't),
 // and for a trailer its state, one overlay at a time (CSS): failed, then buffering, paused or ended, playing.
 function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
-  const pb = untrack(playback);
+  // The TV's report on the item here only: a step's present goes out after its settle.
+  const on = untrack(presented);
+  const pb = on && on.appid === lbRenderedAppid && on.item.shotId === lbRenderedShotId ? untrack(playback) : null;
   const failed = onTv && !!pb?.failed;
   if (failed !== lb.classList.contains('lb--tv-failed')) {
     lb.classList.toggle('lb--tv-failed', failed);
@@ -326,11 +332,9 @@ function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
   lb.classList.toggle('lb--ended', !!pb?.ended);
   lb.classList.toggle('lb--buffering', !!pb?.buffering);
   lb.classList.toggle('lb--tv-playing', !!pb && !paused && !pb.buffering);
+  if (!!pb?.needsClick !== lb.classList.contains('lb--automuted') && pb?.needsClick)
+    noteLb(lb, 'Click the TV for sound');
   lb.classList.toggle('lb--automuted', !!pb?.needsClick);
-  if (!!pb?.needsClick !== lbTvNeedsClick) {
-    lbTvNeedsClick = !!pb?.needsClick;
-    if (lbTvNeedsClick) noteLb(lb, 'Click the TV for sound');
-  }
   const playBtn = lb.querySelector('.lb-vc-play')!;
   playBtn.classList.toggle('lb-on', !paused);
   playBtn.setAttribute('aria-label', paused ? 'Play on TV' : 'Pause on TV');
@@ -1446,7 +1450,12 @@ function wireVideoControls(lb: HTMLElement) {
   });
   // On the TV, one seek where the scrubber is let go; keys held on it settle like steps.
   scrub.addEventListener('pointerdown', () => (lbScrubDragged = true));
+  // After the `change` a release fires, if any: a press that moved nothing, or a cancelled one, fires none.
+  scrub.addEventListener('pointerup', () => setTimeout(() => (lbScrubDragged = false)));
+  scrub.addEventListener('pointercancel', () => (lbScrubDragged = false));
   scrub.addEventListener('change', () => {
+    const dragged = lbScrubDragged;
+    lbScrubDragged = false;
     if (!lbTvTrailer()) return;
     const t = Number(scrub.value) * lbTvClock.dur;
     const send = () => {
@@ -1456,9 +1465,8 @@ function wireVideoControls(lb: HTMLElement) {
       lbTvClock = { ...lbTvClock, t, at: performance.now() };
     };
     clearTimeout(lbScrubTimer);
-    if (lbScrubDragged) send();
+    if (dragged) send();
     else lbScrubTimer = setTimeout(send, LB_SETTLE_MEDIA_MS);
-    lbScrubDragged = false;
   });
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
   scrub.addEventListener('mouseup', () => schedHideLbChrome());
@@ -1534,7 +1542,10 @@ function toggleLbPlay() {
     lbHeld = false;
     const at = lbHeldAt;
     // Loading the stream resets the position: set once it's loaded.
-    if (at) lbVideoEl.addEventListener('loadedmetadata', () => (lbVideoEl.currentTime = at), { once: true });
+    if (at) {
+      lbHeldStart = () => (lbVideoEl.currentTime = at);
+      lbVideoEl.addEventListener('loadedmetadata', lbHeldStart, { once: true });
+    }
     playLbTrailer(document.getElementById('screenshot-lightbox')!, shot);
   } else lbVideoEl.play().catch(() => {});
 }
@@ -1880,7 +1891,10 @@ function renderLightbox() {
   lb.classList.remove('lb--tv-playing');
   lbTvClock = { t: 0, dur: 0, at: 0, playing: false };
   lbScrubUntil = 0;
-  lbTvNeedsClick = false;
+  lbScrubTarget = null;
+  clearTimeout(lbScrubTimer); // a keyboard scrub of the item left
+  if (lbHeldStart) lbVideoEl.removeEventListener('loadedmetadata', lbHeldStart);
+  lbHeldStart = null;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
   lbImgToken++;
@@ -1905,6 +1919,7 @@ function renderLightbox() {
     resetLbVc(vc);
     resetLbVcLabels(lb);
     if (lbHeld) {
+      stopHls(vid); // the trailer played here before this step, if any
       lbVideoEl.muted = lbMutedChoice();
       lbVideoEl.currentTime = lbHeldAt; // shown there until played (set again once loaded)
       syncLbMuteBtn(lb);
@@ -2057,6 +2072,7 @@ createRoot(() => {
   });
   createEffect(() => {
     playback();
+    presented();
     const onTv = linked();
     const trailer = lbTvTrailer();
     const lb = document.getElementById('screenshot-lightbox');
