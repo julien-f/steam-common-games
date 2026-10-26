@@ -1253,6 +1253,30 @@ test('C8 edge: the panel says which of its media is on the TV', async ({ page },
   await expect(page.locator('.panel-hero-present')).toHaveText('Present');
 });
 
+test("C8 edge: the keyboard's play/pause key pauses the TV's trailer from anywhere, and resumes it", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true, mediaKeys: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  expect(await shown.evaluate(() => navigator.mediaSession.metadata?.title)).toBe('Hades');
+  type Keys = { mediaKeys: Record<string, (() => void) | null> };
+  const press = (key: string) => shown.evaluate((k) => (window as unknown as Keys).mediaKeys[k]!(), key);
+  await press('pause');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await press('play'); // still the TV's through the pause
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  // Ended: the keys go back to whatever else plays.
+  await tv.evaluate((v: HTMLVideoElement) => v.dispatchEvent(new Event('ended')));
+  await expect.poll(() => shown.evaluate(() => navigator.mediaSession.metadata)).toBeNull();
+  expect(await shown.evaluate(() => (window as unknown as Keys).mediaKeys.play)).toBeNull();
+});
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');

@@ -12,6 +12,8 @@ export interface PresentationHooks {
   refusedSound?: boolean;
   // `window.presTest.hide()`: the window occluded, so throttled that its heartbeats stop coming.
   occludable?: boolean;
+  // `window.mediaKeys`: the Media Session handlers set, to press as the OS keys would.
+  mediaKeys?: boolean;
 }
 
 export async function hookPresentation(page: Page, hooks: PresentationHooks): Promise<void> {
@@ -66,6 +68,13 @@ function install(hooks: PresentationHooks) {
         silent = true;
       },
     };
+  }
+  if (hooks.mediaKeys) {
+    const keys: Record<string, (() => void) | null> = {};
+    (window as unknown as { mediaKeys: typeof keys }).mediaKeys = keys;
+    MediaSession.prototype.setActionHandler = function (action: string, handler: (() => void) | null) {
+      keys[action] = handler;
+    } as MediaSession['setActionHandler'];
   }
   if (hooks.refusedSound) {
     const play = HTMLMediaElement.prototype.play;

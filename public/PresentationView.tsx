@@ -65,9 +65,20 @@ function PresentationView() {
     root.append(ghost);
   }
 
-  function show({ item, startAt, paused }: OnAir) {
+  // The OS media keys reach the TV's trailer: the host's "wait!" from anywhere. Kept through a pause, or
+  // the key couldn't resume it; dropped when it ends or something else is shown.
+  function claimMediaKeys(name?: string, poster?: string) {
+    const session = navigator.mediaSession;
+    if (!session) return;
+    session.metadata = name ? new MediaMetadata({ title: name, artwork: poster ? [{ src: poster }] : [] }) : null;
+    session.setActionHandler('play', name ? () => void video.play().catch(() => {}) : null);
+    session.setActionHandler('pause', name ? () => video.pause() : null);
+  }
+
+  function show({ name, item, startAt, paused }: OnAir) {
     setFailed(false);
     fadeOut();
+    claimMediaKeys(item.type === 'video' ? name : undefined, item.thumb);
     // A late error or load from the previous media is dropped.
     const current = () => onAir()?.item === item;
     const fail = () => current() && (setLoading(false), setFailed(true), reportPlayback());
@@ -196,6 +207,7 @@ function PresentationView() {
     document.addEventListener('keydown', onKey);
     for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange'])
       video.addEventListener(type, reportPlayback);
+    video.addEventListener('ended', () => claimMediaKeys());
     // The chip's progress line: once a second is plenty.
     video.addEventListener('timeupdate', () => {
       if (Date.now() - lastTimeReport < 1000) return;
