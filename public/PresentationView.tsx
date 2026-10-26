@@ -17,6 +17,8 @@ const IDLE_MS = 3000;
 const CAPTION_GAME_MS = 5000;
 const CAPTION_MEDIA_MS = 2000;
 const FADE_MS = 400; // --dur-4
+// Relayed to the main window, whose lightbox steps with them (`key` in presentationProtocol.ts).
+const RELAYED_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'r', 'R']);
 
 function PresentationView() {
   const main = new URLSearchParams(location.search).get('main');
@@ -299,6 +301,11 @@ function PresentationView() {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return; // the browser's
       if (!activatedAt) return activate();
+      if (RELAYED_KEYS.has(e.key)) {
+        e.preventDefault(); // not the page's scroll
+        post({ type: 'key', key: e.key, up: false });
+        return;
+      }
       if (e.key === 'f' || e.key === 'F') toggleFullscreen();
       if (video.hidden) return;
       if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
@@ -311,7 +318,16 @@ function PresentationView() {
       post({ type: 'bye' });
       closing = true;
     };
+    // Its release too: a hidden main window (this one fullscreen over it) settles a held key on it, its timers throttled.
+    const onKeyUp = (e: KeyboardEvent) =>
+      activatedAt &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      RELAYED_KEYS.has(e.key) &&
+      post({ type: 'key', key: e.key, up: true });
     document.addEventListener('keydown', onKey);
+    document.addEventListener('keyup', onKeyUp);
     // Stalled: the spinner (after a moment, by its own CSS delay).
     video.addEventListener('waiting', () => setLoading(true));
     for (const type of ['playing', 'pause', 'emptied']) video.addEventListener(type, () => setLoading(false));
@@ -340,6 +356,7 @@ function PresentationView() {
     onCleanup(() => {
       clearInterval(heartbeat);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keyup', onKeyUp);
       document.removeEventListener('visibilitychange', keepScreenOn);
       document.removeEventListener('visibilitychange', report);
       document.removeEventListener('fullscreenchange', keepScreenOn);

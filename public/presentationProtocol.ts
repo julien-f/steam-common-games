@@ -46,5 +46,7 @@ export type FromPresentationBody =
   | { type: 'hello' }
   | { type: 'state'; onAir: OnAir | null; hidden?: boolean }
   | { type: 'playback'; playback: Playback }
+  // A host steering from the TV (its focus stays there after its first click): the lightbox's stepping keys.
+  | { type: 'key'; key: string; up: boolean }
   | { type: 'bye' };
 export type FromPresentation = { main: string } & FromPresentationBody;

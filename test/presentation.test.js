@@ -332,3 +332,19 @@ test('P after the user closed the window opens a new one, even before its bye is
   p.present(game(20), 's1');
   assert.equal(opened.length, 2);
 });
+
+test("the window's relayed keys reach the one subscriber, down and up", async () => {
+  const remote = await started();
+  const keys = [];
+  const off = p.onRelayedKey((key, up) => keys.push([key, up]));
+  remote.say({ type: 'key', key: 'ArrowRight', up: false });
+  remote.say({ type: 'key', key: 'ArrowRight', up: true });
+  await tick();
+  off();
+  remote.say({ type: 'key', key: 'ArrowLeft', up: false });
+  await tick();
+  assert.deepEqual(keys, [
+    ['ArrowRight', false],
+    ['ArrowRight', true],
+  ]);
+});

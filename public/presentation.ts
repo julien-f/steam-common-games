@@ -28,6 +28,7 @@ let lastHidden = false;
 // never kept in `presented()`: a reload or a retry would replay it.
 let handover: Pick<OnAir, 'startAt' | 'paused'> | undefined;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+let relayedKey: ((key: string, up: boolean) => void) | undefined;
 let byeTimer: ReturnType<typeof setTimeout> | undefined;
 
 function storedId(): string | null {
@@ -83,6 +84,7 @@ function onMessage(e: MessageEvent<FromPresentation>) {
   seen();
   if (msg.type === 'state') lastHidden = !!msg.hidden;
   if (msg.type === 'playback') setPlayback(msg.playback);
+  if (msg.type === 'key') relayedKey?.(msg.key, msg.up);
   const current = presented();
   // A reloaded window asks again; a reloaded main window learns what's shown from the window's state.
   if (msg.type === 'hello') setPlayback(null); // a reloaded window: its report follows
@@ -147,6 +149,14 @@ export function present(game: ReadonlyGame, shotId: string, from?: Pick<OnAir, '
   if (win) return;
   forget();
   announce('Allow pop-ups for this site to present.'); // the browser's own blocked-pop-up icon is visual only
+}
+
+// The stepping keys pressed in the window (one subscriber: the lightbox); returns the unsubscribe.
+export function onRelayedKey(fn: (key: string, up: boolean) => void): () => void {
+  relayedKey = fn;
+  return () => {
+    if (relayedKey === fn) relayedKey = undefined;
+  };
 }
 
 // The host's remote control: the window answers with `playback`.

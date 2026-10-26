@@ -1738,6 +1738,27 @@ test('C8 edge: a handover on the trailer already on the TV moves it there', asyn
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => [v.currentTime, v.paused])).toEqual([42, true]);
 });
 
+test("C8 edge: the TV passes the lightbox's stepping keys on to the main window, its own keys it keeps", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page);
+  await shown.locator('.pres').click(); // the first click; a first key would only activate it too
+  for (const key of ['ArrowRight', 'ArrowUp', 'Home', 'r', 'f', 'Control+ArrowLeft']) await shown.keyboard.press(key);
+  const relayed = () =>
+    shown.evaluate(() =>
+      (window as unknown as { presTest: PresTest }).presTest.heard
+        .filter((m) => m.type === 'key')
+        .map((m) => `${m.key}${m.up ? '↑' : '↓'}`),
+    );
+  await expect
+    .poll(relayed)
+    .toEqual(['ArrowRight↓', 'ArrowRight↑', 'ArrowUp↓', 'ArrowUp↑', 'Home↓', 'Home↑', 'r↓', 'r↑']);
+});
+
 test("C8 edge: a screenshot whose thumbnail is broken but picture loads isn't called broken", async ({
   page,
 }, testInfo) => {
