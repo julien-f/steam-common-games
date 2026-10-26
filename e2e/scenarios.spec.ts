@@ -1075,7 +1075,7 @@ async function startPresenting(page: Page) {
   return popup;
 }
 
-test('C8.1-4,6-7: the presentation window shows only what is presented, stays fullscreen, and stops from the nav', async ({
+test('C8.1-4,7-8: the presentation window shows only what is presented, stays fullscreen, and stops from the nav', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
@@ -1093,7 +1093,7 @@ test('C8.1-4,6-7: the presentation window shows only what is presented, stays fu
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
   await expect(shown.locator('.pres-caption')).toHaveText('Hades');
 
-  await page.getByRole('button', { name: 'Present (P)' }).click();
+  await page.getByRole('button', { name: 'Present on second screen' }).click();
   await expect(shown.locator('.pres-caption')).toHaveText('Portal 2');
   await expect(chip).toContainText('Portal 2');
   expect(await shown.evaluate(() => !!document.fullscreenElement)).toBe(true);
@@ -1111,11 +1111,14 @@ test('C8 edge: a desktop window narrowed while presenting keeps Present and the 
   await page.setViewportSize({ width: 700, height: 800 });
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
-  await expect(page.getByRole('button', { name: 'Present (P)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Present on second screen' })).toBeVisible();
   const shown = await startPresenting(page);
   await page.keyboard.press('Escape'); // this narrow, the panel covers the nav, as everywhere in the app
   const chip = page.getByRole('banner').locator('.present-chip');
   await expect(chip).toBeVisible();
+  // Compact: the item and the picture go first, Stop always stays.
+  await expect(chip.locator('.present-chip-item')).toBeHidden();
+  await expect(chip.locator('.present-chip-thumb')).toBeHidden();
   const closed = shown.waitForEvent('close');
   await chip.getByRole('button', { name: 'Stop presenting' }).click();
   await closed;
@@ -1155,6 +1158,101 @@ test('C8 edge: a blocked pop-up is announced', async ({ page }, testInfo) => {
   await expect(page.getByRole('banner').locator('.present-chip')).toHaveCount(0);
 });
 
+test('C8.5: the nav chip plays, pauses, mutes and replays the TV, and shows how it goes', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true, neverActivated: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  const chip = page.getByRole('group', { name: /^Presenting Hades, Trailer 1 of 1/ });
+  await expect(chip).toContainText('Trailer 1 / 1');
+  await expect(chip.locator('.present-chip-thumb')).toBeVisible();
+  const status = page.locator('[role="status"]', { hasText: 'Presenting Hades, Trailer 1 of 1' });
+  await expect(status).toBeAttached();
+
+  await chip.getByRole('button', { name: 'Pause the TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await chip.getByRole('button', { name: 'Play on the TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+
+  await chip.getByRole('button', { name: 'Mute the TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  // Unmuted before a click there, Chrome would pause it: the TV waits, and the chip says why.
+  await chip.getByRole('button', { name: 'Unmute the TV' }).click();
+  await expect(chip.getByRole('button', { name: 'Click the TV for sound' })).toBeVisible();
+  expect(await tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  await shown.locator('.pres').click();
+  await expect(chip.getByRole('button', { name: 'Mute the TV' })).toBeVisible();
+
+  // Ended (pause, then ended, as browsers do): replay from the chip.
+  await tv.evaluate(async (v: HTMLVideoElement) => {
+    v.pause();
+    await new Promise((resolve) => setTimeout(resolve));
+    Object.defineProperty(v, 'ended', { configurable: true, get: () => true });
+    v.dispatchEvent(new Event('ended'));
+  });
+  await chip.getByRole('button', { name: 'Replay on the TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime === 0 && !v.paused)).toBe(true);
+});
+
+test('C8 edge: Space and M on the focused chip pause and mute the TV, without scrolling the page', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360');
+  await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  const chip = page.getByRole('group', { name: /^Presenting Hades/ });
+  await chip.focus();
+  const scroll = () => page.evaluate(() => [scrollY, document.querySelector('.app-scroll')?.scrollTop ?? 0]);
+  const before = await scroll();
+  await page.keyboard.press(' ');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  expect(await scroll()).toEqual(before);
+  await page.keyboard.press('m');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+});
+
+test('C8 edge: a picture the TV failed to load shows on the chip, which retries it', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['slow-media'] }); // media from /api/mock-media, so one can fail
+  let broken = true;
+  await page
+    .context()
+    .route('**/api/mock-media/**?full', (route) => (broken ? route.fulfill({ status: 500 }) : route.fallback()));
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
+  const shown = await startPresenting(page);
+  const chip = page.getByRole('group', { name: /^Presenting Hades/ });
+  await expect(chip.getByRole('img', { name: "Couldn't load on the TV" })).toBeVisible();
+  broken = false;
+  await chip.getByRole('button', { name: 'Retry' }).click();
+  await expect(shown.getByRole('alert')).toHaveCount(0);
+  await expect(chip.locator('.present-chip-thumb')).toBeVisible();
+});
+
+test('C8 edge: the panel says which of its media is on the TV', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await startPresenting(page);
+  const onScreen = page.getByRole('button', { name: 'On screen' });
+  await expect(onScreen).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.panel-hero-present')).toHaveText('On screen');
+  await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click(); // another item, not presented
+  await expect(page.getByRole('button', { name: 'Present on second screen' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.panel-hero-present')).toHaveText('Present');
+});
+
 test("C8 edge: Ctrl+P is the browser's print, not P", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await page.goto('/game/1145360');
@@ -1178,7 +1276,7 @@ test('C8 edge: closing the presentation window drops the nav chip', async ({ pag
   await expect(chip).toBeHidden(); // the 2 s bye grace, within expect's 5 s; heartbeats alone take 20 s
 });
 
-test('C8.5: while presenting, opening a media from the panel presents it instead of the lightbox', async ({
+test('C8.6: while presenting, opening a media from the panel presents it instead of the lightbox', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');

@@ -5,7 +5,7 @@ import { render } from 'solid-js/web';
 import { playHls, stopHls } from './hlsPlayer.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
-import type { FromPresentationBody, OnAir, ToPresentation } from './presentationProtocol.ts';
+import type { Control, FromPresentationBody, OnAir, ToPresentation } from './presentationProtocol.ts';
 
 const IDLE_MS = 3000;
 
@@ -30,6 +30,23 @@ function PresentationView() {
     !closing && post({ type: 'state', onAir: onAir(), hidden: document.visibilityState === 'hidden' });
   // The main window said it's going: closed unless it says `main` again (a reload) within this.
   let mainGone: ReturnType<typeof setTimeout> | undefined;
+  // The host's unmute this window refused: no click here yet (see `Playback.needsClick`).
+  let needsClick = false;
+  let lastTimeReport = 0;
+  const reportPlayback = () =>
+    !closing &&
+    post({
+      type: 'playback',
+      playback: {
+        paused: video.paused,
+        muted: video.muted,
+        t: video.currentTime,
+        dur: video.duration || 0,
+        ended: video.ended,
+        failed: failed(),
+        needsClick,
+      },
+    });
 
   function wake() {
     setAwake(true);
@@ -53,7 +70,7 @@ function PresentationView() {
     fadeOut();
     // A late error or load from the previous media is dropped.
     const current = () => onAir()?.item === item;
-    const fail = () => current() && (setLoading(false), setFailed(true));
+    const fail = () => current() && (setLoading(false), setFailed(true), reportPlayback());
     if (item.type === 'video') {
       img.hidden = true;
       video.hidden = false;
@@ -79,12 +96,34 @@ function PresentationView() {
       full.onerror = fail;
       full.src = item.main!;
     }
+    reportPlayback();
+  }
+
+  function obey(c: Control) {
+    if (c === 'retry') return show(onAir()!);
+    if (video.hidden) return;
+    if (c === 'play') video.play().catch(() => {});
+    if (c === 'pause') video.pause();
+    if (c === 'replay') {
+      video.currentTime = 0;
+      video.play().catch(() => {});
+    }
+    if (c === 'mute') video.muted = true;
+    // Unmuted before a click here, Chrome would pause it: it waits for that click instead.
+    if (c === 'unmute') {
+      if (activatedAt || navigator.userActivation?.hasBeenActive) {
+        video.muted = false;
+        setSilenced(false);
+      } else needsClick = true;
+    }
+    reportPlayback();
   }
 
   function receive(e: MessageEvent<ToPresentation>) {
     const msg = e.data;
     if (msg?.main !== main) return;
     if (msg.type === 'close') window.close();
+    if (msg.type === 'control') obey(msg.control);
     if (msg.type === 'bye') mainGone = setTimeout(() => window.close(), 3000);
     // The main window is back from a reload: tell it at once, before it opens a second window.
     if (msg.type === 'main') {
@@ -116,6 +155,7 @@ function PresentationView() {
   function activate() {
     video.muted = false;
     setSilenced(false);
+    needsClick = false;
     if (!activatedAt) {
       activatedAt = Date.now();
       if (!document.fullscreenElement) toggleFullscreen();
@@ -154,6 +194,14 @@ function PresentationView() {
       closing = true;
     };
     document.addEventListener('keydown', onKey);
+    for (const type of ['play', 'pause', 'ended', 'volumechange', 'durationchange'])
+      video.addEventListener(type, reportPlayback);
+    // The chip's progress line: once a second is plenty.
+    video.addEventListener('timeupdate', () => {
+      if (Date.now() - lastTimeReport < 1000) return;
+      lastTimeReport = Date.now();
+      reportPlayback();
+    });
     document.addEventListener('visibilitychange', keepScreenOn);
     document.addEventListener('visibilitychange', report); // hidden: main allows for throttled beats
     addEventListener('pagehide', bye);

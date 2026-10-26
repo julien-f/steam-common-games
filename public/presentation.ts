@@ -1,10 +1,10 @@
 // The main window's side of the presentation window (PresentationView.tsx): opens it and sends it what to
 // show, over a BroadcastChannel tagged with this window's id (docs/dev/frontend.md#the-presentation-window).
 import { createSignal } from 'solid-js';
-import { buildMediaItems } from './mediaItems.ts';
+import { buildMediaItems, mediaLabel } from './mediaItems.ts';
 import type { ReadonlyGame } from './types.ts';
 import { PRESENTATION_CHANNEL, HEARTBEAT_MS } from './presentationProtocol.ts';
-import type { FromPresentation, OnAir, ToPresentation } from './presentationProtocol.ts';
+import type { Control, FromPresentation, OnAir, Playback, ToPresentation } from './presentationProtocol.ts';
 import { announce } from './announce.ts';
 
 const MISSED_BEATS = 3;
@@ -14,7 +14,9 @@ const ID_KEY = 'playshelf-presentation-main';
 
 // What the presentation window shows; null while not presenting.
 const [presented, setPresented] = createSignal<OnAir | null>(null);
-export { presented };
+// How the presented trailer (or picture) is doing, as the window last reported; null until it does.
+const [playback, setPlayback] = createSignal<Playback | null>(null);
+export { presented, playback };
 
 let mainId: string | null = null;
 let channel: BroadcastChannel | null = null;
@@ -41,16 +43,23 @@ function post(msg: ToPresentation) {
 function seen() {
   lastSeen = Date.now();
   heartbeatTimer ??= setInterval(() => {
-    if (win) return void (win.closed && forget());
+    if (win) return void (win.closed && lost());
     const silence = lastHidden ? HIDDEN_SILENCE_MS : HEARTBEAT_MS * MISSED_BEATS;
     // Judged only while this window is visible: a hidden tab's own timers are throttled and would misjudge.
-    if (document.visibilityState === 'visible' && Date.now() - lastSeen > silence) forget();
+    if (document.visibilityState === 'visible' && Date.now() - lastSeen > silence) lost();
   }, HEARTBEAT_MS);
+}
+
+// The window went without being stopped from here: the nav chip goes too, which only sight tells.
+function lost() {
+  forget();
+  announce('Presentation window closed');
 }
 
 function forget() {
   clearTimeout(byeTimer);
   setPresented(null);
+  setPlayback(null);
   clearInterval(heartbeatTimer);
   heartbeatTimer = undefined;
 }
@@ -61,11 +70,12 @@ function onMessage(e: MessageEvent<FromPresentation>) {
   // A reload also says bye, then hello: only a bye that stays one forgets the window.
   clearTimeout(byeTimer);
   if (msg.type === 'bye') {
-    byeTimer = setTimeout(forget, 2000);
+    byeTimer = setTimeout(lost, 2000);
     return;
   }
   seen();
   if (msg.type === 'state') lastHidden = !!msg.hidden;
+  if (msg.type === 'playback') setPlayback(msg.playback);
   const current = presented();
   // A reloaded window asks again; a reloaded main window learns what's shown from the window's state.
   if (msg.type === 'hello' && current) post({ main: mainId, type: 'onAir', onAir: current });
@@ -92,10 +102,15 @@ addEventListener('pageshow', (e) => e.persisted && mainId && post({ main: mainId
 // Shows one media of `game` in the presentation window, opening it first if needed (it then asks for
 // the media on hello). A plain object: store rows are proxies, which postMessage can't clone.
 export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAir, 'startAt' | 'paused'>): void {
-  const item = buildMediaItems(game.appid, game.details?.meta).find((s) => s.shotId === shotId);
-  if (!item) return;
+  const items = buildMediaItems(game.appid, game.details?.meta);
+  const i = items.findIndex((s) => s.shotId === shotId);
+  if (i < 0) return;
   const wasPresenting = presented() != null;
-  const onAir = { appid: game.appid, name: game.name || `App ${game.appid}`, item, ...handover };
+  const spoken = mediaLabel(items, i);
+  const name = game.name || `App ${game.appid}`;
+  const onAir = { appid: game.appid, name, item: items[i], label: spoken.replace(' of ', ' / '), spoken, ...handover };
+  if (presented()?.item.shotId !== shotId || presented()?.appid !== game.appid) setPlayback(null);
+  announce(`Presenting ${name}, ${spoken}`);
   setPresented(onAir);
   seen();
   // An open window main forgot (missed beats) is sent to, not reopened: that would reload it out of fullscreen.
@@ -113,6 +128,11 @@ export function present(game: ReadonlyGame, shotId: string, handover?: Pick<OnAi
   if (win) return;
   forget();
   announce('Allow pop-ups for this site to present.'); // the browser's own blocked-pop-up icon is visual only
+}
+
+// The host's remote control: the window answers with `playback`.
+export function control(c: Control): void {
+  if (mainId && presented()) post({ main: mainId, type: 'control', control: c });
 }
 
 // A new id for the next window: the closing one's last bye and heartbeat then go unheard.

@@ -687,6 +687,12 @@ export function panelStepHero(dir: number, { wrap = false } = {}) {
   return true;
 }
 
+// Whether `shotId` of the open game is what the presentation window shows.
+function onScreen(shotId: string | undefined): boolean {
+  const on = presented();
+  return !!on && on.appid === panelGame()?.appid && on.item.shotId === shotId;
+}
+
 // P and the Present button: the hero's current media goes to the presentation window.
 export function presentHero(): void {
   const g = panelGame();
@@ -1923,8 +1929,14 @@ function HeroMain(props: { items: MediaItem[]; idx: number }): JSX.Element {
         aria-label={presented() ? 'Present this media' : 'Open in lightbox'}
         onClick={openCurrent}
       >
+        {/* Said on the picture, not only in its label: a click presents it, or it's what the TV shows. */}
         <Show when={presented()}>
-          <Cast class="panel-hero-present" aria-hidden="true" />
+          <span class="panel-hero-present lb-glass" aria-hidden="true">
+            <Show when={onScreen(current().shotId)} fallback={<Cast />}>
+              <span class="panel-hero-present-dot" />
+            </Show>
+            {onScreen(current().shotId) ? 'On screen' : 'Present'}
+          </span>
         </Show>
         <img
           class={`panel-hero-img${loading() ? ' loading' : ''}${brokenSrc() === src() ? ' panel-hero-img--broken' : ''}${isShot() ? ' panel-hero-img--shot' : ''}`}
@@ -2362,13 +2374,21 @@ function MoreLinks(props: { game: ReadonlyGame }): JSX.Element {
 }
 
 // Presents the hero's media (presentation.ts), opening the presentation window first if needed.
+// Pressed, in the accent, while the hero's media is what's on the second screen.
 function PresentButton(): JSX.Element {
+  const heroOnScreen = () => {
+    const items = getPanelItems();
+    return onScreen(items[clampedHeroIdx(items.length)]?.shotId);
+  };
   return (
     <button
       type="button"
       class="panel-icon-link panel-present-btn"
-      title="Present (P)"
-      aria-label="Present (P)"
+      classList={{ 'panel-present-btn--on': heroOnScreen() }}
+      title={heroOnScreen() ? 'On screen' : 'Present on second screen (P)'}
+      aria-label={heroOnScreen() ? 'On screen' : 'Present on second screen'}
+      aria-pressed={heroOnScreen()}
+      aria-keyshortcuts="P"
       onClick={presentHero}
     >
       <Cast />
