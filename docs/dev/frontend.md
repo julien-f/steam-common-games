@@ -27,6 +27,7 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 | `/lists/shared`           | Someone else's dynamic list formula, named by `?f=`                     |
 | `/lists/bundle/:bundleId` | One bundle's games                                                      |
 | `/lists/developer?name=`  | A developer's games on Steam (`/lists/publisher?name=`: a publisher's)  |
+| `/lists/game-pass`        | The Steam games in the region's PC Game Pass catalog                    |
 | `/lists/:listId`          | A user list (manual, dynamic or ranked)                                 |
 | `/lists/:listId/rank`     | A ranked list's one-vs-one compare screen                               |
 | `/bundles`                | Browse/discover bundles — a table of bundles, not of games              |
@@ -43,7 +44,7 @@ The data model it renders — accounts, lists, combines, the localStorage schema
 
 ```
 formula ::= op ":(" source (";" source)* ")"
-source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" name | "r" | "g:" formula
+source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" name | "r" | "x" | "g:" formula
 ```
 
 - `:;(),` are legal unencoded in a query, so a formula reads as plain text; each leaf (`accountId`, `bundleId`, a developer's or publisher's `name`) is `encodeURIComponent`'d plus `(`/`)`, and `shareListUrl` escapes those `%` once more, since the route reads `f` through `URLSearchParams` (one decode). A `?u=` carried along (`withAccountParam`) re-encodes the whole value, so that link isn't readable.
@@ -100,6 +101,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `playerProfile.ts` — how an account plays beyond its tags: play style (`playStyle`), story games played to length (`storyGames`) and the archetype titling them (`archetypeOf`), from rows and an hours accessor so a comparison's players reuse it.
 - `tasteCache.ts` — each account's stored Taste, bounded, and the room a full storage makes by evicting them (`setItemMakingRoom`, which `prefs.ts` writes through).
 - `creatorData.ts` — a developer's/publisher's games (`/api/creator-games`), the list's title and path.
+- `gamePassData.ts` — the Steam games in PC Game Pass (`/api/game-pass`), the list's title and path, and an Xbox store link for the ones not on Steam.
 - `bundleData.ts` / `bundleRows.ts` / `bundleBrowseStore.ts` — bundle fetch/flatten/resolve; the flat row shape `/bundles` sorts over; the last-browsed list `/lists/bundle/:bundleId`'s ‹/› nav steps through.
 - `fanaticalPicks.ts` — Buy on Fanatical: the purchase link carrying the picks, and the bookmarklet that adds them there.
 - `authStore.ts` / `syncedPrefKeys.ts` — Steam sign-in status and the prefs merge with the server on sign-in (`syncPrefsWithServer`); the pref keys a signed-in account syncs (the server keeps its own copy, checked equal by a test).
@@ -241,7 +243,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **View persistence.** A table's view (visible columns, sort, grouping, filters) auto-persists locally as it changes:
 
-- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView` — the bundle, compare, shared and creator ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list; `tableViewPrefs.ts`'s helpers take either as a `ViewStore` (a load/save pair; `prefViewStore(key)` for a pref key).
+- One `prefs.ts` key per system kind (`ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `gamePassListView` — the bundle, compare, shared and creator ones shared across instances — plus `bundlesBrowseView` for `/bundles`; listed in `tableViewKeys.ts`). A user list stores its own `tableView` on the list; `tableViewPrefs.ts`'s helpers take either as a `ViewStore` (a load/save pair; `prefViewStore(key)` for a pref key).
 - It's applied _after_ `table.setViewState({ sorts: DEFAULT_SORT })`, so a stored view overrides the default sort and a first visit gets the default.
 - It's **not** written to the URL as it changes — a URL left in the address bar would go stale on the next table change. "Share view" snapshots it into `?tv=` on a copied link only (one param name; one table per route), never calling `history.replaceState`.
   - On Owned/Wishlist it also adds `u=` for the effective account unless the URL has one; other kinds don't, since `u=` there would only swap the recipient's ownership markers.

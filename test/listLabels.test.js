@@ -86,6 +86,10 @@ test('describeListRef: recent-games points at the Recently Looked Up route', () 
   });
 });
 
+test('describeListRef: game-pass points at the PC Game Pass route', () => {
+  assert.deepEqual(describeListRef({ kind: 'game-pass' }, NAMING), { label: 'PC Game Pass', href: '/lists/game-pass' });
+});
+
 test('describeListRef: a user-list source takes its own name and address', () => {
   assert.deepEqual(describeListRef({ kind: 'user', listId: 'l1' }, NAMING), {
     label: 'Co-op night',

@@ -303,6 +303,16 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   5. check it's not in their Family's library
 - **Done when**: prices are in _my_ region, not theirs, and say so; switching back to my account is one click.
 
+### B5 What can I play with PC Game Pass?
+
+- **Who / goal**: a PC Game Pass subscriber wants to know which games on their wishlist they can play without buying them.
+- **Steps**:
+  1. Home → **PC Game Pass**
+  2. check the catalog's region and the games not on Steam
+  3. Home's combine form: my Wishlist ∩ PC Game Pass, then save
+- **Done when**: rows are the Steam games in my region's catalog; the ones not on Steam are named below the table; the list says Game Pass plays them through the Xbox app; Updated re-fetches the catalog.
+- **Edges**: no `ITAD_API_KEY` (says why); the catalog down (says so, Updated retries); a region change reloads the catalog; playing together when one friend owns it on Steam and another has it through Game Pass ◇ (the app doesn't know which games cross-play).
+
 ## Finding a game
 
 ### F1 Look up one game

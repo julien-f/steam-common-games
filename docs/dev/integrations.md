@@ -222,8 +222,8 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
    - **Varies by market** (checked 2026-10-26: US 516 ids; FR identical; DE and BR 2 fewer; JP 24 fewer and 4 of its own), so it follows the app's region and is cached per market (`gamepass:pc:<country>`).
    - An empty or unparseable catalog is an upstream error, never cached as an empty Game Pass.
 2. **Product ids → ITAD gids**: `POST /lookup/id/shop/{shopId}/v1`, the Microsoft Store shop looked up by title (`getShopId('Microsoft Store')`, `lookupShopGids`). The reply also keys ids lowercased (seen live), so they're matched case-insensitively. Several product ids (editions) map to one gid: each game counts once. Cached with the catalog.
-3. **Gids → Steam appids**: `resolveSteamAppIds`, as for [bundles](#resolving-bundle-games-to-steam). Checked 2026-10-26 on US: 516 ids → 377 gids → 344 on Steam.
+3. **Gids → Steam appids**: `resolveSteamAppIds`, as for [bundles](#resolving-bundle-games-to-steam). Checked 2026-10-26 on US: 516 ids → 511 gids → 467 on Steam (482 appids: a Steam package expands to its games), 47 ids not on Steam.
 4. **Names of the games not on Steam** (no gid, or a gid with no Steam listing): `GET https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=<ids>&market=<country>&languages=en-us&fieldsTemplate=browse` — Microsoft's product catalog, undocumented, key-less: untrusted tier. 100 ids per call; `browse` is the smallest template carrying `ProductTitle` (~13 KB per product). Cached per product (`msstore-title:`); a failure logs `[gamepass]` and degrades to the bare id.
 
-- **Volume**: one catalog call and one ITAD lookup per market per `BUNDLES_CACHE_TTL_MINUTES`, plus titles for newly seen non-Steam products (about 2 calls on a cold US cache).
+- **Volume**: one catalog call and one ITAD lookup per market per `BUNDLES_CACHE_TTL_MINUTES`, plus titles for newly seen non-Steam products (1 call on a cold US cache).
 - **Failure**: a gid whose Steam lookup errored is counted in `failed` (uncached, retried next time), not reported as not on Steam.

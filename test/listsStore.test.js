@@ -454,6 +454,7 @@ test('listHasPriceSource: a wishlist or bundle source, at any depth, has prices'
   const manual = createList({ name: 'M', kind: 'manual', appids: [1] });
   const creator = createList({ kind: 'ranked', source: { kind: 'publisher', name: 'P' } });
   assert.equal(listHasPriceSource(creator), true);
+  assert.equal(listHasPriceSource(createList({ kind: 'ranked', source: { kind: 'game-pass' } })), true);
   assert.equal(listHasPriceSource(wish), true);
   assert.equal(listHasPriceSource(ranked), true);
   assert.equal(listHasPriceSource(bundle), true);
@@ -473,6 +474,8 @@ test('listHasRefreshableSource: an account library or wishlist or a store search
   assert.equal(listHasRefreshableSource(manual, getList), false);
   const creator = createList({ kind: 'ranked', source: { kind: 'developer', name: 'D' } });
   assert.equal(listHasRefreshableSource(creator, getList), true);
+  const gamePass = createList({ kind: 'ranked', source: { kind: 'game-pass' } });
+  assert.equal(listHasRefreshableSource(gamePass, getList), true);
   // A shared formula's inlined groups aren't stored: they're found through the caller's lookup.
   const synthetic = { id: 'g1', kind: 'dynamic', op: 'union', sources: [{ kind: 'account-wishlist', accountId: 'a' }] };
   const shared = { id: '', kind: 'dynamic', op: 'union', sources: [{ kind: 'user', listId: 'g1' }] };
@@ -481,6 +484,19 @@ test('listHasRefreshableSource: an account library or wishlist or a store search
     listHasRefreshableSource(shared, (id) => (id === 'g1' ? synthetic : undefined)),
     true,
   );
+});
+
+test('listHasGamePassSource: PC Game Pass at any depth', () => {
+  const { createList, getList, listHasGamePassSource } = store();
+  const gamePass = createList({
+    kind: 'dynamic',
+    op: 'intersect',
+    sources: [{ kind: 'game-pass' }, { kind: 'recent-games' }],
+  });
+  const ranked = createList({ kind: 'ranked', source: { kind: 'user', listId: gamePass.id } });
+  const recent = createList({ kind: 'ranked', source: { kind: 'recent-games' } });
+  assert.equal(listHasGamePassSource(ranked, getList), true);
+  assert.equal(listHasGamePassSource(recent, getList), false);
 });
 
 test('rankingsOf: the ranked lists ordering the same source', () => {

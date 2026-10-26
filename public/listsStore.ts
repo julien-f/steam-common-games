@@ -127,9 +127,13 @@ function listReaches(
 
 const isCreatorRef = (ref: ListRef): boolean => ref.kind === 'developer' || ref.kind === 'publisher';
 
-// Whether a list is built, at any depth, from a source that has prices (a wishlist, a bundle, a store search); `get` as listHasRefreshableSource's.
+// Whether a list is built, at any depth, from a source that has prices (a wishlist, a bundle, a store search, Game Pass); `get` as listHasRefreshableSource's.
 export function listHasPriceSource(list: GameList, get: (id: string) => GameList | undefined = getList): boolean {
-  return listReaches(list, (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle' || isCreatorRef(ref), get);
+  return listReaches(
+    list,
+    (ref) => ref.kind === 'account-wishlist' || ref.kind === 'bundle' || isCreatorRef(ref) || ref.kind === 'game-pass',
+    get,
+  );
 }
 
 // Whether a list is built, at any depth, from a bundle; `get` as listHasRefreshableSource's.
@@ -137,11 +141,17 @@ export function listHasBundleSource(list: GameList, get: (id: string) => GameLis
   return listReaches(list, (ref) => ref.kind === 'bundle', get);
 }
 
-// Whether a list is built, at any depth, from a fetch with an age and a forced refresh (an account, a store search); `get` finds its lists, a shared formula's inlined groups included.
+// Whether a list is built, at any depth, from PC Game Pass, whose catalog depends on the region; `get` as listHasRefreshableSource's.
+export function listHasGamePassSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
+  return listReaches(list, (ref) => ref.kind === 'game-pass', get);
+}
+
+// Whether a list is built, at any depth, from a fetch with an age and a forced refresh (an account, a store search, Game Pass); `get` finds its lists, a shared formula's inlined groups included.
 export function listHasRefreshableSource(list: GameList, get: (id: string) => GameList | undefined): boolean {
   return listReaches(
     list,
-    (ref) => ref.kind === 'account-owned' || ref.kind === 'account-wishlist' || isCreatorRef(ref),
+    (ref) =>
+      ref.kind === 'account-owned' || ref.kind === 'account-wishlist' || isCreatorRef(ref) || ref.kind === 'game-pass',
     get,
   );
 }

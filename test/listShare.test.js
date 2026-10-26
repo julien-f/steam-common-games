@@ -19,6 +19,15 @@ function makeGetList(lists) {
 
 // ── encodeListFormula: leaf sources ─────────────────────────────────────────────────────────
 
+test('encodeListFormula/decodeListFormula: game-pass round-trips as `x`', () => {
+  const result = encodeListFormula(
+    { op: 'intersect', sources: [{ kind: 'game-pass' }, { kind: 'recent-games' }] },
+    makeGetList([]),
+  );
+  assert.equal(result.formula, 'intersect:(x;r)');
+  assert.deepEqual(decodeListFormula(result.formula).sources, [{ kind: 'game-pass' }, { kind: 'recent-games' }]);
+});
+
 test('encodeListFormula: encodes owned/wishlist/bundle/recent-games sources', () => {
   const list = {
     op: 'union',

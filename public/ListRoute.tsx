@@ -102,6 +102,7 @@ import {
   SOURCE_NAMES,
 } from './gameColumns.ts';
 import {
+  ApiError,
   computeSteamdbRating,
   computeProductionTier,
   fetchJson,
@@ -267,6 +268,7 @@ import {
   listHasPriceSource,
   listHasRefreshableSource,
   listHasBundleSource,
+  listHasGamePassSource,
   rankingsOf,
   isCombineOp,
   listDeps,
@@ -283,6 +285,7 @@ import { CombineForm, sourceOptions, refKey, type SourceOption } from './Combine
 import type { MembershipGroup } from './combine.ts';
 import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
 import { creatorTitle, fetchCreatorGames, steamSearchUrl, type CreatorRole } from './creatorData.ts';
+import { fetchGamePass, GAME_PASS_PATH, GAME_PASS_TITLE, xboxStoreUrl, type GamePassData } from './gamePassData.ts';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import Check from 'lucide-solid/icons/check';
 import ChevronDown from 'lucide-solid/icons/chevron-down';
@@ -295,7 +298,7 @@ import Plus from 'lucide-solid/icons/plus';
 import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import Trophy from 'lucide-solid/icons/trophy';
 
-type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared' | 'creator';
+type ListKind = 'owned' | 'wishlist' | 'bundle' | 'recent' | 'user' | 'compare' | 'shared' | 'creator' | 'game-pass';
 
 // /game (bare) and /game/:appid both live here, kind 'recent' either way — see this file's own
 // header comment and AppRoot.tsx.
@@ -305,6 +308,7 @@ function kindFromPath(pathname: string, params: { bundleId?: string; listId?: st
   if (pathname === '/lists/compare') return 'compare';
   if (pathname === '/lists/shared') return 'shared';
   if (pathname === '/lists/developer' || pathname === '/lists/publisher') return 'creator';
+  if (pathname === GAME_PASS_PATH) return 'game-pass';
   if (params.bundleId) return 'bundle';
   if (pathname === '/game' || pathname.startsWith('/game/')) return 'recent';
   return 'user';
@@ -868,6 +872,17 @@ export default function ListRoute() {
   // so a 13-game bundle could render as a 3-row table with nothing saying where the rest went.
   const [unresolvedGames, setUnresolvedGames] = createSignal<FlatGame[]>([]);
   const [unresolvedOpen, setUnresolvedOpen] = createSignal(false);
+  // The "not on Steam" list under the table: a bundle's, or PC Game Pass's (titled when Microsoft's catalog answered).
+  const offSteamGames = (): { title: string; href: string; type?: string | null }[] =>
+    kind === 'game-pass'
+      ? (gamePass()?.notOnSteam ?? []).map((g) => ({ title: g.title ?? g.id, href: xboxStoreUrl(g.id) }))
+      : kind === 'bundle'
+        ? unresolvedGames().map((g) => ({
+            title: g.title,
+            href: `https://isthereanydeal.com/game/${g.slug}/info/`,
+            type: g.type,
+          }))
+        : [];
   // How many of the bundle's games made it into the table. `total` (the plain counter updateStatus
   // reads) is the same number, but it isn't reactive — the hero card's Games tile needs a signal.
   const [bundleResolvedCount, setBundleResolvedCount] = createSignal(0);
@@ -1003,6 +1018,7 @@ export default function ListRoute() {
       return account ? { kind: kind === 'owned' ? 'account-owned' : 'account-wishlist', accountId: account.id } : null;
     }
     if (kind === 'bundle') return params.bundleId ? { kind: 'bundle', bundleId: params.bundleId } : null;
+    if (kind === 'game-pass') return { kind: 'game-pass' };
     const list = userList();
     return list && list.kind !== 'ranked' ? { kind: 'user', listId: list.id } : null;
   }
@@ -1195,6 +1211,8 @@ export default function ListRoute() {
   const creatorRole = (): CreatorRole => (routerLocation.pathname === '/lists/publisher' ? 'publisher' : 'developer');
   const creatorName = createMemo(() => (new URLSearchParams(routerLocation.search).get('name') ?? '').trim());
   const [creatorResult, setCreatorResult] = createSignal<{ total: number; capped: boolean } | null>(null);
+  // kind === 'game-pass': the last catalog read, for its note, its games not on Steam and its failures.
+  const [gamePass, setGamePass] = createSignal<GamePassData | null>(null);
   const sharedGetList = (id: string): GameList | undefined => sharedSynthetic().get(id) ?? getList(id);
   function sharedFetchers(base: ListResolveFetchers): ListResolveFetchers {
     return { ...base, getList: sharedGetList };
@@ -1955,7 +1973,8 @@ export default function ListRoute() {
     kind === 'user' ||
     kind === 'compare' ||
     kind === 'shared' ||
-    kind === 'creator';
+    kind === 'creator' ||
+    kind === 'game-pass';
 
   // Re-stamps when a row appears after the load (openOrAddRecentGame), the sets land, or the account changes.
   createEffect(
@@ -1978,6 +1997,7 @@ export default function ListRoute() {
     if (kind === 'bundle') return 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     if (kind === 'creator') return 'creatorListView';
+    if (kind === 'game-pass') return 'gamePassListView';
     return 'ownedListView';
   }
   // Owned/Wishlist's saved view (listViews.ts) in `?view=`, for whichever account is current.
@@ -2066,7 +2086,12 @@ export default function ListRoute() {
   // Wishlist prices, by appid: the Wishlist itself, and a saved or shared list built from one, a bundle or a developer/publisher.
   function hasPrices(): boolean {
     const defined = definedList();
-    return kind === 'wishlist' || kind === 'creator' || (!!defined && listHasPriceSource(defined.list, defined.get));
+    return (
+      kind === 'wishlist' ||
+      kind === 'creator' ||
+      kind === 'game-pass' ||
+      (!!defined && listHasPriceSource(defined.list, defined.get))
+    );
   }
   // Mid-load, from the definition alone: a region change then must still reload the Tier Price.
   function showsTierPrice(): boolean {
@@ -2078,6 +2103,11 @@ export default function ListRoute() {
       defined.list.kind !== 'ranked' &&
       listHasBundleSource(defined.list, defined.get)
     );
+  }
+  // The PC Game Pass catalog differs per region, so a list built from it reloads on a region change.
+  function showsGamePass(): boolean {
+    const defined = definedList();
+    return kind === 'game-pass' || (!!defined && listHasGamePassSource(defined.list, defined.get));
   }
   // A /lists/<id> link only opens here; a dynamic list's 🔗 Share list replaces Share view outright.
   function isDynamicList(): boolean {
@@ -2193,6 +2223,7 @@ export default function ListRoute() {
       setHeroAccount(null);
     }
     bundleLeftOut = new Map();
+    gamePassLeftOut = undefined;
     creatorCapped = new Map();
     // Every kind that has one re-reports it during this load; a kind that doesn't (manual list,
     // recents) must not keep showing the previous list's. A refresh keeps both until replaced, so
@@ -2375,6 +2406,7 @@ export default function ListRoute() {
           refresh,
           onFetchedAt,
           onBundleLeftOut: noteLeftOut,
+          onGamePassLeftOut: (n) => (gamePassLeftOut = n),
           onCreatorCapped: noteCapped,
           onBundleGames: (_bundleId, _bundle, games) => {
             if (!loadGuard.isStale(gen)) collectTiers(games);
@@ -2416,6 +2448,7 @@ export default function ListRoute() {
             refresh,
             onFetchedAt,
             onBundleLeftOut: noteLeftOut,
+            onGamePassLeftOut: (n) => (gamePassLeftOut = n),
             onCreatorCapped: noteCapped,
             onBundleGames: (bundleId, bundle, games) => {
               if (loadGuard.isStale(gen)) return;
@@ -2467,6 +2500,25 @@ export default function ListRoute() {
       } catch (err) {
         if (loadGuard.isStale(gen)) return;
         setStatusText(`Steam's store search didn't answer (${(err as Error).message}). Click Updated to retry.`);
+        return;
+      }
+    } else if (kind === 'game-pass') {
+      setGamePass(null);
+      setListTitle(GAME_PASS_TITLE);
+      setStatusText('Reading the PC Game Pass catalog…');
+      try {
+        const data = await fetchGamePass(currentRegion(), { refresh });
+        if (loadGuard.isStale(gen)) return;
+        noteFetchedAt(data.fetchedAt);
+        setGamePass(data);
+        initialRows = data.appids.map((appid) => ({ appid, name: '', loading: true, details: null }));
+      } catch (err) {
+        if (loadGuard.isStale(gen)) return;
+        setStatusText(
+          err instanceof ApiError && err.status === 503
+            ? "PC Game Pass isn't available on this instance: it isn't connected to IsThereAnyDeal."
+            : `The PC Game Pass catalog didn't answer (${(err as Error).message}). Click Updated to retry.`,
+        );
         return;
       }
     } else if (kind === 'bundle') {
@@ -2615,7 +2667,7 @@ export default function ListRoute() {
       };
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
-      const sharedPriced = (kind === 'shared' || kind === 'creator') && pricesShown;
+      const sharedPriced = (kind === 'shared' || kind === 'creator' || kind === 'game-pass') && pricesShown;
       const columns = insertColumnsAfter(
         isRanked
           ? priced
@@ -2645,7 +2697,7 @@ export default function ListRoute() {
                           comparePlayers.map((p) => p.label),
                         ),
                       )
-                    : kind === 'shared' || kind === 'creator'
+                    : kind === 'shared' || kind === 'creator' || kind === 'game-pass'
                       ? sharedPriced
                         ? tiered
                           ? SHARED_TIERED_COLUMNS
@@ -2676,7 +2728,7 @@ export default function ListRoute() {
                   ? [...RECENT_DEFAULT_VISIBLE, ...comparePlayers.map((_, i) => playedByKey(i)), GROUP_FIT_KEY]
                   : kind === 'user' || kind === 'shared'
                     ? RECENT_DEFAULT_VISIBLE
-                    : kind === 'creator'
+                    : kind === 'creator' || kind === 'game-pass'
                       ? [...RECENT_DEFAULT_VISIBLE, TASTE_FIT_KEY]
                       : OWNED_DEFAULT_VISIBLE;
       const sort = isRanked
@@ -2819,7 +2871,9 @@ export default function ListRoute() {
             ? `${whose} library is empty, or private on Steam.`
             : kind === 'creator'
               ? `Steam's store has no games under the exact ${creatorRole()} name "${creatorName()}".`
-              : 'No games in this list.',
+              : kind === 'game-pass'
+                ? 'None of the games in this PC Game Pass catalog are on Steam.'
+                : 'No games in this list.',
       );
       return;
     }
@@ -3083,6 +3137,7 @@ export default function ListRoute() {
       kind === 'owned' ||
       kind === 'wishlist' ||
       kind === 'creator' ||
+      kind === 'game-pass' ||
       (!!list && listHasRefreshableSource(list, sharedGetList))
     ) {
       tiles.push({
@@ -3093,7 +3148,9 @@ export default function ListRoute() {
             ? "How old the server's cached copy of this account's list is — click to force a fresh fetch"
             : kind === 'creator'
               ? "How old the server's copy of Steam's search is — click to search again"
-              : 'How old the oldest source this list was built from is — click to re-fetch them all',
+              : kind === 'game-pass'
+                ? "How old the server's copy of the PC Game Pass catalog is — click to fetch it again"
+                : 'How old the oldest source this list was built from is — click to re-fetch them all',
         // This tile *is* the ↻ Refresh the actions row used to carry: the staleness is stated
         // here, so this is where the reader already is when they decide to do something about it.
         // Prices keep their own age and refresh (a different fetch) on the Prices tile's own
@@ -3173,8 +3230,11 @@ export default function ListRoute() {
   function noteLeftOut(bundleId: string, notOnSteam: number): void {
     bundleLeftOut.set(bundleId, notOnSteam);
   }
+  // Per load: PC Game Pass's games with no Steam listing (createDefaultFetchers' onGamePassLeftOut).
+  let gamePassLeftOut: number | undefined;
   function leftOutOf(list: GameList, i: number): number | undefined {
     const ref = listDeps(list)[i];
+    if (ref?.kind === 'game-pass') return gamePassLeftOut;
     return ref?.kind === 'bundle' && ref.bundleId ? bundleLeftOut.get(ref.bundleId) : undefined;
   }
   // Per load: each capped developer/publisher source's total on Steam (createDefaultFetchers' onCreatorCapped).
@@ -3264,7 +3324,21 @@ export default function ListRoute() {
     if (kind === 'owned')
       return playtimeHidden() ? "No playtime to profile: it's private, or nothing was played yet." : undefined;
     if (kind === 'creator') return creatorNote();
+    if (kind === 'game-pass') return gamePassNote();
     return undefined;
+  }
+
+  function gamePassNote(): JSX.Element | undefined {
+    if (!gamePass()) return undefined;
+    return (
+      <>
+        The Steam games in PC Game Pass's catalog for {regionLabel(regionCode())}. Game Pass plays them through the Xbox
+        app, not Steam.{' '}
+        <a href="https://www.xbox.com/xbox-game-pass/pc-game-pass" target="_blank" rel="noopener">
+          PC Game Pass on Xbox ↗
+        </a>
+      </>
+    );
   }
 
   function creatorNote(): JSX.Element | undefined {
@@ -3928,7 +4002,7 @@ export default function ListRoute() {
       regionCode,
       () => {
         setPriceFetchedAt(undefined);
-        if (showsTierPrice()) void load();
+        if (showsTierPrice() || showsGamePass()) void load();
         else if (hasPrices()) void loadPrices(rowsStore, loadGuard.current());
       },
       { defer: true },
@@ -4139,6 +4213,11 @@ export default function ListRoute() {
             <span class="list-failed">Steam didn't answer for {n()} of this bundle's games — reload to retry</span>
           )}
         </Show>
+        <Show when={gamePass()?.failed}>
+          {(n) => (
+            <span class="list-failed">Steam didn't answer for {n()} of PC Game Pass's games — reload to retry</span>
+          )}
+        </Show>
       </div>
       <Show when={hasPrices() || kind === 'bundle'}>
         <div
@@ -4202,7 +4281,7 @@ export default function ListRoute() {
           but dropping them silently made the table look like the whole bundle. Collapsed by
           default, with the count in the summary, so nothing is hidden even when it's closed —
           which matters: for a bundle of courses these can be the *majority* of what you're buying. */}
-      <Show when={kind === 'bundle' && unresolvedGames().length > 0}>
+      <Show when={offSteamGames().length > 0}>
         <div class="unresolved-games">
           <button
             type="button"
@@ -4210,14 +4289,15 @@ export default function ListRoute() {
             aria-expanded={unresolvedOpen()}
             onClick={() => setUnresolvedOpen(!unresolvedOpen())}
           >
-            <ChevronRight class="unresolved-chevron" /> {unresolvedGames().length} more in this bundle, not on Steam
+            <ChevronRight class="unresolved-chevron" /> {offSteamGames().length} more in{' '}
+            {kind === 'game-pass' ? GAME_PASS_TITLE : 'this bundle'}, not on Steam
           </button>
           <Show when={unresolvedOpen()}>
             <ul class="unresolved-list">
-              <For each={unresolvedGames()}>
+              <For each={offSteamGames()}>
                 {(game) => (
                   <li>
-                    <a href={`https://isthereanydeal.com/game/${game.slug}/info/`} target="_blank" rel="noopener">
+                    <a href={game.href} target="_blank" rel="noopener">
                       {game.title}
                     </a>
                     <Show when={game.type}>

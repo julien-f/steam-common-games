@@ -42,6 +42,7 @@ export function sourceOptions(excludeListId?: string, keep: readonly ListRef[] =
       { kind: 'account-wishlist', accountId: acc.id },
     ]),
     { kind: 'recent-games' },
+    { kind: 'game-pass' },
     ...getLists()
       .filter((l) => l.id !== excludeListId)
       .map((list): ListRef => ({ kind: 'user', listId: list.id })),

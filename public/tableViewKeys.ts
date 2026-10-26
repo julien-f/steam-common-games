@@ -12,5 +12,6 @@ export const TABLE_VIEW_PREF_KEYS: readonly string[] = [
   'compareListView',
   'sharedListView',
   'creatorListView',
+  'gamePassListView',
   'bundlesBrowseView',
 ];

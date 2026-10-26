@@ -21,6 +21,7 @@ import { loadRecentGames } from './recentGames.ts';
 import { getList, isBundleReferenced, orphanBundle } from './listsStore.ts';
 import { getBundleSnapshot, rememberBundle } from './bundleSnapshots.ts';
 import { creatorTitle, fetchCreatorGames, type CreatorRole } from './creatorData.ts';
+import { fetchGamePass, GAME_PASS_TITLE } from './gamePassData.ts';
 
 export interface ListResolveFetchers {
   accountOwned(accountId: string): Promise<Set<number>>;
@@ -28,6 +29,7 @@ export interface ListResolveFetchers {
   bundle(bundleId: string): Promise<Set<number>>;
   recentGames(): Promise<Set<number>>;
   creator(role: CreatorRole, name: string): Promise<Set<number>>;
+  gamePass(): Promise<Set<number>>;
   getList(listId: string): GameList | undefined;
 }
 
@@ -50,6 +52,8 @@ function labelForRef(ref: ListRef, index: number): string {
       return `bundle:${ref.bundleId ?? index}`;
     case 'recent-games':
       return 'recent-games';
+    case 'game-pass':
+      return 'game-pass';
     case 'user':
       return `list:${ref.listId ?? index}`;
     case 'developer':
@@ -80,6 +84,8 @@ export async function resolveRef(
       return ref.bundleId ? fetchers.bundle(ref.bundleId) : new Set();
     case 'recent-games':
       return fetchers.recentGames();
+    case 'game-pass':
+      return fetchers.gamePass();
     case 'developer':
     case 'publisher':
       return ref.name ? fetchers.creator(ref.kind, ref.name) : new Set();
@@ -189,6 +195,7 @@ export interface DefaultFetchersOptions {
   onBundleLeftOut?: (bundleId: string, notOnSteam: number) => void; // a bundle's games with no Steam listing
   onBundleGames?: BundleGamesCallback; // a freshly fetched bundle's games, for their tier prices
   onCreatorCapped?: (role: CreatorRole, name: string, total: number) => void; // only Steam's first page
+  onGamePassLeftOut?: (notOnSteam: number) => void; // PC Game Pass games with no Steam listing
 }
 export type BundleGamesCallback = (bundleId: string, bundle: Bundle, resolved: ResolvedGame[]) => void;
 
@@ -204,6 +211,7 @@ export function createDefaultFetchers({
   onBundleLeftOut,
   onBundleGames,
   onCreatorCapped,
+  onGamePassLeftOut,
 }: DefaultFetchersOptions = {}): ListResolveFetchers {
   return {
     accountOwned: async (accountId) => {
@@ -240,6 +248,18 @@ export function createDefaultFetchers({
       onFetchedAt?.(fetchedAt);
       if (capped) onCreatorCapped?.(role, name, total);
       return new Set(appids);
+    },
+    // No snapshot to fall back on, unlike a bundle: a failure fails the list.
+    gamePass: async () => {
+      let result;
+      try {
+        result = await fetchGamePass(currentRegion(), { refresh });
+      } catch (err) {
+        throw new Error(`${GAME_PASS_TITLE}: ${(err as Error).message}`, { cause: err });
+      }
+      onFetchedAt?.(result.fetchedAt);
+      onGamePassLeftOut?.(result.notOnSteam.length);
+      return new Set(result.appids);
     },
     getList,
   };

@@ -6090,3 +6090,61 @@ test('F4 edge: a game with no Steam tags still offers More from', async ({ page 
   await expect(moreFrom(page).getByRole('link', { name: 'All games by Re-Logic (developer)' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sort list by similarity' })).toHaveCount(0);
 });
+
+test('B5.1-2: PC Game Pass lists its Steam games for the region, and names the ones not on Steam', async ({ page }) => {
+  await mockApi(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  const requested = page.waitForRequest((req) => /\/api\/game-pass\?country=[A-Z]{2}$/.test(req.url()));
+  await page.getByRole('link', { name: 'PC Game Pass' }).click();
+  await requested;
+  await expect(rows(page)).toHaveCount(4);
+  await expect(page.getByRole('button', { name: /Rank this list/ })).toBeVisible();
+  await expect(page.getByRole('main')).toContainText(
+    /PC Game Pass's catalog for .+\. Game Pass plays them through the Xbox app/,
+  );
+  await page.getByRole('button', { name: /2 more in PC Game Pass, not on Steam/ }).click();
+  await expect(page.getByRole('link', { name: 'Xbox Exclusive Quest' })).toHaveAttribute(
+    'href',
+    'https://www.xbox.com/games/store/_/9NXBOXONLY01',
+  );
+  await expect(page.getByRole('link', { name: '9NUNNAMED002' })).toBeVisible();
+});
+
+test('B5.3: my wishlist ∩ PC Game Pass as a combined list', async ({ page }) => {
+  await mockApi(page);
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New combined list' }).click();
+  const form = page.locator('.combine-form');
+  await form.getByRole('combobox', { name: 'How to combine the sources' }).selectOption('intersect');
+  await form.getByRole('checkbox', { name: 'Alice — Wishlist' }).check();
+  await form.getByRole('checkbox', { name: 'PC Game Pass' }).check();
+  await form.getByRole('button', { name: 'Create combined list' }).click();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(page.locator('.list-formula')).toContainText('PC Game Pass');
+  const forced = page.waitForRequest((req) => /\/api\/game-pass\?.*refresh=1/.test(req.url()));
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
+  await forced;
+});
+
+test('B5 edge: the catalog down says so, and Updated retries it', async ({ page }) => {
+  await mockApi(page, { states: ['upstream-down'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/game-pass');
+  await expect(page.locator('.list-status')).toContainText("The PC Game Pass catalog didn't answer");
+  await mockApi(page);
+  const forced = page.waitForRequest((req) => /\/api\/game-pass\?.*refresh=1/.test(req.url()));
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
+  await forced;
+  await expect(rows(page)).toHaveCount(4);
+});
+
+test('B5 edge: without an IsThereAnyDeal key, PC Game Pass says why it is unavailable', async ({ page }) => {
+  await mockApi(page, { states: ['no-itad'] });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/game-pass');
+  await expect(page.locator('.list-status')).toContainText(
+    "PC Game Pass isn't available on this instance: it isn't connected to IsThereAnyDeal.",
+  );
+});

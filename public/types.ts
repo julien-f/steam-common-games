@@ -276,7 +276,8 @@ export type CombineOp = 'union' | 'intersect' | 'subtract' | 'group-by-membershi
 // scoped refs always pin an explicit accountId, never "whichever account is current", so a
 // saved "Alice ∩ Bob" comparison keeps meaning that regardless of what currentAccount becomes.
 export interface ListRef {
-  kind: 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user' | 'developer' | 'publisher';
+  kind:
+    'account-owned' | 'account-wishlist' | 'bundle' | 'recent-games' | 'user' | 'developer' | 'publisher' | 'game-pass';
   accountId?: string; // AccountSlot.id
   bundleId?: string;
   listId?: string; // → GameList.id

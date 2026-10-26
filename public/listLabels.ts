@@ -15,6 +15,7 @@ import { getLists, listDeps } from './listsStore.ts';
 import { membersFromAccountId } from './accountData.ts';
 import { getBundleSnapshot } from './bundleSnapshots.ts';
 import { creatorListPath, creatorTitle } from './creatorData.ts';
+import { GAME_PASS_PATH, GAME_PASS_TITLE } from './gamePassData.ts';
 
 // Short form — a chip/label on its own, where surrounding context already says it's a combine.
 export const OP_LABELS: Record<CombineOp, string> = {
@@ -114,6 +115,8 @@ export function describeListRef(ref: ListRef, naming: ListNaming): RefDescriptio
       };
     case 'recent-games':
       return { label: 'Recently Looked Up', href: '/game' };
+    case 'game-pass':
+      return { label: GAME_PASS_TITLE, href: GAME_PASS_PATH };
     case 'developer':
     case 'publisher':
       if (!ref.name)

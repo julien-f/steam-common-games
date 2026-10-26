@@ -263,7 +263,7 @@ const json = (body: unknown, status = 200): MockResponse => ({
   body: JSON.stringify(body),
 });
 
-const ITAD_ROUTE = /^\/api\/(bundles|game-bundles|prices)(\/|$)/;
+const ITAD_ROUTE = /^\/api\/(bundles|game-bundles|prices|game-pass)(\/|$)/;
 
 // Plain request in, response out: shared by mockApi() below and `npm run dev:mock` (vite.config.js).
 export function respond(
@@ -390,6 +390,19 @@ export function respond(
     const appids = CATALOG.filter((g) => creators(g.appid)[`${role}s`].includes(name!)).map((g) => g.appid);
     const capped = states.has('creator-capped');
     return json({ appids, total: capped ? 523 : appids.length, capped, fetchedAt: NOW });
+  }
+
+  // Two of Alice's wishlist games among them; one game off Steam that Microsoft's catalog didn't name.
+  if (path === '/api/game-pass') {
+    return json({
+      appids: [620, 1426210, 728880, 367520],
+      notOnSteam: [
+        { id: '9NXBOXONLY01', title: 'Xbox Exclusive Quest' },
+        { id: '9NUNNAMED002', title: null },
+      ],
+      failed: 0,
+      fetchedAt: NOW,
+    });
   }
 
   const bundleGames = [...BUNDLE.games, ...PICK_BUNDLE.games];

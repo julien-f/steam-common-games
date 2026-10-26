@@ -43,6 +43,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
   - Changing a view's table doesn't save it: **Save** or **Revert** in the banner above it; leaving the view drops the changes. Its **⋯** renames or deletes it.
   - A view follows the account you're exploring, like Owned and Wishlist themselves; Home's Owned and Wishlist cards link each one.
 - **Recently Looked Up** collects the last 10 games you searched for, latest first (its **Looked up** column), browsable like any other list.
+- **PC Game Pass** lists the Steam games currently in PC Game Pass, from the catalog of the region set in Preferences (catalogs differ slightly by country). Game Pass plays them through the Xbox app, not Steam. Its games not on Steam are listed below the table, each linking to its Xbox store page. Combine it with your Wishlist to see what you could play without buying (see [Combining lists](#combining-lists)). Like Bundles, it needs the app's IsThereAnyDeal key.
 - **Your own lists** come in three kinds: a **manual** list you add and remove games from, a **dynamic** list defined as a formula over other lists, recomputed every time you open it, and a **ranked** list that orders another list by your preferences (see [Ranking a list](#ranking-a-list)).
 - Lists live in a **folder tree** you can rename, nest and organize. Each row shows its kind's icon and what it holds ("List · 12 games", "Ranking · 30 ranked"); its **⋯** menu moves it elsewhere in the tree (**Move to…**), renames or deletes it.
 - **Taste fit** (shown on Wishlist and bundles, available on every list): how close each game is to the current account's taste, learned from its Owned list. Open that account's Owned list once on this device first (the line under the list header says so, how old the taste is, or that the account has too few games played; on a link to someone else's list it doesn't ask you to open theirs). It's refreshed on every visit there. This device keeps only the [most recent few accounts' tastes](../dev/lists-and-accounts.md#storage-schema), keeping your ★ and current one's when it saves another, and drops them first when the browser's storage is full: a change to your lists or settings may then clear any of them.
@@ -87,7 +88,7 @@ A bundle joins a combine from its own page: **What does this add?** shows that b
 - It follows its source: games added later are queued for comparison; a removed game drops out, and gets its rank back if it returns. **Change source** keeps every answer already given.
 - A list can have several rankings, each by its own criterion. Once it has one, **Rank this list** opens a menu: continue a ranking (with its progress), or start a new one named by what you're ranking by, e.g. "best JRPG".
 - A ranked list can't be shared via a link yet.
-- A ranked or combined list built from a Wishlist, a bundle or a developer's or publisher's games keeps its price columns and Prices tile.
+- A ranked or combined list built from a Wishlist, a bundle, a developer's or publisher's games or PC Game Pass keeps its price columns and Prices tile.
 
 ### Comparing libraries
 

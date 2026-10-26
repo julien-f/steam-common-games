@@ -59,10 +59,12 @@ import { bindNavPopover } from './navPopover.ts';
 import { useBaseTitle } from './pageTitle.ts';
 import { createDefaultNaming, formatFormula, listDisplayName } from './listLabels.ts';
 import { CombineForm } from './CombineForm.tsx';
+import { GAME_PASS_PATH, GAME_PASS_TITLE } from './gamePassData.ts';
 import Blend from 'lucide-solid/icons/blend';
 import Ellipsis from 'lucide-solid/icons/ellipsis';
 import FolderIcon from 'lucide-solid/icons/folder';
 import FolderPlus from 'lucide-solid/icons/folder-plus';
+import Gamepad2 from 'lucide-solid/icons/gamepad-2';
 import Heart from 'lucide-solid/icons/heart';
 import RotateCcwClock from 'lucide-solid/icons/rotate-ccw-clock';
 import LibraryBig from 'lucide-solid/icons/library-big';
@@ -293,6 +295,12 @@ export default function HomeRoute() {
     // account override alongside them would be two different claims about whose games are on screen.
     { name: 'Compare', href: COMPARE_PATH, icon: Users, description: 'Two or more players, grouped by who owns what' },
     { name: 'Bundles', href: accountLink('/bundles'), icon: Package, description: 'Current Steam game bundles' },
+    {
+      name: GAME_PASS_TITLE,
+      href: accountLink(GAME_PASS_PATH),
+      icon: Gamepad2,
+      description: 'Steam games currently in PC Game Pass',
+    },
     {
       name: 'Recently Looked Up',
       href: accountLink('/game'),
