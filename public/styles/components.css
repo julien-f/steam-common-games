@@ -3285,6 +3285,39 @@
   #screenshot-lightbox.lb--automuted .lb-unmute {
     display: flex;
   }
+  /* A linked trailer playing on the TV, over its poster here; chrome or not. */
+  .lb-tvplaying {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    margin: 0;
+    padding: 0 16px;
+    border-radius: 20px;
+    font-size: var(--fs-body);
+    pointer-events: none;
+  }
+  .lb-tvplaying .lucide {
+    width: 18px;
+    height: 18px;
+    color: var(--accent);
+  }
+  #screenshot-lightbox.lb--tv.lb--tv-playing:not(.lb--tv-failed) .lb-tvplaying {
+    display: flex;
+  }
+  /* One state at a time over it: failed, then buffering, then paused or ended. */
+  #screenshot-lightbox.lb--tv:is(.lb--buffering, .lb--tv-failed) .lb-bigplay {
+    opacity: 0;
+    visibility: hidden;
+  }
+  #screenshot-lightbox.lb--tv-failed .lb-surface::after {
+    display: none;
+  }
 
   /* ‹ ›: at the screen's edges for a mouse; in the bottom band for a finger, below. */
   .lb-btn {

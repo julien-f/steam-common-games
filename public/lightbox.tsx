@@ -1,6 +1,6 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
-import { present, presented, privateMode, setPrivateMode, stopPresenting } from './presentation.ts';
+import { control, present, presented, playback, privateMode, setPrivateMode, stopPresenting } from './presentation.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
@@ -66,8 +66,20 @@ const linked = createRoot(() => createMemo(() => lbGame() !== null && !!presente
 let lbRenderedAppid: number | undefined;
 let lbRenderedShotId: string | undefined;
 let lbRenderedOnTv = false;
-// A trailer held unstarted (private, or just unlinked): the first play loads it.
+// A trailer held unstarted (private, or just unlinked): the first play loads it, from `lbHeldAt`.
 let lbHeld = false;
+let lbHeldAt = 0;
+// A linked trailer on screen: its controls drive the TV and mirror its `playback`.
+const [lbTvTrailer, setLbTvTrailer] = createSignal(false);
+// The TV's playhead as last reported, run on locally between its 1 s reports.
+let lbTvClock = { t: 0, dur: 0, at: 0, playing: false };
+let lbTvTick: ReturnType<typeof setInterval> | undefined;
+// The scrubber's own value wins while it's dragged, and until the TV reports its seek (1 s at most).
+let lbScrubDragged = false;
+let lbScrubTarget: number | null = null;
+let lbScrubUntil = 0;
+let lbScrubTimer: ReturnType<typeof setTimeout> | undefined;
+let lbTvNeedsClick = false;
 // The present waiting out the settle (`LB_SETTLE_*`), and whether the next one goes at once (just linked).
 let lbTvTimer: ReturnType<typeof setTimeout> | undefined;
 let lbTvSend: (() => void) | null = null;
@@ -241,6 +253,86 @@ function stopPresentingFromLb() {
   stopPresenting();
 }
 
+function lbTvTime() {
+  const { t, dur, at, playing } = lbTvClock;
+  const now = playing ? t + (performance.now() - at) / 1000 : t;
+  return dur ? Math.min(now, dur) : now;
+}
+
+// Seeking, here or on the TV: Shift+←/→, J/L, a double-tap's third.
+function seekLb(delta: number) {
+  if (!lbTvTrailer()) return seekVideo(lbVideoEl, delta);
+  control({ seekBy: delta });
+  // Shown at once (the OSD, the line), the TV's report confirming it.
+  lbTvClock = { ...lbTvClock, t: Math.max(0, lbTvTime() + delta), at: performance.now() };
+  drawLbTvTime();
+}
+
+function lbPausedNow() {
+  if (!lbTvTrailer()) return lbVideoEl.paused;
+  const pb = playback();
+  return !pb || pb.paused || pb.ended;
+}
+
+function toggleLbMute() {
+  if (lbTvTrailer()) control(playback()?.muted ? 'unmute' : 'mute');
+  else setLbMuted(!lbVideoEl.muted);
+}
+
+function drawLbTvTime() {
+  const vc = document.querySelector<HTMLElement>('#screenshot-lightbox .lb-vctrls');
+  if (!vc || lbScrubDragged || Date.now() < lbScrubUntil) return;
+  const { dur } = lbTvClock;
+  const t = lbTvTime();
+  const scrub = vc.querySelector<HTMLInputElement>('.lb-vc-scrub')!;
+  scrub.value = String(dur ? t / dur : 0);
+  scrub.style.backgroundImage = lbScrubGradient(dur ? (100 * t) / dur : 0);
+  syncLbTime(vc, t, dur);
+}
+
+// Mirrors the TV's report on a linked item: its failure (stills too: the TV can fail where this didn't),
+// and for a trailer its state, one overlay at a time (CSS): failed, then buffering, paused or ended, playing.
+function syncLbTv(lb: HTMLElement, onTv: boolean, trailer: boolean) {
+  const pb = untrack(playback);
+  const failed = onTv && !!pb?.failed;
+  if (failed !== lb.classList.contains('lb--tv-failed')) {
+    lb.classList.toggle('lb--tv-failed', failed);
+    if (failed) {
+      showLbError("Couldn't load on the TV.");
+      noteLb(lb, "The TV couldn't load this");
+    } else hideLbError();
+  }
+  clearInterval(lbTvTick);
+  if (!trailer) return;
+  const paused = !pb || pb.paused || pb.ended;
+  lb.classList.toggle('lb--paused', !!pb && paused);
+  lb.classList.toggle('lb--ended', !!pb?.ended);
+  lb.classList.toggle('lb--buffering', !!pb?.buffering);
+  lb.classList.toggle('lb--tv-playing', !!pb && !paused && !pb.buffering);
+  lb.classList.toggle('lb--automuted', !!pb?.needsClick);
+  if (!!pb?.needsClick !== lbTvNeedsClick) {
+    lbTvNeedsClick = !!pb?.needsClick;
+    if (lbTvNeedsClick) noteLb(lb, 'Click the TV for sound');
+  }
+  const playBtn = lb.querySelector('.lb-vc-play')!;
+  playBtn.classList.toggle('lb-on', !paused);
+  playBtn.setAttribute('aria-label', paused ? 'Play on TV' : 'Pause on TV');
+  const bigPlay = lb.querySelector('.lb-bigplay')!;
+  bigPlay.classList.toggle('lb-on', !paused);
+  bigPlay.setAttribute(
+    'aria-label',
+    pb?.ended ? 'Replay on TV' : paused ? 'Play trailer on TV' : 'Pause trailer on TV',
+  );
+  const muteBtn = lb.querySelector('.lb-vc-mute')!;
+  muteBtn.classList.toggle('lb-on', !!pb?.muted);
+  muteBtn.setAttribute('aria-label', pb?.needsClick ? 'Click the TV for sound' : pb?.muted ? 'Unmute TV' : 'Mute TV');
+  if (pb) lbTvClock = { t: pb.t, dur: pb.dur, at: performance.now(), playing: !paused && !pb.buffering };
+  // The TV's report of the seek the scrubber asked for ends its hold.
+  if (lbScrubTarget !== null && pb && Math.abs(pb.t - lbScrubTarget) < 1) lbScrubUntil = 0;
+  drawLbTvTime();
+  if (lbTvClock.playing) lbTvTick = setInterval(drawLbTvTime, 250);
+}
+
 // Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
 // here. The host's step opens the panel *behind* the overlay, and `panelOpen` focuses that
 // panel's hero image — which drops focus straight out of the lightbox's own trap onto an element
@@ -354,8 +446,9 @@ function showLbError(msg: string) {
   err.style.display = 'flex';
 }
 
+// Only while it's on screen: a load failing late, after a step or a handover to the TV, isn't the item shown.
 function showLbVideoError() {
-  showLbError("Couldn't load this video.");
+  if (lbShowingVideo()) showLbError("Couldn't load this video.");
 }
 
 function hideLbError() {
@@ -367,6 +460,8 @@ function hideLbError() {
 // Re-attempts loading whatever shot is currently shown, from the Retry button.
 function retryCurrentShot() {
   hideLbError();
+  const lb = document.getElementById('screenshot-lightbox')!;
+  if (lb.classList.contains('lb--tv-failed')) return control('retry');
   const shot = shots()[idx()];
   if (!shot) return;
   if (shot.type === 'video') {
@@ -502,6 +597,14 @@ function resetLbVc(vc: HTMLElement) {
   syncLbTime(vc, 0, 0);
 }
 
+// A local trailer's control names (a linked one's say "on TV": `syncLbTv`); its events keep them after.
+function resetLbVcLabels(lb: HTMLElement) {
+  lb.querySelector('.lb-vc-play')!.setAttribute('aria-label', 'Play');
+  lb.querySelector('.lb-bigplay')!.setAttribute('aria-label', 'Play trailer');
+  lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek');
+  syncLbMuteBtn(lb);
+}
+
 // Starts a trailer at the viewer's own mute, falling back to muted (and saying so) where the browser refuses sound.
 function playLbTrailer(lb: HTMLElement, shot: MediaItem) {
   lbVideoEl.muted = lbMutedChoice();
@@ -586,9 +689,9 @@ function osdLb(kind: 'play' | 'pause' | 'mute' | 'unmute' | 'seek') {
   if (!osd) return;
   osd.dataset.kind = kind;
   if (kind === 'seek') {
-    const vid = lbVideoEl;
-    osd.querySelector('.lb-osd-time')!.textContent = `${fmtTime(vid.currentTime)} / ${fmtTime(vid.duration || 0)}`;
-    osd.style.setProperty('--lb-osd-progress', String(vid.duration ? vid.currentTime / vid.duration : 0));
+    const [t, dur] = lbTvTrailer() ? [lbTvTime(), lbTvClock.dur] : [lbVideoEl.currentTime, lbVideoEl.duration || 0];
+    osd.querySelector('.lb-osd-time')!.textContent = `${fmtTime(t)} / ${fmtTime(dur)}`;
+    osd.style.setProperty('--lb-osd-progress', String(dur ? t / dur : 0));
   }
   osd.classList.add('lb-osd--show');
   clearTimeout(osd._flashTimer);
@@ -689,8 +792,12 @@ function LightboxDom() {
           <span class="lb-bigplay-replay">Replay</span>
         </button>
         <button class="lb-unmute lb-glass">
-          <VolumeX /> Unmute
+          <VolumeX /> {lbTvTrailer() ? 'Click the TV for sound' : 'Unmute'}
         </button>
+        {/* A linked trailer plays on the TV only: said over its poster, so it never looks stuck. */}
+        <p class="lb-tvplaying lb-glass" aria-hidden="true">
+          <Cast /> Playing on TV
+        </p>
         {/* The seek line across the top, the buttons and time below it (YouTube's). */}
         <div class="lb-vctrls" style={{ display: 'none' }}>
           <input class="lb-vc-scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
@@ -837,6 +944,7 @@ function wireKeyboard(lb: HTMLElement) {
       }
 
       const vid = lbShowingVideo() ? lbVideoEl : null;
+      const trailer = !!vid || lbTvTrailer();
 
       // A zoomed picture: the arrows pan it, and Esc zooms back out before it closes anything.
       if (lbZoom > 1 && e.key.startsWith('Arrow')) {
@@ -857,13 +965,13 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         const dir = e.key === 'ArrowRight' ? 1 : -1;
         if (!e.shiftKey) stepLightbox(dir);
-        else if (vid) {
-          seekVideo(vid, dir * LB_SEEK_SECONDS);
+        else if (trailer) {
+          seekLb(dir * LB_SEEK_SECONDS);
           osdLb('seek');
         }
       }
-      if (vid && ['j', 'J', 'l', 'L'].includes(e.key)) {
-        seekVideo(vid, (e.key.toLowerCase() === 'l' ? 1 : -1) * LB_LONG_SEEK_SECONDS);
+      if (trailer && ['j', 'J', 'l', 'L'].includes(e.key)) {
+        seekLb((e.key.toLowerCase() === 'l' ? 1 : -1) * LB_LONG_SEEK_SECONDS);
         osdLb('seek');
       }
       if (!onScrub && (e.key === 'Home' || e.key === 'End')) {
@@ -888,17 +996,18 @@ function wireKeyboard(lb: HTMLElement) {
         return;
       }
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
-      if ((e.key === 'z' || e.key === 'Z') && !vid) toggleLbZoom();
-      if (vid) {
+      if ((e.key === 'z' || e.key === 'Z') && !trailer) toggleLbZoom();
+      if (trailer) {
         // A focused button takes Space as its own press.
         if (e.key === ' ' && !onScrub && !(e.target as HTMLElement).closest('button')) {
           e.preventDefault();
-          osdLb(vid.paused ? 'play' : 'pause');
+          osdLb(lbPausedNow() ? 'play' : 'pause');
           toggleLbPlay();
         }
         if (e.key === 'm' || e.key === 'M') {
-          setLbMuted(!vid.muted);
-          osdLb(vid.muted ? 'mute' : 'unmute');
+          const muted = lbTvTrailer() ? !!playback()?.muted : lbVideoEl.muted;
+          toggleLbMute();
+          osdLb(muted ? 'unmute' : 'mute');
         }
       }
     },
@@ -1169,15 +1278,15 @@ function wireTouchHandlers(lb: HTMLElement) {
         return;
       }
       const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10;
-      const showingImg = lbShowingImage();
-      const showingVid = lbShowingVideo();
+      const showingImg = lbShowingImage() && !lbTvTrailer();
+      const showingVid = lbShowingVideo() || lbTvTrailer();
       if (isTap && showingVid && seekStreak && Date.now() < seekStreak.until) {
         const frac = (endX - lb.getBoundingClientRect().left) / lb.getBoundingClientRect().width;
         const side = frac < 1 / 3 ? 'left' : frac > 2 / 3 ? 'right' : null;
         if (side === seekStreak.side) {
           e.preventDefault();
           clearTimeout(lbChromeTapTimer);
-          seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+          seekLb((side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
           seekStreak.total += LB_LONG_SEEK_SECONDS;
           seekStreak.until = Date.now() + 600;
           flashSeek(side, seekStreak.total);
@@ -1203,7 +1312,7 @@ function wireTouchHandlers(lb: HTMLElement) {
             if (side) {
               clearTimeout(lbChromeTapTimer); // the first tap's toggle of the controls
               e.preventDefault();
-              seekVideo(lbVideoEl, (side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
+              seekLb((side === 'left' ? -1 : 1) * LB_LONG_SEEK_SECONDS);
               seekStreak = { side, total: LB_LONG_SEEK_SECONDS, until: Date.now() + 600 };
               flashSeek(side, LB_LONG_SEEK_SECONDS);
             }
@@ -1262,7 +1371,8 @@ function wireVideoControls(lb: HTMLElement) {
     lbBufferTimer = setTimeout(() => lb.classList.add('lb--buffering'), 400);
   });
   for (const type of ['playing', 'pause', 'emptied']) vid2.addEventListener(type, buffered);
-  lb.querySelector('.lb-unmute')!.addEventListener('click', () => setLbMuted(false));
+  // On the TV it only says a click there gives sound: nothing to do here.
+  lb.querySelector('.lb-unmute')!.addEventListener('click', () => !lbTvTrailer() && setLbMuted(false));
   vid2.addEventListener('play', () => {
     playBtn.classList.add('lb-on');
     playBtn.setAttribute('aria-label', 'Pause');
@@ -1295,8 +1405,25 @@ function wireVideoControls(lb: HTMLElement) {
   vid2.addEventListener('volumechange', () => syncLbMuteBtn(lb));
 
   scrub.addEventListener('input', () => {
-    if (vid2.duration) vid2.currentTime = Number(scrub.value) * vid2.duration;
     updateScrubBg();
+    if (lbTvTrailer()) return syncLbTime(vc2, Number(scrub.value) * lbTvClock.dur, lbTvClock.dur);
+    if (vid2.duration) vid2.currentTime = Number(scrub.value) * vid2.duration;
+  });
+  // On the TV, one seek where the scrubber is let go; keys held on it settle like steps.
+  scrub.addEventListener('pointerdown', () => (lbScrubDragged = true));
+  scrub.addEventListener('change', () => {
+    if (!lbTvTrailer()) return;
+    const t = Number(scrub.value) * lbTvClock.dur;
+    const send = () => {
+      control({ seekTo: t });
+      lbScrubTarget = t;
+      lbScrubUntil = Date.now() + 1000;
+      lbTvClock = { ...lbTvClock, t, at: performance.now() };
+    };
+    clearTimeout(lbScrubTimer);
+    if (lbScrubDragged) send();
+    else lbScrubTimer = setTimeout(send, LB_SETTLE_MEDIA_MS);
+    lbScrubDragged = false;
   });
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
   scrub.addEventListener('mouseup', () => schedHideLbChrome());
@@ -1313,7 +1440,7 @@ function wireVideoControls(lb: HTMLElement) {
     },
     { signal: _lbSignal },
   );
-  muteBtn.addEventListener('click', () => setLbMuted(!vid2.muted));
+  muteBtn.addEventListener('click', toggleLbMute);
 
   // A click plays or pauses; a finger's tap toggles the controls instead (below, which cancels its click).
   vid2.addEventListener('click', toggleLbPlay);
@@ -1346,14 +1473,14 @@ function wireVideoControls(lb: HTMLElement) {
       if (e.defaultPrevented) return;
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
       if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
-      if (lbShowingVideo()) e.preventDefault(); // its click would play or pause: the centre button does
+      if (lbShowingVideo() || lbTvTrailer()) e.preventDefault(); // its click would play or pause: the centre button does
       if (lb.classList.contains('lb--unstarted')) return toggleLbPlay();
       if (tapRevealedChrome) return revealLbChrome();
       clearTimeout(lbChromeTapTimer);
       // A trailer's middle third hides at once; elsewhere a tap waits out a possible second one (a zoom, a seek).
       const rect = lb.getBoundingClientRect();
       const frac = (t.clientX - rect.left) / rect.width;
-      if (lbShowingVideo() && frac >= 1 / 3 && frac <= 2 / 3) hideLbChrome();
+      if ((lbShowingVideo() || lbTvTrailer()) && frac >= 1 / 3 && frac <= 2 / 3) hideLbChrome();
       else lbChromeTapTimer = setTimeout(hideLbChrome, LB_DOUBLE_TAP_MS);
     },
     { passive: false },
@@ -1362,10 +1489,17 @@ function wireVideoControls(lb: HTMLElement) {
 
 // A held trailer (`lbHeld`) loads on its first play.
 function toggleLbPlay() {
+  if (lbTvTrailer()) {
+    const pb = playback();
+    return control(pb?.ended ? 'replay' : !pb || pb.paused ? 'play' : 'pause');
+  }
   if (!lbVideoEl.paused) return lbVideoEl.pause();
   const shot = shots()[idx()];
   if (lbHeld && shot?.type === 'video') {
     lbHeld = false;
+    const at = lbHeldAt;
+    // Loading the stream resets the position: set once it's loaded.
+    if (at) lbVideoEl.addEventListener('loadedmetadata', () => (lbVideoEl.currentTime = at), { once: true });
     playLbTrailer(document.getElementById('screenshot-lightbox')!, shot);
   } else lbVideoEl.play().catch(() => {});
 }
@@ -1542,9 +1676,15 @@ function closeLightboxNow() {
     'lb--automuted',
     'lb--ended',
     'lb--buffering',
+    'lb--tv',
+    'lb--tv-playing',
+    'lb--tv-failed',
   );
   lbRenderedAppid = lbRenderedShotId = undefined;
   lbRenderedOnTv = lbHeld = false;
+  setLbTvTrailer(false);
+  clearInterval(lbTvTick);
+  clearTimeout(lbScrubTimer);
   clearTimeout(lbStatusTimer);
   lbStatusNote = lbStatusMedia = lbStatusGame = '';
   lb.querySelector('.lb-status')!.textContent = '';
@@ -1696,9 +1836,16 @@ function renderLightbox() {
   flashLbCounter(lb, gameChanged);
   // Private, or unlinked on what the TV played: no sound starting here by itself.
   lbHeld = shot.type === 'video' && !onTv && (untrack(privateMode) || (sameItem && lbRenderedOnTv));
+  lbHeldAt = lbHeld && sameItem && lbRenderedOnTv ? lbTvTime() : 0;
   lbRenderedAppid = appid;
   lbRenderedShotId = shot.shotId;
   lbRenderedOnTv = onTv && shot.type === 'video';
+  setLbTvTrailer(lbRenderedOnTv);
+  lb.classList.toggle('lb--tv', lbRenderedOnTv);
+  lb.classList.remove('lb--tv-playing');
+  lbTvClock = { t: 0, dur: 0, at: 0, playing: false };
+  lbScrubUntil = 0;
+  lbTvNeedsClick = false;
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
   lbImgToken++;
@@ -1721,8 +1868,10 @@ function renderLightbox() {
     vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
     vc.style.display = '';
     resetLbVc(vc);
+    resetLbVcLabels(lb);
     if (lbHeld) {
       lbVideoEl.muted = lbMutedChoice();
+      lbVideoEl.currentTime = lbHeldAt; // shown there until played (set again once loaded)
       syncLbMuteBtn(lb);
       lb.classList.remove('lb--automuted', 'lb--ended');
     } else playLbTrailer(lb, shot);
@@ -1740,10 +1889,13 @@ function renderLightbox() {
     img.onerror = null;
     enterLbItem(img, 'lb-img', dir, axis);
     if (shot.type === 'video') {
-      // On the TV: its poster here (the <video> stays detached — see `lbVideoEl`).
+      // On the TV: its poster here (the <video> stays detached — see `lbVideoEl`), its controls the TV's.
       img.style.opacity = '1';
       img.src = shot.thumb || '';
       setLbLoading(lb, false);
+      vc.style.display = '';
+      resetLbVc(vc);
+      lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek on TV');
       schedHideLbChrome();
     } else {
       // Show a degraded placeholder (the thumbnail, already loaded/cached from
@@ -1864,6 +2016,13 @@ createRoot(() => {
     };
     if (fresh) flushLbTv();
     else lbTvTimer = setTimeout(flushLbTv, on?.appid === game.appid ? LB_SETTLE_MEDIA_MS : LB_SETTLE_GAME_MS);
+  });
+  createEffect(() => {
+    playback();
+    const onTv = linked();
+    const trailer = lbTvTrailer();
+    const lb = document.getElementById('screenshot-lightbox');
+    if (lb) syncLbTv(lb, onTv, trailer);
   });
   // Says a link change while open: linked (an open on the TV included), private, or presenting over.
   const tvState = createMemo(() =>

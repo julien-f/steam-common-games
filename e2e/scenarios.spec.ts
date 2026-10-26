@@ -1581,9 +1581,17 @@ test('C8 edge: game steps in the linked lightbox put each game on the TV once it
   const shown = await startPresenting(page);
   await expect(lightbox).toHaveAttribute('open');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  // Every line said, as the TV may say something after (its fixture media doesn't load).
+  await lightbox.locator('.lb-status').evaluate((el) => {
+    const w = window as unknown as { said: string[] };
+    w.said = [];
+    new MutationObserver(() => w.said.push(el.textContent ?? '')).observe(el, { childList: true, characterData: true });
+  });
   await page.keyboard.press('ArrowDown');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
-  await expect(lightbox.locator('.lb-status')).toContainText('On TV: Valheim, game 3 of 3');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { said: string[] }).said.join('\n')))
+    .toContain('On TV: Valheim, game 3 of 3');
   await page.waitForTimeout(600);
   // Its media streamed in after the step: one send, of what the lightbox landed on, not the Cover first.
   const valheim = (await sentOnAir(shown)).filter((m) => m.appid === 892970);
@@ -1679,6 +1687,129 @@ test('C8 edge: closing the main window closes the presentation', async ({ page }
   const closed = shown.waitForEvent('close', { timeout: HEARTBEAT_MS + 3000 });
   await page.close();
   await closed;
+});
+
+test("C8 edge: a linked trailer's controls drive the TV, showing one state at a time", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true, neverActivated: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360?shot=v1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  // One overlay at a time: failed > buffering > paused or ended > playing.
+  const overlays = () =>
+    lightbox.evaluate((lb) =>
+      ['.lb-error', '.lb-bigplay', '.lb-tvplaying'].filter((sel) => {
+        const el = lb.querySelector<HTMLElement>(sel)!;
+        return el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+      }),
+    );
+  await expect.poll(overlays).toEqual(['.lb-tvplaying']);
+  await expect(lightbox.locator('.lb-tvplaying')).toHaveText('Playing on TV');
+
+  await reachForControls(page);
+  await lightbox.getByRole('button', { name: 'Pause on TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect.poll(overlays).toEqual(['.lb-bigplay']);
+  await lightbox.getByRole('button', { name: 'Play trailer on TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+
+  await reachForControls(page);
+  await lightbox.getByRole('button', { name: 'Mute TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
+  // Unmuted before a click there, the TV waits for one, and the lightbox says so.
+  await lightbox.getByRole('button', { name: 'Unmute TV' }).click();
+  await expect(lightbox.getByRole('button', { name: 'Click the TV for sound' }).first()).toBeVisible();
+  await expect(lightbox.locator('.lb-status')).toHaveText('Click the TV for sound');
+
+  // Seeking: Shift+→ and L add up on the TV's own position.
+  await tv.evaluate((v: HTMLVideoElement) => (v.currentTime = 30));
+  await lightbox.locator('.lb-surface').focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('l');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(45);
+  const scrub = lightbox.getByRole('slider', { name: 'Seek on TV' });
+  await scrub.focus();
+  await page.keyboard.press('Home');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(0);
+
+  await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.stall());
+  await expect(lightbox).toHaveClass(/lb--buffering/);
+  await expect.poll(overlays).toEqual([]);
+  await shown.evaluate(() => (window as unknown as { presTest: PresTest }).presTest.resume());
+  await expect(lightbox).not.toHaveClass(/lb--buffering/);
+
+  await tv.evaluate((v: HTMLVideoElement) => {
+    v.currentTime = 90;
+    v.pause();
+    v.dispatchEvent(new Event('ended'));
+  });
+  await expect.poll(overlays).toEqual(['.lb-bigplay']);
+  await lightbox.getByRole('button', { name: 'Replay on TV' }).click();
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => [v.currentTime, v.paused])).toEqual([0, false]);
+});
+
+test('C8 edge: what the TV fails to load the linked lightbox says, and retries', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await mockApi(page, { states: ['broken-trailer'] });
+  await page.goto('/game/1145360?shot=s1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await page.keyboard.press('ArrowLeft'); // the trailer, broken
+  await expect(shown.getByRole('alert')).toHaveText("Couldn't load this video.");
+  await expect(lightbox.getByRole('alert')).toContainText("Couldn't load on the TV");
+  await expect(lightbox.locator('.lb-status')).toContainText("The TV couldn't load this");
+  const retried = shown.evaluate(
+    (name) =>
+      new Promise((resolve) => {
+        new BroadcastChannel(name).onmessage = (e) => e.data?.control === 'retry' && resolve(true);
+      }),
+    PRESENTATION_CHANNEL,
+  );
+  await lightbox.getByRole('button', { name: 'Retry' }).click();
+  expect(await retried).toBe(true);
+});
+
+test('C8 edge: a linked trailer goes back to the lightbox paused where the TV was, and back to the TV where the host was', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360?shot=v1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  const tv = shown.locator('video.pres-media');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await tv.evaluate((v: HTMLVideoElement) => (v.currentTime = 30));
+  // Private: the local trailer waits for a press, from where the TV was.
+  await page.keyboard.press('p');
+  const local = lightbox.locator('video');
+  await expect(local).toHaveCount(1);
+  expect(await local.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.keyboard.press(' ');
+  await expect
+    .poll(() => local.evaluate((v: HTMLVideoElement) => [Math.round(v.currentTime), v.paused]))
+    .toEqual([30, false]);
+  // Back on the TV: it moves to where the host got to, the trailer already being on it.
+  await local.evaluate((v: HTMLVideoElement) => (v.currentTime = 42));
+  await page.keyboard.press('p');
+  await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(42);
+  await expect(local).toHaveCount(0);
+  // The TV gone: no sound starting here by itself.
+  await shown.close();
+  await expect(lightbox.locator('.lb-tv')).toBeHidden();
+  await expect(local).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(await local.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });
 
 test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now on the TV', async ({
