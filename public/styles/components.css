@@ -3390,6 +3390,51 @@
     gap: 8px;
     margin-left: auto;
   }
+  /* Presenting: steering the TV (the cast in the accent), or private; the toggle, then the × that stops presenting. */
+  .lb-tv {
+    flex: none;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    border-radius: 20px;
+  }
+  .lb-tv .lb-tv-toggle {
+    width: auto;
+    height: 100%;
+    gap: 6px;
+    padding: 0 10px 0 12px;
+    border-radius: 20px 0 0 20px;
+    background: none;
+    color: #fff;
+    font: inherit;
+    font-size: var(--fs-ui);
+    white-space: nowrap;
+  }
+  .lb-tv-toggle .lucide {
+    width: 16px;
+    height: 16px;
+    color: var(--accent);
+  }
+  .lb-tv--private .lb-tv-toggle .lucide {
+    color: rgb(255 255 255 / 0.6);
+  }
+  .lb-tv .lb-tv-stop {
+    width: 28px;
+    height: 28px;
+    margin-right: 6px;
+    border-left: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 0 14px 14px 0;
+    background: none;
+    color: #fff;
+    font-size: var(--fs-title);
+  }
+  /* "· On TV" after the counter: only in a keyboard step's flash, the chrome having the pill. */
+  .lb-counter-tv {
+    margin-left: 1ch;
+  }
+  #screenshot-lightbox:not(.lb-idle) .lb-counter-tv {
+    display: none;
+  }
 
   /* The new item slides in from the side it was stepped toward (from where a swipe's peek was), fading in. */
   @keyframes lb-enter-x {
@@ -3577,9 +3622,14 @@
       height: 44px;
     }
     .lb-caption,
-    .lb-counter {
+    .lb-counter,
+    .lb-tv {
       height: 44px;
       border-radius: 22px;
+    }
+    .lb-tv .lb-tv-stop {
+      width: 36px;
+      height: 36px;
     }
     .lb-caption button {
       width: 34px;
@@ -3643,6 +3693,14 @@
     }
     .lb-vc-scrub {
       appearance: auto;
+    }
+    /* On the TV, said without the accent. */
+    .lb-tv-toggle .lucide {
+      color: CanvasText;
+    }
+    .lb-tv-toggle[aria-pressed='true'] {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
     }
   }
 

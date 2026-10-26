@@ -1,6 +1,6 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
 import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
-import { present, presented } from './presentation.ts';
+import { present, presented, privateMode, setPrivateMode, stopPresenting } from './presentation.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
@@ -11,8 +11,9 @@ import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
 
-import { createSignal, createEffect, createRoot, batch, untrack } from 'solid-js';
+import { createSignal, createEffect, createMemo, createRoot, batch, untrack, Show } from 'solid-js';
 import { render } from 'solid-js/web';
+import Cast from 'lucide-solid/icons/cast';
 import ChevronDown from 'lucide-solid/icons/chevron-down';
 import ChevronLeft from 'lucide-solid/icons/chevron-left';
 import ChevronRight from 'lucide-solid/icons/chevron-right';
@@ -57,8 +58,24 @@ const shots = () => {
 // every read of `shots()[idx()]` (the render, the caption, the leave-memory) must stay in bounds.
 const idx = () => Math.max(0, Math.min(lbIdx(), shots().length - 1));
 const gameName = () => lbGame()?.name ?? '';
-// The game `renderLightbox` last drew, so a render can tell a game step from a media step.
+// While presenting and not set private, the lightbox steers the TV: the item it rests on is presented
+// (the effect at the foot of this file), and a trailer plays there only.
+const linked = createRoot(() => createMemo(() => lbGame() !== null && !!presented() && !privateMode()));
+// The game and item `renderLightbox` last drew, so a render can tell a game step from a media step,
+// and whether that one was the TV's (poster only), so unlinking on it doesn't start it here by itself.
 let lbRenderedAppid: number | undefined;
+let lbRenderedShotId: string | undefined;
+let lbRenderedOnTv = false;
+// A trailer held unstarted (private, or just unlinked): the first play loads it.
+let lbHeld = false;
+// The present waiting out the settle (`LB_SETTLE_*`), and whether the next one goes at once (just linked).
+let lbTvTimer: ReturnType<typeof setTimeout> | undefined;
+let lbTvSend: (() => void) | null = null;
+let lbTvLinked = false;
+// Stop presenting came from the lightbox's own pill: said as a stop, not as a lost window.
+let lbStopped = false;
+const LB_SETTLE_MEDIA_MS = 200;
+const LB_SETTLE_GAME_MS = 400; // the TV's cross-fade: a held ↓ shouldn't flash half-loaded games at the room
 let lbZoom = 1,
   lbPanX = 0,
   lbPanY = 0,
@@ -127,7 +144,7 @@ let _getGamePosition: () => { index: number; total: number } | null = () => null
 // Set when a re-point landed on a banner for want of anything else — see `repointLightboxGame`.
 // Holds the *kind* of shot being left, so the screenshot/trailer that eventually arrives is
 // picked by the same rule the re-point itself would have used.
-let _awaitingMedia: ShotKind | null = null;
+const [awaitingMedia, setAwaitingMedia] = createSignal<ShotKind | null>(null);
 let _lbPrevFocus: Element | null = null;
 // One mount at a time: a second initLightbox (Vite hot-reloading AppShell) tears the first down —
 // its DOM and every listener it put on `document` — instead of mounting a duplicate beside it.
@@ -191,6 +208,37 @@ export function lightboxShot(): { appid: number; shotId: string } | null {
   const game = lbGame();
   const shot = shots()[idx()];
   return game && shot ? { appid: game.appid, shotId: shot.shotId } : null;
+}
+
+function flushLbTv() {
+  clearTimeout(lbTvTimer);
+  const send = lbTvSend;
+  lbTvSend = null;
+  send?.();
+}
+
+function cancelLbTv() {
+  clearTimeout(lbTvTimer);
+  lbTvSend = null;
+}
+
+// P and the pill: not presenting yet → present; linked → private; private → back on the TV, at once.
+function toggleTv() {
+  const game = lbGame();
+  const shot = shots()[idx()];
+  if (!game || !shot) return;
+  if (linked()) return void setPrivateMode(true);
+  // A trailer carries on where it was, as a cast does (the TV takes it even on the item it shows); one
+  // never started goes out fresh, by the link itself, and only if the TV isn't showing it already.
+  const vid = lbShowingVideo() && !lbHeld ? lbVideoEl : null;
+  const from = vid ? { startAt: vid.currentTime, paused: vid.paused } : undefined;
+  if (!presented() || from) present(game, shot.shotId, from, { silent: true });
+  setPrivateMode(false);
+}
+
+function stopPresentingFromLb() {
+  lbStopped = true;
+  stopPresenting();
 }
 
 // Every game step from inside the lightbox (↑/↓, R, the caption's own buttons) goes through
@@ -672,8 +720,26 @@ function LightboxDom() {
             <span class="lb-caption-pos" />
           </div>
           {/* Its full wording ("Screenshot 3 of 12") is the status line's, below. */}
-          <div class="lb-counter lb-glass" aria-hidden="true" />
+          <div class="lb-counter lb-glass" aria-hidden="true">
+            <span class="lb-counter-n" />
+            {/* Only in the keyboard's step flash (CSS): with the chrome, the pill says it. */}
+            <Show when={linked()}>
+              <span class="lb-counter-tv">· On TV</span>
+            </Show>
+          </div>
           <div class="lb-toolbar-right">
+            {/* Steering the TV, or private; its × stops presenting (the nav chip is under this modal). */}
+            <Show when={presented()}>
+              <div class="lb-tv lb-glass" classList={{ 'lb-tv--private': !linked() }}>
+                <button class="lb-tv-toggle" aria-pressed={linked()} aria-keyshortcuts="P" onClick={toggleTv}>
+                  <Cast aria-hidden="true" />
+                  {linked() ? 'On TV' : 'Private · P to show'}
+                </button>
+                <button class="lb-tv-stop" aria-label="Stop presenting" onClick={stopPresentingFromLb}>
+                  <X />
+                </button>
+              </div>
+            </Show>
             <button class="lb-fullscreen lb-glass" aria-label="Enter fullscreen">
               <Maximize class="lb-icon-off" />
               <Minimize class="lb-icon-on" />
@@ -815,18 +881,10 @@ function wireKeyboard(lb: HTMLElement) {
         e.preventDefault();
         stepGameFromLightbox(_onGameRandom);
       }
-      // Presents it instead: the presentation window stands in for the lightbox.
       if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
-        // panelKeyboard.ts's P would present again once the lightbox is closed.
-        e.stopImmediatePropagation();
-        const game = lbGame();
-        const shot = shots()[idx()];
-        // A trailer carries on where it was, as a cast does.
-        const vid = lbShowingVideo() ? lbVideoEl : null;
-        if (game && shot)
-          present(game, shot.shotId, vid ? { startAt: vid.currentTime, paused: vid.paused } : undefined);
-        closeLightbox();
+        e.stopImmediatePropagation(); // panelKeyboard.ts's P would present the panel's item too
+        toggleTv();
         return;
       }
       if (e.key === 'f' || e.key === 'F') toggleLbFullscreen(lb);
@@ -836,7 +894,7 @@ function wireKeyboard(lb: HTMLElement) {
         if (e.key === ' ' && !onScrub && !(e.target as HTMLElement).closest('button')) {
           e.preventDefault();
           osdLb(vid.paused ? 'play' : 'pause');
-          vid.paused ? vid.play().catch(() => {}) : vid.pause();
+          toggleLbPlay();
         }
         if (e.key === 'm' || e.key === 'M') {
           setLbMuted(!vid.muted);
@@ -1243,11 +1301,9 @@ function wireVideoControls(lb: HTMLElement) {
   scrub.addEventListener('mousedown', () => clearTimeout(lbVcTimer));
   scrub.addEventListener('mouseup', () => schedHideLbChrome());
 
-  playBtn.addEventListener('click', () => {
-    vid2.paused ? vid2.play().catch(() => {}) : vid2.pause();
-  });
+  playBtn.addEventListener('click', toggleLbPlay);
   const bigPlay = lb.querySelector<HTMLElement>('.lb-bigplay')!;
-  bigPlay.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
+  bigPlay.addEventListener('click', toggleLbPlay);
   // Screen locked, app or tab switched: stop rather than play on unseen. Not resumed on return —
   // the large play button is there, and sound starting by itself on unlock would surprise.
   document.addEventListener(
@@ -1260,7 +1316,7 @@ function wireVideoControls(lb: HTMLElement) {
   muteBtn.addEventListener('click', () => setLbMuted(!vid2.muted));
 
   // A click plays or pauses; a finger's tap toggles the controls instead (below, which cancels its click).
-  vid2.addEventListener('click', () => (vid2.paused ? vid2.play().catch(() => {}) : vid2.pause()));
+  vid2.addEventListener('click', toggleLbPlay);
 
   // Any mouse move brings it all back (as video players do); leaving the window hides it at once.
   lb.addEventListener('pointermove', (e) => {
@@ -1291,7 +1347,7 @@ function wireVideoControls(lb: HTMLElement) {
       if (Math.abs(t.clientX - tapX) >= 10 || Math.abs(t.clientY - tapY) >= 10) return;
       if ((e.target as HTMLElement).closest('button, input')) return revealLbChrome();
       if (lbShowingVideo()) e.preventDefault(); // its click would play or pause: the centre button does
-      if (lb.classList.contains('lb--unstarted')) return void lbVideoEl.play().catch(() => {});
+      if (lb.classList.contains('lb--unstarted')) return toggleLbPlay();
       if (tapRevealedChrome) return revealLbChrome();
       clearTimeout(lbChromeTapTimer);
       // A trailer's middle third hides at once; elsewhere a tap waits out a possible second one (a zoom, a seek).
@@ -1302,6 +1358,16 @@ function wireVideoControls(lb: HTMLElement) {
     },
     { passive: false },
   );
+}
+
+// A held trailer (`lbHeld`) loads on its first play.
+function toggleLbPlay() {
+  if (!lbVideoEl.paused) return lbVideoEl.pause();
+  const shot = shots()[idx()];
+  if (lbHeld && shot?.type === 'video') {
+    lbHeld = false;
+    playLbTrailer(document.getElementById('screenshot-lightbox')!, shot);
+  } else lbVideoEl.play().catch(() => {});
 }
 
 // The large play button shows over a trailer that isn't playing — autoplay refused, paused, ended.
@@ -1351,7 +1417,7 @@ export function openLightbox(game: Game, idxOrShotId: number | string) {
     setIdx(resolveShotIndex(newShots, idxOrShotId));
   });
   // A deliberate open supersedes any pending "take the media when it lands" latch.
-  _awaitingMedia = null;
+  setAwaitingMedia(null);
   lbShotChosen = true;
   const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
   // Focuses the surface (`autofocus`): the shortcuts work from there, and nothing shows a ring.
@@ -1415,15 +1481,15 @@ export function repointLightboxGame(game: ReadonlyGame) {
   lbShotChosen = false;
   // A pending latch's kind carries on through a game still loading: its lone banner is no Cover.
   const leaving: ShotKind =
-    _awaitingMedia ?? (left?.shotId === 'banner' && shots().length > 1 ? 'cover' : (left?.type ?? 'image'));
+    untrack(awaitingMedia) ?? (left?.shotId === 'banner' && shots().length > 1 ? 'cover' : (left?.type ?? 'image'));
   const next = buildMediaItems(game.appid, game.details?.meta);
   const target = landingIndex(game.appid, next, leaving);
   // A lone banner means this row's details are still streaming — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
-  _awaitingMedia = next.length === 1 ? leaving : null;
   batch(() => {
+    setAwaitingMedia(next.length === 1 ? leaving : null);
     setLbGame(game);
     setIdx(target);
   });
@@ -1458,8 +1524,9 @@ export function closeLightbox() {
 
 function closeLightboxNow() {
   if (!isLightboxOpen()) return;
+  flushLbTv(); // a step closed within its settle still reaches the TV
   setLbGame(null);
-  _awaitingMedia = null;
+  setAwaitingMedia(null);
   clearTimeout(lbVcTimer);
   const lb = document.getElementById('screenshot-lightbox') as HTMLDialogElement;
   stopHls(lbVideoEl);
@@ -1476,8 +1543,10 @@ function closeLightboxNow() {
     'lb--ended',
     'lb--buffering',
   );
-  lbRenderedAppid = undefined;
+  lbRenderedAppid = lbRenderedShotId = undefined;
+  lbRenderedOnTv = lbHeld = false;
   clearTimeout(lbStatusTimer);
+  lbStatusNote = lbStatusMedia = lbStatusGame = '';
   lb.querySelector('.lb-status')!.textContent = '';
   document.body.classList.remove('lb-open');
   if (isFullscreen()) exitFullscreen();
@@ -1493,7 +1562,7 @@ function stepLightbox(dir: number, swipe = false) {
   if (shots().length <= 1) return;
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
-  _awaitingMedia = null;
+  setAwaitingMedia(null);
   lbShotChosen = true;
   lbLastAxis = 'x';
   const list = shots();
@@ -1509,7 +1578,7 @@ function stepLightbox(dir: number, swipe = false) {
 // than always sliding one way, same as a multi-step stepLightbox would.
 function gotoLightbox(target: number) {
   if (target === idx()) return;
-  _awaitingMedia = null; // same reason as stepLightbox's
+  setAwaitingMedia(null); // same reason as stepLightbox's
   lbShotChosen = true;
 
   lbLastDir = target > idx() ? 1 : -1;
@@ -1526,14 +1595,26 @@ function gotoLightbox(target: number) {
 // position: that read must stay tracked for the position to follow a list still streaming in,
 // and must not drag a full image reload along with it each time. Two text writes, no media.
 // One status line, debounced so holding → doesn't queue every step; it names the game only when it changes.
+// While linked it says the item is on the TV; a link change is a note before it.
 let lbStatusTimer: ReturnType<typeof setTimeout> | undefined;
 let lbStatusGame = '';
+let lbStatusMedia = '';
+let lbStatusNote = '';
 function announceLb(lb: HTMLElement, game: string, media: string) {
   if (game) lbStatusGame = game;
+  lbStatusMedia = media;
+  sayLbStatus(lb);
+}
+function noteLb(lb: HTMLElement, note: string) {
+  lbStatusNote = note;
+  sayLbStatus(lb);
+}
+function sayLbStatus(lb: HTMLElement) {
   clearTimeout(lbStatusTimer);
   lbStatusTimer = setTimeout(() => {
-    lb.querySelector('.lb-status')!.textContent = lbStatusGame + media;
-    lbStatusGame = '';
+    const item = lbStatusMedia && (untrack(linked) ? 'On TV: ' : '') + lbStatusGame + lbStatusMedia;
+    lb.querySelector('.lb-status')!.textContent = [lbStatusNote, item].filter(Boolean).join('. ');
+    lbStatusGame = lbStatusMedia = lbStatusNote = '';
   }, 300);
 }
 
@@ -1609,9 +1690,15 @@ function renderLightbox() {
   resetLbZoom();
   const appid = lbGame()?.appid;
   const gameChanged = appid !== lbRenderedAppid;
+  const sameItem = !gameChanged && shot.shotId === lbRenderedShotId;
+  const onTv = untrack(linked);
   if (dir !== 0) fadeOutLbItem(lb);
   flashLbCounter(lb, gameChanged);
+  // Private, or unlinked on what the TV played: no sound starting here by itself.
+  lbHeld = shot.type === 'video' && !onTv && (untrack(privateMode) || (sameItem && lbRenderedOnTv));
   lbRenderedAppid = appid;
+  lbRenderedShotId = shot.shotId;
+  lbRenderedOnTv = onTv && shot.type === 'video';
   hideLbError();
   // Invalidate any image preload still in flight from a previous render — see lbImgToken decl.
   lbImgToken++;
@@ -1624,7 +1711,7 @@ function renderLightbox() {
   const pos = untrack(() => _getGamePosition());
   const label =
     `${name ? name + ' — ' : ''}${pos ? `game ${pos.index + 1} of ${pos.total} — ` : ''}` + mediaLabel(list, i);
-  if (shot.type === 'video') {
+  if (shot.type === 'video' && !onTv) {
     img.style.display = 'none';
     setLbLoading(lb, false);
     attachLbVideo();
@@ -1634,7 +1721,11 @@ function renderLightbox() {
     vid.setAttribute('aria-label', shot.name ? `${label}: ${shot.name}` : label);
     vc.style.display = '';
     resetLbVc(vc);
-    playLbTrailer(lb, shot);
+    if (lbHeld) {
+      lbVideoEl.muted = lbMutedChoice();
+      syncLbMuteBtn(lb);
+      lb.classList.remove('lb--automuted', 'lb--ended');
+    } else playLbTrailer(lb, shot);
     syncLbPaused();
     schedHideLbChrome();
   } else {
@@ -1648,24 +1739,32 @@ function renderLightbox() {
     img.onload = null;
     img.onerror = null;
     enterLbItem(img, 'lb-img', dir, axis);
-    // Show a degraded placeholder (the thumbnail, already loaded/cached from
-    // the hero carousel) instead of leaving the *previous* shot on screen
-    // while the full-size image loads. The banner shot has no separate
-    // thumbnail (thumb === main), so there's nothing degraded to show — fall
-    // back to blank there.
-    if (shot.thumb && shot.thumb !== shot.main) {
+    if (shot.type === 'video') {
+      // On the TV: its poster here (the <video> stays detached — see `lbVideoEl`).
       img.style.opacity = '1';
-      img.src = shot.thumb;
+      img.src = shot.thumb || '';
+      setLbLoading(lb, false);
+      schedHideLbChrome();
     } else {
-      img.style.opacity = '0';
+      // Show a degraded placeholder (the thumbnail, already loaded/cached from
+      // the hero carousel) instead of leaving the *previous* shot on screen
+      // while the full-size image loads. The banner shot has no separate
+      // thumbnail (thumb === main), so there's nothing degraded to show — fall
+      // back to blank there.
+      if (shot.thumb && shot.thumb !== shot.main) {
+        img.style.opacity = '1';
+        img.src = shot.thumb;
+      } else {
+        img.style.opacity = '0';
+      }
+      loadLbImage(shot.main!);
+      schedHideLbChrome();
     }
-    loadLbImage(shot.main!);
-    schedHideLbChrome();
   }
   syncLbZoomBtn(lb);
   syncLbFullscreenShown(lb);
   const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
-  counter.textContent = `${i + 1} / ${list.length}`;
+  counter.querySelector('.lb-counter-n')!.textContent = `${i + 1} / ${list.length}`;
   counter.style.display = list.length > 1 ? '' : 'none';
   announceLb(
     lb,
@@ -1719,7 +1818,7 @@ function renderLightbox() {
 // scope (never torn down), so without a root it would warn "created outside a createRoot ...
 // will never be disposed" (same fix panel.tsx's own top-level effects needed).
 createRoot(() => {
-  // Consumes the `_awaitingMedia` latch (see `repointLightboxGame`): a game paged onto before
+  // Consumes the `awaitingMedia` latch (see `repointLightboxGame`): a game paged onto before
   // its details had streamed in has only its banner to offer, so the moment the real media
   // lands, take it. Created *before* the render effect below so it runs first within the same
   // flush — the render then happens once, on the shot actually wanted, rather than painting the
@@ -1729,9 +1828,9 @@ createRoot(() => {
   // out from under someone who is looking at it.
   createEffect(() => {
     const list = shots();
-    const leaving = _awaitingMedia;
+    const leaving = untrack(awaitingMedia);
     if (!leaving || list.length <= 1) return;
-    _awaitingMedia = null;
+    setAwaitingMedia(null);
     const target = landingIndex(lbGame()!.appid, list, leaving);
     if (target === 0) return; // the Cover wanted, or trailers but no screenshots (not worth autoplaying unasked)
     setIdx(target);
@@ -1739,9 +1838,48 @@ createRoot(() => {
   });
   createEffect(() => {
     const list = shots();
-    idx();
+    // A trailer is drawn differently on the TV (its poster) than here: a link change redraws it.
+    if (list[idx()]?.type === 'video') linked();
     gameName();
     if (list.length) renderLightbox();
+  });
+  // Steers the TV: the item the lightbox rests on is presented once, after the settle (at once on
+  // linking); not while a game's media is still streaming in (the latch above picks what it lands on).
+  createEffect(() => {
+    const now = linked();
+    const fresh = now && !lbTvLinked;
+    lbTvLinked = now;
+    const game = lbGame();
+    const shot = shots()[idx()];
+    if (!now || !game || !shot || (awaitingMedia() && !game.details)) return cancelLbTv();
+    const on = presented();
+    if (on?.appid === game.appid && on.item.shotId === shot.shotId) return cancelLbTv();
+    clearTimeout(lbTvTimer);
+    // What's on screen when it goes: any change since would have rescheduled it.
+    // eslint-disable-next-line solid/reactivity -- read once when the settle ends, from a timer: nothing to track
+    lbTvSend = () => {
+      const g = lbGame();
+      const item = shots()[idx()];
+      if (g && item) present(g, item.shotId, undefined, { silent: true });
+    };
+    if (fresh) flushLbTv();
+    else lbTvTimer = setTimeout(flushLbTv, on?.appid === game.appid ? LB_SETTLE_MEDIA_MS : LB_SETTLE_GAME_MS);
+  });
+  // Says a link change while open: linked (an open on the TV included), private, or presenting over.
+  const tvState = createMemo(() =>
+    lbGame() === null ? 'closed' : !presented() ? 'off' : privateMode() ? 'private' : 'on',
+  );
+  let lastTvState = 'closed';
+  createEffect(() => {
+    const now = tvState();
+    const lb = document.getElementById('screenshot-lightbox');
+    if (lb && now !== 'closed' && (lastTvState !== 'closed' || now === 'on')) {
+      if (now === 'on') noteLb(lb, 'Linked to the TV');
+      if (now === 'private') noteLb(lb, `Private, the TV keeps ${untrack(presented)!.name}`);
+      if (now === 'off') noteLb(lb, lbStopped ? 'Stopped presenting' : 'Presentation window closed');
+    }
+    lbStopped = false;
+    lastTvState = now;
   });
   createEffect(() => {
     if (shots().length) renderLbCaption();

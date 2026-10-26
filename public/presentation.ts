@@ -17,7 +17,9 @@ const ID_KEY = 'playshelf-presentation-main';
 const [presented, setPresented] = createSignal<OnAir | null>(null);
 // How the presented trailer (or picture) is doing, as the window last reported; null until it does.
 const [playback, setPlayback] = createSignal<Playback | null>(null);
-export { presented, playback };
+// The host's "private": the lightbox no longer steers the TV, on every open, until P relinks it or presenting stops.
+const [privateMode, setPrivateMode] = createSignal(false);
+export { presented, playback, privateMode, setPrivateMode };
 
 let mainId: string | null = null;
 let channel: BroadcastChannel | null = null;
@@ -68,6 +70,7 @@ function forget() {
   handover = undefined;
   setPresented(null);
   setPlayback(null);
+  setPrivateMode(false);
   clearInterval(heartbeatTimer);
   heartbeatTimer = undefined;
 }
@@ -112,7 +115,13 @@ addEventListener('pageshow', (e) => e.persisted && mainId && post({ main: mainId
 
 // Shows one media of `game` in the presentation window, opening it first if needed (it then asks for
 // the media on hello). A plain object: store rows are proxies, which postMessage can't clone.
-export function present(game: ReadonlyGame, shotId: string, from?: Pick<OnAir, 'startAt' | 'paused'>): void {
+export function present(
+  game: ReadonlyGame,
+  shotId: string,
+  from?: Pick<OnAir, 'startAt' | 'paused'>,
+  // The linked lightbox says it on its own status line (the shell's is inert under its modal).
+  { silent = false } = {},
+): void {
   const items = buildMediaItems(game.appid, game.details?.meta);
   const i = items.findIndex((s) => s.shotId === shotId);
   if (i < 0) return;
@@ -122,7 +131,7 @@ export function present(game: ReadonlyGame, shotId: string, from?: Pick<OnAir, '
   const onAir = { appid: game.appid, name, item: items[i], label: spoken.replace(' of ', ' / '), spoken };
   handover = from;
   if (presented()?.item.shotId !== shotId || presented()?.appid !== game.appid) setPlayback(null);
-  announce(`Presenting ${name}, ${spoken}`);
+  if (!silent) announce(`Presenting ${name}, ${spoken}`);
   setPresented(onAir);
   seen();
   // An open window main forgot (missed beats) is sent to, not reopened: that would reload it out of fullscreen.

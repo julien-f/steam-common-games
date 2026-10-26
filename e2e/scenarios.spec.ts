@@ -1088,6 +1088,31 @@ async function tellTv(page: Page, body: Record<string, unknown>) {
   );
 }
 
+// The media main sent the TV, in order (the TV's own log: `hookPresentation`).
+async function sentOnAir(shown: Page) {
+  return shown.evaluate(() =>
+    (window as unknown as { presTest: PresTest }).presTest.heard
+      .filter((m) => m.type === 'onAir')
+      .map((m) => m.onAir as { appid: number; item: { shotId: string } }),
+  );
+}
+async function sentShots(shown: Page) {
+  return (await sentOnAir(shown)).map((m) => m.item.shotId);
+}
+
+// Keys pressed in one task, quicker than any settle delay: on the lightbox's surface, as the keyboard would.
+async function stepsAtOnce(page: Page, keys: string[]) {
+  await page.evaluate((keys) => {
+    const surface = document.querySelector('#screenshot-lightbox .lb-surface')!;
+    for (const key of keys)
+      surface.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  }, keys);
+}
+
+async function lightboxShotId(page: Page) {
+  return new URL(page.url()).searchParams.get('shot');
+}
+
 // What the TV last reported of its trailer.
 async function lastPlayback(shown: Page) {
   return shown.evaluate(
@@ -1308,9 +1333,9 @@ test('C8 edge: the panel says which of its media is on the TV', async ({ page },
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await startPresenting(page);
-  const onScreen = page.getByRole('button', { name: 'On screen' });
-  await expect(onScreen).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.panel-hero-present')).toHaveText('On screen');
+  const onTv = page.getByRole('button', { name: 'On TV' });
+  await expect(onTv).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.panel-hero-present')).toHaveText('On TV');
   await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click(); // another item, not presented
   await expect(page.getByRole('button', { name: 'Present on second screen' })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.panel-hero-present')).toHaveText('Present');
@@ -1494,10 +1519,11 @@ test('C8 edge: closing the presentation window drops the nav chip', async ({ pag
   await expect(chip).toBeHidden(); // the 2 s bye grace, within expect's 5 s; heartbeats alone take 20 s
 });
 
-test('C8.6: while presenting, opening a media from the panel presents it instead of the lightbox', async ({
+test('C8.6: while presenting, a media opened from the panel opens the lightbox on the TV, which follows its steps', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
@@ -1506,8 +1532,142 @@ test('C8.6: while presenting, opening a media from the panel presents it instead
   const picture = () => shown.locator('img.pres-media').getAttribute('src');
   expect(await picture()).toContain('header.jpg'); // browsing the panel moves nothing: still the Cover
   await page.getByRole('button', { name: 'Present this media' }).click();
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).toHaveAttribute('open');
   await expect.poll(picture).toContain('Screenshot%203');
+  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(lightbox.locator('.lb-status')).toHaveText(
+    'Linked to the TV. On TV: Hades, game 1 of 1, Screenshot 3 of 3',
+  );
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(picture).toContain('Screenshot%202');
+  await expect(lightbox.locator('.lb-status')).toHaveText('On TV: Screenshot 2 of 3');
+  // Said once, by the lightbox: the shell's own status line sits in the page the dialog makes inert.
+  await expect(page.locator('[role="status"]', { hasText: 'Presenting Hades, Screenshot 2' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(lightbox).not.toHaveAttribute('open');
+  await page.waitForTimeout(300);
+  expect(await picture()).toContain('Screenshot%202'); // the TV keeps it
+  await expect(page.locator('.panel-hero-present')).toHaveText('On TV');
+});
+
+test("C8 edge: steps faster than the TV's settle send it only the item they stop on, and Esc sends it at once", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360?shot=s3');
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  const shown = await startPresenting(page);
+  await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
+  await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft']);
+  await page.waitForTimeout(500);
+  expect(await sentShots(shown)).toEqual(['s3', 's1']);
+  await stepsAtOnce(page, ['ArrowRight']);
+  await page.keyboard.press('Escape'); // well within the settle
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's1', 's2']);
+});
+
+test('C8 edge: game steps in the linked lightbox put each game on the TV once its media is in', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
+  // P in a lightbox not presenting yet: presents, and the lightbox stays, now on the TV.
+  const shown = await startPresenting(page);
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await page.keyboard.press('ArrowDown');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
+  await expect(lightbox.locator('.lb-status')).toContainText('On TV: Valheim, game 3 of 3');
+  await page.waitForTimeout(600);
+  // Its media streamed in after the step: one send, of what the lightbox landed on, not the Cover first.
+  const valheim = (await sentOnAir(shown)).filter((m) => m.appid === 892970);
+  expect(valheim.map((m) => m.item.shotId)).toEqual([await lightboxShotId(page)]);
+  await page.keyboard.press('ArrowUp');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+});
+
+test('C8 edge: P in the linked lightbox keeps what follows private, sticking until P again', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360?shot=s3');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect.poll(() => sentShots(shown)).toEqual(['s3']);
+  await expect(lightbox.locator('.lb-status')).toContainText('Linked to the TV');
+  await page.keyboard.press('p');
+  const pill = lightbox.locator('.lb-tv-toggle');
+  await expect(pill).toHaveAccessibleName('Private · P to show');
+  await expect(pill).toHaveAttribute('aria-pressed', 'false');
+  await expect(lightbox.locator('.lb-status')).toHaveText('Private, the TV keeps Hades');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Escape');
+  // Reopened from the panel: still private, and nothing sent.
+  await page.getByRole('button', { name: 'Open in lightbox' }).click();
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(page.locator('.panel-hero-present')).toHaveText('Open');
+  await page.waitForTimeout(500);
+  expect(await sentShots(shown)).toEqual(['s3']);
+  await page.keyboard.press('p');
+  await expect(pill).toHaveAccessibleName('On TV');
+  await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']);
+});
+
+test("C8 edge: stopping from the lightbox's pill, or losing the TV, leaves a plain lightbox", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await page.goto('/game/1145360?shot=s3');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  let shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await expect(lightbox.locator('.lb-status')).toContainText('Linked to the TV');
+  const closed = shown.waitForEvent('close');
+  await reachForControls(page);
+  await lightbox.getByRole('button', { name: 'Stop presenting' }).click();
+  await closed;
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(lightbox.locator('.lb-tv')).toBeHidden();
+  await expect(lightbox.locator('.lb-status')).toHaveText('Stopped presenting');
+  shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await expect(lightbox.locator('.lb-tv')).toBeVisible();
+  await shown.close();
+  await expect(lightbox.locator('.lb-tv')).toBeHidden(); // the 2 s bye grace
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(lightbox.locator('.lb-status')).toHaveText('Presentation window closed');
+});
+
+test('C8 edge: a trailer in the linked lightbox plays on the TV only; private, it waits for a press', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await fakePlayback(page);
+  await hookPresentation(page, { fakePlayback: true });
+  await withTrailerStream(page);
+  await page.goto('/game/1145360?shot=s1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
+  await page.keyboard.press('ArrowLeft'); // the trailer
+  await expect.poll(() => shown.locator('video.pres-media').evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
+  await expect(lightbox.locator('video')).toHaveCount(0); // no second decoder, no second sound
+  await expect(lightbox.locator('.lb-img')).toBeVisible();
+  await page.keyboard.press('p'); // private: the local trailer is there, but not started
+  await expect(lightbox.locator('video')).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(await lightbox.locator('video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect(lightbox.getByRole('button', { name: 'Play trailer' })).toBeVisible();
 });
 
 test('C8 edge: closing the main window closes the presentation', async ({ page }, testInfo) => {
@@ -1521,7 +1681,9 @@ test('C8 edge: closing the main window closes the presentation', async ({ page }
   await closed;
 });
 
-test('C8 edge: P in the lightbox presents its media and closes the lightbox', async ({ page }, testInfo) => {
+test('C8 edge: P in the lightbox presents its media and keeps the lightbox, now on the TV', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   // A second present() in the same keydown (the panel's own P, once the lightbox closed) would send it the media.
   await page.addInitScript(() => {
@@ -1546,8 +1708,9 @@ test('C8 edge: P in the lightbox presents its media and closes the lightbox', as
   const popup = page.waitForEvent('popup', { timeout: 3000 });
   await page.keyboard.press('p');
   const shown = await popup;
-  await expect(lightbox).not.toHaveAttribute('open');
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(lightbox.getByRole('button', { name: 'On TV' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('banner').locator('.present-chip')).toContainText('Hades');
   expect(popups).toBe(1);
   expect(await page.evaluate(() => (window as unknown as { postsAtKey: number[] }).postsAtKey)).toEqual([0]);
