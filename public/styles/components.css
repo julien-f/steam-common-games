@@ -3150,8 +3150,8 @@
   :not(.lb-on) > .lb-icon-on {
     display: none;
   }
-  .lb-bigplay .lucide,
-  .lb-vc-play .lucide {
+  /* Solid play/pause glyphs; the replay arrow stays a line. */
+  :is(.lb-bigplay, .lb-vc-play) :is(.lucide-play, .lucide-pause) {
     fill: currentColor;
   }
   .lb-vc-time {
@@ -3468,10 +3468,23 @@
   .lb-bigplay .lucide-play {
     margin-left: 2px; /* the triangle's visual centre sits left of its box */
   }
-  /* Ended: a replay in place of play/pause. */
+  /* Ended: a "Replay" pill in place of play/pause — the arrow alone read as undo or refresh. */
   #screenshot-lightbox:not(.lb--ended) .lb-bigplay-replay,
   #screenshot-lightbox.lb--ended .lb-bigplay :is(.lb-icon-on, .lb-icon-off) {
     display: none;
+  }
+  #screenshot-lightbox.lb--ended .lb-bigplay {
+    width: auto;
+    height: 48px;
+    gap: 8px;
+    padding: 0 20px 0 16px;
+    border-radius: 24px;
+    font-size: var(--fs-body);
+    font-weight: 600;
+  }
+  #screenshot-lightbox.lb--ended .lb-bigplay svg {
+    width: 22px;
+    height: 22px;
   }
   /* Delayed, so it doesn't flash up in the moment before autoplay starts. */
   #screenshot-lightbox.lb--paused .lb-bigplay {

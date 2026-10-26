@@ -3496,6 +3496,7 @@ test('I2 edge: a key on a control reached with Tab leaves the controls shown', a
   test.skip(testInfo.project.name !== 'desktop', 'keyboard');
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.lb-surface')).toBeFocused(); // opened: its own focus is placed
   await page.locator('.lb-next').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
@@ -4412,6 +4413,7 @@ test('M3 edge: a trailer that ends offers a replay, and its seek line reads out 
   const replay = page.getByRole('button', { name: 'Replay trailer' });
   await expect(replay).toBeVisible();
   await expect(replay.locator('.lucide-rotate-ccw')).toBeVisible();
+  await expect(replay).toContainText('Replay'); // the arrow alone read as undo or refresh
   await replay.click();
   await expect(page.locator('.lb-vc-play')).toHaveAccessibleName('Pause');
 });

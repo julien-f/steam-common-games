@@ -638,6 +638,7 @@ function LightboxDom() {
           <Play class="lb-icon-off" />
           <Pause class="lb-icon-on" />
           <RotateCcw class="lb-bigplay-replay" />
+          <span class="lb-bigplay-replay">Replay</span>
         </button>
         <button class="lb-unmute lb-glass">
           <VolumeX /> Unmute
