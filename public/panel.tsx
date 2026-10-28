@@ -14,6 +14,7 @@ import {
   focusGameRow,
   fadeInOnLoad,
   safeHref,
+  fmtReleaseDate,
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
@@ -48,7 +49,6 @@ import type {
   PanelPrice,
 } from './panelData.ts';
 import { bestPickRate, bundleUrgency, fmtBundleDateTime, pickTiers } from './bundleRows.ts';
-import { fmtReleaseDate } from './gameColumns.ts';
 import { formatWithEstimate } from './currency.ts';
 import { currentRegion, regionCurrency } from './region.ts';
 import { nextHopHistory } from './panelHistory.ts';

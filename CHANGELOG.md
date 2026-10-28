@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Suggested views show only the columns that matter to them, the one they sort or filter on first
 - The screenshot and trailer viewer gives the screen to the media: its controls show only for the mouse or a tap, it follows photo and video players' keys and gestures, and trailers remember muting and offer a replay.
 - Home's Explore cards sit in two even rows of three
+- Home loads about 10 KB less code before showing (the table's column definitions now wait for a table page)
 
 ### Fixed
 

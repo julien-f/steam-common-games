@@ -14,7 +14,6 @@ registerHooks({
 
 const {
   endOfReleasePeriod,
-  fmtReleaseDate,
   releaseSortTimestamp,
   computePriceStatus,
   computeOwnershipStatus,
@@ -28,12 +27,6 @@ const {
 } = require('../public/gameColumns.ts');
 
 const day = (y, m, d) => new Date(y, m - 1, d).getTime();
-
-test('fmtReleaseDate: a day-precise release reads as an ISO date, a coarse one as Steam wrote it', () => {
-  assert.equal(fmtReleaseDate('Oct 13, 2026'), '2026-10-13');
-  assert.equal(fmtReleaseDate('13 Oct, 2026'), '2026-10-13');
-  for (const s of ['Q4 2026', 'Fall 2026', 'October 2026', '2026', 'Coming soon']) assert.equal(fmtReleaseDate(s), s);
-});
 
 test('endOfReleasePeriod: anchors a coarse date at the end of its period', () => {
   for (const [input, expected] of [

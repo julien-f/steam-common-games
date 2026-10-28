@@ -48,7 +48,7 @@ import {
   PROTON_TIER_COLORS,
   PROTON_TIER_UNKNOWN,
   fadeInOnLoad,
-  fmtLocalDate,
+  fmtReleaseDate,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -300,13 +300,6 @@ export function endOfReleasePeriod(str: string): number {
     if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth() + 1, 0).getTime(); // month name + year, no day — last day of that month
   }
   return new Date(s).getTime();
-}
-
-// A day-precise release as YYYY-MM-DD, like every other date in the app; coarse ones ("Q4 2026") as Steam wrote them.
-export function fmtReleaseDate(str: string): string {
-  const d = /\b\d{1,2}\b/.test(str) ? new Date(str) : null;
-  if (!d || isNaN(d.getTime())) return str;
-  return fmtLocalDate(d);
 }
 
 // Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a
