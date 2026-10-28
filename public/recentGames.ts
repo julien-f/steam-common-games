@@ -30,7 +30,9 @@ export function loadRecentGames(): RecentGame[] {
   return getPref<RecentGame[]>(RECENT_GAMES_PREF_KEY, []);
 }
 
-function saveRecentGames(list: RecentGame[]): void {
+function saveRecentGames(list: RecentGame[], stored: RecentGame[]): void {
+  // A lookup writes its entry again once its details land; most of those change nothing.
+  if (JSON.stringify(list) === JSON.stringify(stored)) return;
   setPref(RECENT_GAMES_PREF_KEY, list);
 }
 
@@ -44,7 +46,7 @@ export function addRecentGame(appid: number, name: string, tinyImage?: string | 
   const existing = list.find((g) => g.appid === appid);
   const rest = list.filter((g) => g.appid !== appid);
   rest.unshift({ appid, name: name || existing?.name || '', tinyImage: tinyImage || existing?.tinyImage || null });
-  saveRecentGames(rest.slice(0, MAX_RECENT_GAMES));
+  saveRecentGames(rest.slice(0, MAX_RECENT_GAMES), list);
 }
 
 // Fills in a stored entry's name/thumbnail *without* moving it to the front — for a game whose
@@ -55,6 +57,7 @@ export function renameRecentGame(appid: number, name: string, tinyImage?: string
   const list = loadRecentGames();
   const idx = list.findIndex((g) => g.appid === appid);
   if (idx === -1) return;
-  list[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
-  saveRecentGames(list);
+  const next = list.slice();
+  next[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
+  saveRecentGames(next, list);
 }
