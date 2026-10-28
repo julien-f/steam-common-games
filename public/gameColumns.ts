@@ -320,7 +320,7 @@ export function releaseSortTimestamp(str: string): number {
   return endOfReleasePeriod(s);
 }
 
-// A sort parses each value ~4 times per comparison; capped as Last Played and Bundles' datetimes are near-unique.
+// A sort parses each value ~4 times per comparison; capped as Bundles' publish/expiry datetimes are near-unique.
 const SORT_TIMESTAMPS_MAX = 10_000;
 const sortTimestamps = new Map<string, number>();
 function cachedSortTimestamp(v: unknown): number {
