@@ -99,7 +99,7 @@ export const PANEL_SETTLE_MS = 250;
 // `settled`: whether the game a load was asked for is still the one open, once PANEL_SETTLE_MS has passed.
 type LoadOptions = { force?: boolean; settled?: () => boolean };
 
-// Each cache's latest load per key, until it settles: an unforced call joins it, a forced one replaces it.
+// Each cache's latest load per key, until it settles: a paused call joins it, any other replaces it.
 const pendingLoads = new WeakMap<Map<unknown, unknown>, Map<unknown, Promise<unknown>>>();
 
 // The cached value when there is one and `force` is unset, else a load that caches its result. A
@@ -107,7 +107,7 @@ const pendingLoads = new WeakMap<Map<unknown, unknown>, Map<unknown, Promise<unk
 // `null` ("couldn't load") only the first time, when there's no fallback. `refusals` keeps the
 // server's message for the key's last load when it was a 429 (refusalMessage), left uncached. With
 // `settled`, a load the panel moved on from is never sent; its caller discards the uncached null.
-// A load superseded by a later forced one for its key isn't sent, or doesn't write if already sent.
+// A superseded load isn't sent, or doesn't write if already sent; a paused one answers with what replaced it.
 function sessionCached<K, V>(
   cache: Map<K, V | null>,
   key: K,
@@ -120,7 +120,7 @@ function sessionCached<K, V>(
   let pending = pendingLoads.get(cache) as Map<K, Promise<V | null>> | undefined;
   if (!pending) pendingLoads.set(cache, (pending = new Map()));
   const joined = pending.get(key);
-  if (!force && joined) return joined;
+  if (!force && settled && joined) return joined;
   const latest = () => pending.get(key) === call;
   const run = () =>
     load().then(
@@ -144,7 +144,7 @@ function sessionCached<K, V>(
   const call: Promise<V | null> =
     !force && settled
       ? new Promise((resolve) => setTimeout(resolve, PANEL_SETTLE_MS)).then(() =>
-          settled() && latest() ? run() : null,
+          !settled() ? null : latest() ? run() : (pending.get(key) ?? cache.get(key) ?? null),
         )
       : run();
   pending.set(key, call);

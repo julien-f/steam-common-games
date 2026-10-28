@@ -172,15 +172,15 @@ test('a refused bundles lookup keeps the server message', async (t) => {
   assert.deepEqual(cache.fetchBundles(620, 'FR'), DATA.bundles);
 });
 
+// With mocked timers a paused load never settles: this fails rather than hanging the test.
+const unpaused = (p) => Promise.race([p, new Promise((_, reject) => setImmediate(() => reject(new Error('paused'))))]);
+
 test('settled: an answer known without a request skips the pause', async (t) => {
   const state = mockPanelRoutes(t, DATA, { itadConfigured: false });
   const cache = createPanelDataCache();
   await cache.isItadConfigured();
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const settled = () => true;
-  // The mocked timer never fires: a paused load fails here rather than hanging the test.
-  const unpaused = (p) =>
-    Promise.race([p, new Promise((_, reject) => setImmediate(() => reject(new Error('paused'))))]);
   assert.equal(await unpaused(cache.fetchBundles(620, 'FR', { settled })), null);
   assert.equal(await unpaused(cache.fetchPrice(620, 'FR', { settled })), null);
   assert.equal((await unpaused(cache.fetchAchievements(620, [], { settled, achievementCount: 0 }))).total, 0);
@@ -222,6 +222,14 @@ test('settled: a game left and come back to within the pause is fetched once', a
   );
 });
 
+test('settled: a call with no pause answers without waiting on a paused one for its key', async (t) => {
+  mockPanelRoutes(t, DATA);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const cache = createPanelDataCache();
+  cache.fetchNews(620, { settled: () => false });
+  assert.deepEqual(await unpaused(cache.fetchNews(620)), DATA.news);
+});
+
 test('settled: a ↻ during the pause wins over the paused load', async (t) => {
   const answers = new Map(); // url → its response, sent when the test says
   t.mock.method(
@@ -250,7 +258,7 @@ test('settled: a ↻ during the pause wins over the paused load', async (t) => {
     await new Promise(setImmediate);
   }
   assert.deepEqual(await forced, ['fresh']);
-  await paused;
+  assert.deepEqual(await paused, ['fresh']);
   assert.deepEqual(cache.fetchNews(620), ['fresh']);
   assert.deepEqual([...answers.keys()], ['/api/game-news/620?refresh=1']);
 });
