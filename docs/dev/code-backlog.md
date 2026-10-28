@@ -31,6 +31,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C195 · minor · S** — `fmtLastPlayed` (`public/utils.ts:289`) gives the UTC day while Released and the Taste fit date use `fmtLocalDate`'s local day: a game played at 20:00 in UTC-8 shows tomorrow's date. Use `fmtLocalDate`.
 - **C222 · minor · S** — `trackedFetch` (`lib/metrics.js`) counts a call in the lifetime `requests` when it starts but adds its latency and status when it ends, so `sinceRestart`'s `avgLatencyMs` reads low during a burst of slow calls (HLTB), and `requests` exceeds its status counts plus network errors, unlike `lastHour`, which counts on completion. Count completed calls the same way in both.
 - **C201 · minor · S** — the Demo column's filter list labels both values "Demo": the checklist formats the stringified raw value, and `format` (`public/gameColumns.ts:1145`) treats the truthy string `'false'` as a demo. Compare against `'true'` there, or give the column a `value` getter returning its label.
+- **C209 · minor · S** — a game lookup that fails (`openStandaloneInPlace`, `public/ListRoute.tsx`; `openResult`, `public/SearchRoute.tsx`) leaves its panel on the loading skeleton for good, with no Refresh to retry (the header waits for `loading` to clear); only the page's status line says it failed, and on a phone the full-screen panel covers that. Mark the game failed so the panel says the lookup didn't answer and offers ↻.
 
 ## Security
 
