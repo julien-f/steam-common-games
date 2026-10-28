@@ -5920,6 +5920,15 @@ test("F2 edge: /search, About and the 404 page title themselves with the list ro
   }
 });
 
+test('F2 edge: on /search, the box keeps a trailing space once the search runs', async ({ page }) => {
+  await page.goto('/search?q=hade');
+  const box = page.getByPlaceholder('Search for a game…');
+  await box.fill('hades ');
+  await expect(page).toHaveURL(/\?q=hades(&|$)/);
+  await expect(rows(page)).toHaveCount(1);
+  await expect(box).toHaveValue('hades ');
+});
+
 test('F2 edge: on /search, ↓ moves from the box into the results, and an opened result keeps its row focused', async ({
   page,
 }) => {
