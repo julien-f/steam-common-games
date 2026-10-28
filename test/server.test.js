@@ -24,6 +24,7 @@ const { PREFS_MAX_BYTES, SYNCED_PREF_KEYS, getUserPrefs, setUserPref } = require
 const { _resetAuth } = require('../lib/hltb');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
+const { getMetrics } = require('../lib/metrics');
 
 const api = supertest(app);
 
@@ -51,7 +52,7 @@ function makeLibraryFetch(games1 = [], games2 = []) {
 // (appid → tagids) call plus a separate, shared (tagid → name) map.
 const TAG_IDS = [1001, 1002];
 const TAG_NAME_MAP = { 1001: 'Action', 1002: 'Co-op' };
-// The demo link (getGameDemo) rides on the exact same IStoreBrowseService item as the
+// The demo link (extractDemoAppid) rides on the exact same IStoreBrowseService item as the
 // tagids above — see the `tagsOk` flag below, which gates both.
 const DEMO_APPID = 999900;
 
@@ -687,6 +688,30 @@ test('GET /api/game-details/:appid: 200 from cache without fetching', async (t) 
   assert.equal(res.body.demo, 1714800);
   assert.equal(res.body.protondb?.tier, 'gold');
   assert.equal(fetchCalled, false);
+});
+
+test('GET /api/game-details/:appid: a warm request reads each cached meta-tier row once', async (t) => {
+  _reset();
+  for (const appid of [403, 404]) {
+    setCache(`hltb:${appid}`, []);
+    setCache(`meta:${appid}`, { name: 'X' });
+    setCache(`browse:${appid}`, { tagids: TAG_IDS, related_items: { demo_appid: [1] } });
+    setCache(`protondb:${appid}`, null);
+  }
+  setCache('tagnames:all', TAG_NAME_MAP);
+  setCache('rating:404', { total_reviews: 1, total_positive: 1 });
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('should not fetch');
+  });
+  await api.get('/api/game-details/403');
+
+  const metaHits = () => getMetrics().sinceRestart.cacheHits.meta.hits;
+  const before = metaHits();
+  const res = await api.get('/api/game-details/404');
+  assert.deepEqual(res.body.tags, ['Action', 'Co-op']);
+  assert.equal(res.body.demo, 1);
+  // hltb, meta, browse and protondb: the browse row serves tags and demo, the tag names stay parsed
+  assert.equal(metaHits() - before, 4);
 });
 
 test('GET /api/game-details/:appid: dates each source separately, and fetchedAt is the oldest of them', async (t) => {

@@ -57,14 +57,14 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 
 ## Tags & demo link — store browse data
 
-`getSteamTags` (`lib/steam.js`) reads the user tags shown on the game's own store page (and so on SteamDB and ITAD), not SteamSpy's separate dataset, which is sparse for niche or recent games. Two undocumented, key-less endpoints:
+`resolveSteamTags` (`lib/steam.js`) reads the user tags shown on the game's own store page (and so on SteamDB and ITAD), not SteamSpy's separate dataset, which is sparse for niche or recent games. Two undocumented, key-less endpoints:
 
 - `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json={"ids":[{"appid":N}],"context":{"language":"english","country_code":"US"},"data_request":{"include_tag_count":30}}` — the app's whole store browse item.
   - `tagids` are already ordered by relevance, as the store page shows them; all are shown (20 at most, whatever `include_tag_count` asks).
-  - `tags: [{tagid, weight}]` gives the votes behind that order, in the same order. `getSteamTags` sends each weight relative to the game's top tag (raw counts don't compare across games, and some top tags are capped at 10000), as `tagWeights` on `/api/game-details`.
-  - `getGameDemo` reads `related_items.demo_appid` from the same item, shown as the panel's "🎮 Try the Free Demo" banner (`.panel-demo-banner`) rather than in ⋯ More, since a demo is a call to action.
-  - The **whole raw item** is cached (`browse:{appid}`), so a new field from it needs only a new extractor, no new request; `getSteamTags` and `getGameDemo` share one fetch.
-- `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` — tagid → name, one near-static list of ~430, cached once (`tagnames:all`).
+  - `tags: [{tagid, weight}]` gives the votes behind that order, in the same order. `resolveSteamTags` sends each weight relative to the game's top tag (raw counts don't compare across games, and some top tags are capped at 10000), as `tagWeights` on `/api/game-details`.
+  - `extractDemoAppid` reads `related_items.demo_appid` from the same item, shown as the panel's "🎮 Try the Free Demo" banner (`.panel-demo-banner`) rather than in ⋯ More, since a demo is a call to action.
+  - The **whole raw item** is cached (`browse:{appid}`), so a new field from it needs only a new extractor, no new request; `fetchGameDetails` reads it once for both.
+- `https://store.steampowered.com/actions/ajaxgetstoretags?l=english` — tagid → name, one near-static list of ~430, cached once (`tagnames:all`); the parsed map stays in memory until that row is rewritten or expires.
 - A cache key whose value shape changes gets a new prefix rather than reusing the old one: a shape check can't tell an old value from a new one of the same JS type (an empty array, say). Retired keys age out with the TTL sweep.
 
 ## Store metadata — appdetails

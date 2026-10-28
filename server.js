@@ -26,8 +26,9 @@ const {
   getPlayerSummaries,
   getGameRating,
   getAppDetails,
-  getSteamTags,
-  getGameDemo,
+  getStoreBrowseItem,
+  resolveSteamTags,
+  extractDemoAppid,
   searchStoreGames,
   searchCreatorGames,
   getProtonDbStatus,
@@ -723,16 +724,15 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (force || !isCached(`hltb:${appid}`)) setCache(`hltb:${appid}`, [], { ttlMs: MISS_CACHE_TTL_MS });
       return null;
     });
+    // Tags and the demo link both come from this one store browse item.
+    const browsePromise = getStoreBrowseItem(appid, { force });
 
     return Promise.allSettled([
       getGameRating(appid, { force }),
       hltbPromise,
       metaPromise,
-      getSteamTags(appid, { force }),
-      // Rides on the exact same cached IStoreBrowseService item getSteamTags just fetched
-      // (or is about to) — see getGameDemo/getStoreBrowseItem in lib/steam.js — so this
-      // never costs an extra upstream call of its own.
-      getGameDemo(appid, { force }),
+      browsePromise.then(resolveSteamTags),
+      browsePromise.then(extractDemoAppid),
       getProtonDbStatus(appid, { force }),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes, demoRes, protondbRes]) => {
       // appid is included on every line — fetchGameDetails runs once per appid, often many in

@@ -6,7 +6,7 @@ process.env.UPSTREAM_MIN_INTERVAL_MS = '1000';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { getProtonDbStatus, getGameDemo } = require('../lib/steam');
+const { getProtonDbStatus, getStoreBrowseItem } = require('../lib/steam');
 const { getHLTB, _resetAuth } = require('../lib/hltb');
 const { _reset } = require('../lib/cache');
 
@@ -22,7 +22,7 @@ for (const [name, call, respond] of [
   ],
   [
     'store browse',
-    (i) => getGameDemo(600 + i),
+    (i) => getStoreBrowseItem(600 + i),
     () => ({ ok: true, status: 200, json: async () => ({ response: { store_items: [{ success: 1 }] } }) }),
   ],
   [
