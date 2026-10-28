@@ -46,8 +46,8 @@ export function parseDirectAppid(raw: string): number | null {
 // Small "already owned/wishlisted" markers next to a result — same `myOwnership.ts` status
 // (checked against `currentAccount`, whichever account's list is actually on screen) the side
 // panel's own ownership badge shows, so a lookup reports the same thing whether it's opened from
-// this dropdown or already open in the panel. `peekMyOwnership` never blocks (a search
-// result list re-renders on every keystroke) — see its own comment for what `null` means here
+// this dropdown or already open in the panel. The ownership peek never blocks (a search
+// result list re-renders on every keystroke) — see `MyOwnershipPeek.status` for what `null` means here
 // (no `currentAccount` loaded, or the fetch simply hasn't landed yet).
 export function ownershipMarkersHtml(status: OwnershipStatus | null): string {
   if (!status) return '';

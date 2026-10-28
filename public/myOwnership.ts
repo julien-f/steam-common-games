@@ -142,15 +142,16 @@ export function createMyOwnershipCache() {
     };
   }
 
-  // Sync and tracked; starts loading. One peek per list of rows: reading the account parses the whole prefs blob.
+  // Sync and tracked; a lookup starts loading. One peek per list of rows: reading the account parses the whole prefs blob.
   function peekMyOwnership(): MyOwnershipPeek {
     loaded();
-    const ready = ensureLoading();
-    const landed = ready && !!ownedGames && !!wishlistSet;
-    const games = ready && !ownedFailed ? ownedGames : null;
+    // On the first lookup, so an empty list or search starts no fetch.
+    let ready: boolean | undefined;
+    const isReady = (): boolean => (ready ??= ensureLoading());
     return {
-      status: (appid) => (landed ? statusOf(appid) : null),
+      status: (appid) => (isReady() && ownedGames && wishlistSet ? statusOf(appid) : null),
       playtime: (appid) => {
+        const games = isReady() && !ownedFailed ? ownedGames : null;
         if (!games) return undefined;
         const game = games.get(appid);
         if (!game) return null;

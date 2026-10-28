@@ -324,14 +324,33 @@ test('peekMyOwnership: reads the current account once for any number of rows (C2
   const getItem = localStorage.getItem;
   let reads = 0;
   localStorage.getItem = (k) => (reads++, getItem(k));
-  const peek = peekMyOwnership();
-  for (let appid = 0; appid < 1000; appid++) {
-    peek.status(appid);
-    peek.playtime(appid);
-  }
+  const readsFor = (rows) => {
+    reads = 0;
+    const peek = peekMyOwnership();
+    for (let appid = 0; appid < rows; appid++) {
+      peek.status(appid);
+      peek.playtime(appid);
+    }
+    return reads;
+  };
 
-  assert.equal(reads, 1);
+  assert.equal(readsFor(1000), readsFor(1));
+  const peek = peekMyOwnership();
   assert.deepEqual(peek.status(440), { inLibrary: true, onWishlist: false });
   assert.deepEqual(peek.status(620), { inLibrary: false, onWishlist: true });
   assert.deepEqual(peek.playtime(440), { playtime: 0, lastPlayed: '' });
+});
+
+test('peekMyOwnership: a peek with no lookups starts no fetch (an empty list or search)', async (t) => {
+  let fetches = 0;
+  withFetch(t, (...args) => {
+    fetches++;
+    return fakeAccountFetch()(...args);
+  });
+  setCurrentAccount(makeAccount('1'));
+  const { peekMyOwnership } = createMyOwnershipCache();
+
+  peekMyOwnership();
+
+  assert.equal(fetches, 0);
 });
