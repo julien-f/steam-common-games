@@ -106,6 +106,7 @@ import {
   computeSteamdbRating,
   computeProductionTier,
   detailsFields,
+  failedLookupFields,
   fetchJson,
   fmtAge,
   fmtLastPlayed,
@@ -1692,6 +1693,7 @@ export default function ListRoute() {
       restorePendingShot();
     } catch (err) {
       if (token !== standaloneLookupToken) return;
+      setStandaloneRows(appid, failedLookupFields());
       if (getPanelGame() === game) setStatusText(`Lookup failed: ${(err as Error).message}`);
     }
   }

@@ -449,3 +449,12 @@ export function detailsFields(
     failedSources: data.failed ?? [],
   };
 }
+
+// A lookup that didn't answer at all: every source failed, so the panel says so and offers ↻ (no age: nothing was fetched).
+export function failedLookupFields(): ReturnType<typeof detailsFields> {
+  const none = { rating: null, hltb: null, meta: null, tags: null, protondb: null, demo: null };
+  return {
+    ...detailsFields({ ...none, failed: ['rating', 'hltb', 'meta', 'tags', 'protondb'] }),
+    detailsFetchedAt: undefined,
+  };
+}

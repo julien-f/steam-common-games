@@ -20,7 +20,7 @@ import { peekMyOwnershipStatus } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
 import type { Game, GameDetailsReply } from './types.ts';
-import { detailsFields, fetchJson } from './utils.ts';
+import { detailsFields, failedLookupFields, fetchJson } from './utils.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 
 // CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
@@ -169,7 +169,9 @@ export default function SearchRoute() {
       setGames(appid, { ...detailsFields(data), name: data.meta?.name || name });
       addRecentGame(appid, data.meta?.name || name, data.meta?.capsule || tinyImage);
     } catch (err) {
-      if (token === lookupToken) setStatusText(`Lookup failed: ${(err as Error).message}`);
+      if (token !== lookupToken) return;
+      setGames(appid, failedLookupFields());
+      setStatusText(`Lookup failed: ${(err as Error).message}`);
     }
   }
 

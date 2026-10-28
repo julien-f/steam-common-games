@@ -5946,6 +5946,10 @@ test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
   );
   await page.goto('/search?q=hades');
   await expect(page.getByRole('status').filter({ hasText: 'Lookup failed' })).toContainText('Steam store error 500');
+  await expect(page.locator('.panel-glance')).toContainText("didn't answer");
+  await page.unrouteAll();
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(page.locator('.panel-glance')).not.toContainText("didn't answer");
 });
 
 test('F2 edge: on /search, a failed refresh says so until one succeeds', async ({ page }) => {
@@ -6691,6 +6695,17 @@ test('I2 edge: closing a game with no row returns focus to the row it was opened
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-panel')).toBeHidden();
   await expect(row(page, 'Hades')).toBeFocused();
+});
+
+test("F1 edge: a lookup that fails says the sources didn't answer, and ↻ retries it", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route(/\/api\/game-details\/1426210$/, (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }),
+  );
+  await page.goto('/lists/owned?game=1426210');
+  await expect(page.locator('.panel-glance')).toContainText("didn't answer");
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(page.locator('.panel-glance')).not.toContainText("didn't answer");
 });
 
 test('I2 edge: a game outside the list shows the age of its details', async ({ page }) => {
