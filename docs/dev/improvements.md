@@ -60,6 +60,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U217 · minor · C8** — a host on a phone or tablet can't show a trailer on the TV: the presentation window is a computer's (no Present button there). Cast a trailer through the Remote Playback API (`video.remote.prompt()`: Chromecast on Chrome for Android, AirPlay on Safari), trailers only — a separate feature from the presentation window.
 - **U189 · minor · L1, C3, I1** — on a phone, Home's five full-width Explore cards (~400 px, repeating the nav bar and the chip's Owned/Wishlist) push **Your lists** below the fold: its heading starts at 898 px on an 844 px screen, so a returning user sees none of their lists. With no account, the Owned and Wishlist cards still read "The current account's games" and lead to "No account selected — pick one on Home". Compact the cards on a phone (two columns, no description), or put Your lists first once it has any; drop or disable the two account cards until there's an account.
 - **U202 · minor · B1** — on a phone, a bundle's table starts at 514 px of 844 (hero 189 px, two toolbar rows 89 px, sort chips 32 px, plus the "Taste fit needs Alice's Owned list opened on this device" line), so four rows fit above the fold. Fold the taste note into the Taste fit column's header or hide that column until it has data (as U193 for `?u=`), and fit search and the view buttons on one row.
+- **U222 · minor · F2** — on a phone, `/search?q=…` lands on the closest match's full-screen panel, hiding the results and the refine box until × (F2's "refines without reopening the panel" can't happen there). On a phone, open the results with the match highlighted, or open the panel only on a single match.
 
 ## Accounts and first visit
 
@@ -73,6 +74,10 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U179 · polish · I2, I3** — the first Tab stop reads "Skip to table" on pages with no table (Home, Compare's form, About, the rank screen), where it skips to `main`. "Skip to content" there.
 - **U182 · polish · I2** — a second Esc in the nav search blurs it to `<body>`, so the next Tab starts from the page top. Hand focus to the main content's first stop, or back to where `/` was pressed.
 - **U192 · polish · R1** — right after **Continue**, Undo is disabled with no reason given, so the last answer before Esc can't be undone (R1's edge "Undo right after resuming"); the stack is in memory only. Keep the undo stack with the ranking, or say "Undo covers this session's answers".
+- **U220 · minor · F1** — on `/search`, opening a game from the panel's Similar list hides ↑/↓ but keeps R, which jumps back into the results. Hide R with ↑/↓ when the game isn't among the results, as a list route does.
+- **U221 · minor · F1** — a game looked up from Home, `/bundles` or `/about` opens on `/game/:appid`; its × lands on Recently Looked Up, a page the user never visited, while × everywhere else leaves you where you were (Back does return). Close back to the page the lookup came from when the history entry is ours.
+- **U223 · polish · F1** — tag and developer pills are filter buttons on list routes but inert on `/search` and the rank screen, styled the same (same border, only the cursor differs), so a click there does nothing with no hint why. Give the inert pills a plainer style.
+- **U224 · polish · F1, I2** — focus on open differs per page: list routes move it to the hero's "Open in lightbox", `/game/:appid` to Close, `/search` keeps it on the row and Enter on the current row doesn't move it into the panel. One rule (the panel's first stop) everywhere, Search's row ring aside.
 
 ## Review tooling
 
