@@ -17,8 +17,9 @@ const {
   getPlayerSummaries,
   getGameRating,
   getAppDetails,
-  getSteamTags,
-  getGameDemo,
+  getStoreBrowseItem,
+  resolveSteamTags,
+  extractDemoAppid,
   resolveSteamPackageAppids,
   resolveSteamBundleAppids,
   searchStoreGames,
@@ -33,7 +34,7 @@ const { getSemaphoreStats, createSemaphore } = require('../lib/upstream');
 const { _reset, setCache } = require('../lib/cache');
 const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { db } = require('../lib/db');
-const { MISS_CACHE_TTL_MS } = require('../lib/config');
+const { MISS_CACHE_TTL_MS, META_CACHE_TTL_MS } = require('../lib/config');
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -192,7 +193,7 @@ test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth h
   _reset();
   const releases = [];
   // tagLimit (concurrency 3, no minIntervalMs cooldown, unlike storeLimit's 500ms one — see
-  // its own comment in lib/steam.js) backs getGameDemo, so contention here resolves
+  // its own comment in lib/steam.js) backs getStoreBrowseItem, so contention here resolves
   // deterministically without a cross-test real-time release delay to account for.
   t.mock.method(
     globalThis,
@@ -205,7 +206,7 @@ test('getSemaphoreStats: reports live active/queued and a lifetime queue-depth h
       }),
   );
 
-  const results = Promise.all([704, 705, 706, 707].map((appid) => getGameDemo(appid)));
+  const results = Promise.all([704, 705, 706, 707].map((appid) => getStoreBrowseItem(appid)));
   await new Promise((r) => setImmediate(r)); // let the first three fetches actually start
 
   const busy = getSemaphoreStats();
@@ -1197,10 +1198,12 @@ test('getAppDetails: caps movies at 5', async (t) => {
   assert.equal(result.movies.length, 5);
 });
 
-// ── getSteamTags / getGameDemo ─────────────────────────────────────────────
-// Both are backed by the same cached IStoreBrowseService item (see getStoreBrowseItem in
+// ── resolveSteamTags / extractDemoAppid ────────────────────────────────────
+// Both read the same cached IStoreBrowseService item (see getStoreBrowseItem in
 // lib/steam.js) — tags via its `tagids` field, the demo link via `related_items.demo_appid`
 // — so they're tested together here rather than in separate sections.
+const steamTags = async (appid) => resolveSteamTags(await getStoreBrowseItem(appid));
+const gameDemo = async (appid) => extractDemoAppid(await getStoreBrowseItem(appid));
 
 // Routes the shared fetch mock by URL: IStoreBrowseService for the per-app store browse item
 // (tagids + related_items), ajaxgetstoretags for the tagid → name map.
@@ -1238,19 +1241,19 @@ function mockTagEndpoints(t, { tagids = [], tags, nameMap = {}, demoAppid, brows
   return () => browseCalls;
 }
 
-test('getSteamTags: returns every tag in weight order, resolved via the name map (no display cap)', async (t) => {
+test('resolveSteamTags: returns every tag in weight order, resolved via the name map (no display cap)', async (t) => {
   _reset();
   const tagids = Array.from({ length: 30 }, (_, i) => 100 + i); // already weight-ordered
   const nameMap = Object.fromEntries(tagids.map((id) => [id, `Tag${id}`]));
   mockTagEndpoints(t, { tagids, nameMap });
 
-  const result = await getSteamTags(400);
+  const result = await steamTags(400);
   assert.equal(result.length, 30);
   assert.equal(result[0].name, 'Tag100');
   assert.equal(result[29].name, 'Tag129');
 });
 
-test('getSteamTags: weights each tag relative to the top one', async (t) => {
+test('resolveSteamTags: weights each tag relative to the top one', async (t) => {
   _reset();
   mockTagEndpoints(t, {
     tagids: [1, 2, 3],
@@ -1262,29 +1265,29 @@ test('getSteamTags: weights each tag relative to the top one', async (t) => {
     nameMap: { 1: 'Action', 2: 'Indie', 3: 'Roguelike' },
   });
 
-  assert.deepEqual(await getSteamTags(400), [
+  assert.deepEqual(await steamTags(400), [
     { name: 'Action', weight: 1 },
     { name: 'Indie', weight: 0.33 },
     { name: 'Roguelike', weight: 0.02 },
   ]);
 });
 
-test('getSteamTags: a null weight when the item has no tag weights', async (t) => {
+test('resolveSteamTags: a null weight when the item has no tag weights', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [1], nameMap: { 1: 'Action' } });
 
-  assert.deepEqual(await getSteamTags(400), [{ name: 'Action', weight: null }]);
+  assert.deepEqual(await steamTags(400), [{ name: 'Action', weight: null }]);
 });
 
-test('getSteamTags: returns empty array when the app has no tagids', async (t) => {
+test('resolveSteamTags: returns empty array when the app has no tagids', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [], nameMap: {} });
 
-  const result = await getSteamTags(400);
+  const result = await steamTags(400);
   assert.deepEqual(result, []);
 });
 
-test('getSteamTags: returns empty array when the store item lookup is unsuccessful', async (t) => {
+test('resolveSteamTags: returns empty array when the store item lookup is unsuccessful', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1293,35 +1296,35 @@ test('getSteamTags: returns empty array when the store item lookup is unsuccessf
     return { ok: true, json: async () => ({ tags: [] }) };
   });
 
-  const result = await getSteamTags(400);
+  const result = await steamTags(400);
   assert.deepEqual(result, []);
 });
 
-test('getSteamTags: drops tagids with no matching name in the map', async (t) => {
+test('resolveSteamTags: drops tagids with no matching name in the map', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [1, 2, 3], nameMap: { 1: 'Action', 3: 'Indie' } });
 
-  const result = await getSteamTags(400);
+  const result = await steamTags(400);
   assert.deepEqual(
     result.map((t) => t.name),
     ['Action', 'Indie'],
   );
 });
 
-test('getSteamTags: throws isUpstream when the tagid fetch fails', async (t) => {
+test('resolveSteamTags: throws isUpstream when the tagid fetch fails', async (t) => {
   _reset();
   mockTagEndpoints(t, { browseOk: false });
   await assert.rejects(
-    () => getSteamTags(400),
+    () => steamTags(400),
     (err) => err.isUpstream === true,
   );
 });
 
-test('getSteamTags: throws isUpstream when the tag name map fetch fails', async (t) => {
+test('resolveSteamTags: throws isUpstream when the tag name map fetch fails', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [1], namesOk: false });
   await assert.rejects(
-    () => getSteamTags(400),
+    () => steamTags(400),
     (err) => err.isUpstream === true,
   );
 });
@@ -1330,7 +1333,7 @@ test('getSteamTags: throws isUpstream when the tag name map fetch fails', async 
 // what looked like an upstream hiccup, rather than the usual `{tags: [...]}` shape.
 // Destructuring straight off that would throw an opaque TypeError instead of a clean,
 // caller-recognizable upstream error.
-test('getSteamTags: throws isUpstream (not a raw TypeError) when the tag name map response body is null', async (t) => {
+test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag name map response body is null', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1343,28 +1346,28 @@ test('getSteamTags: throws isUpstream (not a raw TypeError) when the tag name ma
   });
 
   await assert.rejects(
-    () => getSteamTags(400),
+    () => steamTags(400),
     (err) => err.isUpstream === true,
   );
 });
 
-test('getGameDemo: returns the demo appid from related_items.demo_appid', async (t) => {
+test('extractDemoAppid: returns the demo appid from related_items.demo_appid', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [], nameMap: {}, demoAppid: 1714800 });
 
-  const result = await getGameDemo(1634360);
+  const result = await gameDemo(1634360);
   assert.equal(result, 1714800);
 });
 
-test('getGameDemo: returns null when the game has no demo', async (t) => {
+test('extractDemoAppid: returns null when the game has no demo', async (t) => {
   _reset();
   mockTagEndpoints(t, { tagids: [], nameMap: {} });
 
-  const result = await getGameDemo(400);
+  const result = await gameDemo(400);
   assert.equal(result, null);
 });
 
-test('getGameDemo: returns null when the store item lookup is unsuccessful', async (t) => {
+test('extractDemoAppid: returns null when the store item lookup is unsuccessful', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1373,21 +1376,61 @@ test('getGameDemo: returns null when the store item lookup is unsuccessful', asy
     return { ok: true, json: async () => ({ tags: [] }) };
   });
 
-  const result = await getGameDemo(400);
+  const result = await gameDemo(400);
   assert.equal(result, null);
 });
 
-// The whole point of caching the raw store browse item (rather than just the extracted
-// tagids, as an earlier version of this code did) — getSteamTags and getGameDemo must share
-// one upstream fetch per appid, not make two, since both read off the same cached response.
-test('getSteamTags and getGameDemo share a single upstream IStoreBrowseService call per appid', async (t) => {
+// A stream resolves tags for every game against the same ~430-entry map.
+test('resolveSteamTags: parses the tag name map once while its row is live', async (t) => {
   _reset();
-  const browseCalls = mockTagEndpoints(t, { tagids: [1], nameMap: { 1: 'Action' }, demoAppid: 555 });
+  mockTagEndpoints(t, { nameMap: { 1: 'Action' } });
+  await resolveSteamTags({ tagids: [1] });
 
-  const [tags, demo] = await Promise.all([getSteamTags(400), getGameDemo(400)]);
-  assert.deepEqual(tags, [{ name: 'Action', weight: null }]);
-  assert.equal(demo, 555);
-  assert.equal(browseCalls(), 1, 'both calls should share one upstream fetch via cache + dedup');
+  const parse = t.mock.method(JSON, 'parse');
+  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Action', weight: null }]);
+  assert.equal(parse.mock.callCount(), 0);
+});
+
+test('resolveSteamTags: fetches the tag name map alongside a pending store browse item', async (t) => {
+  _reset();
+  let releaseBrowse;
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(String(url));
+    if (String(url).includes('IStoreBrowseService')) {
+      await new Promise((r) => (releaseBrowse = r));
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1] }] } }) };
+    }
+    return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
+  });
+
+  const tags = resolveSteamTags(getStoreBrowseItem(400));
+  await new Promise((r) => setImmediate(r));
+  assert.ok(
+    urls.some((u) => u.includes('ajaxgetstoretags')),
+    'the name map request should not wait on the browse item',
+  );
+  releaseBrowse();
+  assert.deepEqual(await tags, [{ name: 'Action', weight: null }]);
+});
+
+test('resolveSteamTags: re-fetches the tag name map once its row expires', async (t) => {
+  const now = Date.now();
+  _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now }]]);
+  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Old', weight: null }]);
+
+  _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now - META_CACHE_TTL_MS - 1 }]]);
+  mockTagEndpoints(t, { nameMap: { 1: 'New' } });
+  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'New', weight: null }]);
+});
+
+test('resolveSteamTags: reads a tag name map row rewritten since the last read', async () => {
+  const now = Date.now();
+  _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now - 1000 }]]);
+  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Old', weight: null }]);
+
+  _reset([['tagnames:all', { value: { 1: 'New' }, ts: now }]]);
+  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'New', weight: null }]);
 });
 
 // ── resolveSteamPackageAppids / resolveSteamBundleAppids ────────────────────────

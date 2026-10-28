@@ -1129,7 +1129,7 @@ export const CORE_COLUMNS: ColumnDef<Row>[] = markFailedSources([
   // Achievements/DLC Count right below, which only matter to completionists. `event.demo`
   // (top-level on the SSE/game-details response, not nested under `meta`) — the free demo's
   // appid if this game has one, from the same IStoreBrowseService item tags/demo share (see
-  // getGameDemo in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
+  // extractDemoAppid in lib/steam.js); the side panel's own "🎮 Try the Free Demo" banner
   // (public/panel.js) reads the exact same field. Only a plain has-a-demo boolean here — the
   // demo's own appid isn't useful in a cell with nowhere to link it — outbound links stay in the
   // panel, not the table. Rendered as a badge (renderDemoBadge above) rather than plain
