@@ -328,9 +328,17 @@ export function releaseSortTimestamp(str: string): number {
 // NaN comparisons — both need to be pinned last instead. "Coming soon" and "To be announced" are
 // NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
 // they sort deterministically after every dated/coarse entry instead of landing in this bucket.
+// Memoized: a sort calls this ~4 times per comparison, and the distinct date strings are few.
+const sortTimestamps = new Map<string, number>();
+function cachedSortTimestamp(v: unknown): number {
+  const s = String(v);
+  let t = sortTimestamps.get(s);
+  if (t === undefined) sortTimestamps.set(s, (t = releaseSortTimestamp(s)));
+  return t;
+}
 export const compareDateMissingLast = compareMissingLast(
-  (a, b) => releaseSortTimestamp(String(a)) - releaseSortTimestamp(String(b)),
-  (v) => v == null || v === '' || isNaN(releaseSortTimestamp(String(v))),
+  (a, b) => cachedSortTimestamp(a) - cachedSortTimestamp(b),
+  (v) => v == null || v === '' || isNaN(cachedSortTimestamp(v)),
 );
 
 // A still-unreleased game in `--warn`, like a middling score: notable, not final. By Steam's

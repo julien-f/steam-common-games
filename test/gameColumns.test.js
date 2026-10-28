@@ -15,6 +15,7 @@ registerHooks({
 const {
   endOfReleasePeriod,
   releaseSortTimestamp,
+  compareDateMissingLast,
   computePriceStatus,
   computeOwnershipStatus,
   priceTierBucket,
@@ -81,6 +82,18 @@ test('releaseSortTimestamp: placeholder spellings and plain dates', () => {
   assert.equal(releaseSortTimestamp(' tba '), releaseSortTimestamp('TBA'));
   assert.equal(releaseSortTimestamp('Q3 2026'), day(2026, 9, 30));
   assert.ok(Number.isNaN(releaseSortTimestamp('nonsense')));
+});
+
+test('compareDateMissingLast: dated, then placeholders, then missing, the same on a repeat sort', () => {
+  const dated = ['Oct 14, 2026', 'Q4 2026', '2026', 'Coming soon', 'TBA'];
+  const input = [null, 'TBA', 'nonsense', '2026', '', 'Oct 14, 2026', 'Coming soon', 'Q4 2026'];
+  for (let i = 0; i < 2; i++) {
+    const asc = [...input].sort((a, b) => compareDateMissingLast(a, b, 'asc'));
+    assert.deepEqual(asc.slice(0, 5), dated);
+    const desc = [...input].sort((a, b) => -compareDateMissingLast(a, b, 'desc')); // the table flips the sign for desc
+    assert.deepEqual(desc.slice(0, 5), [...dated].reverse());
+    for (const sorted of [asc, desc]) assert.deepEqual(new Set(sorted.slice(5)), new Set([null, '', 'nonsense']));
+  }
 });
 
 test('computePriceStatus: loading, no data, record tiers, sale, full price', () => {
