@@ -753,7 +753,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
       if (hltbRes.status === 'rejected' && hltbRes.reason !== metaRes.reason) logErr('hltb', hltbRes.reason);
       if (metaRes.status === 'rejected') logErr('meta', metaRes.reason);
       if (tagsRes.status === 'rejected') logErr('tags', tagsRes.reason);
-      if (demoRes.status === 'rejected') logErr('demo', demoRes.reason);
+      if (demoRes.status === 'rejected' && demoRes.reason !== tagsRes.reason) logErr('demo', demoRes.reason);
       if (protondbRes.status === 'rejected') logErr('protondb', protondbRes.reason);
       // A null field is "no data" unless named here — the client marks these as failed, not empty.
       const failed = Object.entries({
