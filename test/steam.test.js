@@ -1391,6 +1391,29 @@ test('resolveSteamTags: parses the tag name map once while its row is live', asy
   assert.equal(parse.mock.callCount(), 0);
 });
 
+test('resolveSteamTags: fetches the tag name map alongside a pending store browse item', async (t) => {
+  _reset();
+  let releaseBrowse;
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(String(url));
+    if (String(url).includes('IStoreBrowseService')) {
+      await new Promise((r) => (releaseBrowse = r));
+      return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1] }] } }) };
+    }
+    return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
+  });
+
+  const tags = resolveSteamTags(getStoreBrowseItem(400));
+  await new Promise((r) => setImmediate(r));
+  assert.ok(
+    urls.some((u) => u.includes('ajaxgetstoretags')),
+    'the name map request should not wait on the browse item',
+  );
+  releaseBrowse();
+  assert.deepEqual(await tags, [{ name: 'Action', weight: null }]);
+});
+
 test('resolveSteamTags: re-fetches the tag name map once its row expires', async (t) => {
   const now = Date.now();
   _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now }]]);

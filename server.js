@@ -731,7 +731,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
       getGameRating(appid, { force }),
       hltbPromise,
       metaPromise,
-      browsePromise.then(resolveSteamTags),
+      resolveSteamTags(browsePromise),
       browsePromise.then(extractDemoAppid),
       getProtonDbStatus(appid, { force }),
     ]).then(([ratingRes, hltbRes, metaRes, tagsRes, demoRes, protondbRes]) => {
