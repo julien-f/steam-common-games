@@ -209,7 +209,10 @@ export default function RankRoute() {
       return;
     }
     // The open panel has the keyboard (↓ scrolls it); an answer would also close it under the reader.
-    if (isPanelOpen() && ANSWER_KEYS.has(key)) return;
+    if (isPanelOpen() && ANSWER_KEYS.has(key)) {
+      setArmed(null);
+      return;
+    }
     if (key === 'z' || key === 'Z' || key === 'Backspace') {
       e.preventDefault();
       undo();

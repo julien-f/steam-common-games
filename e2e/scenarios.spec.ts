@@ -3413,6 +3413,12 @@ test("R1 edge: the answer keys wait while the ranking's side panel is open", asy
   for (const key of ['ArrowDown', 's', 'z']) await page.keyboard.press(key);
   await expect(page.locator('.game-panel')).toBeVisible();
   await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+  // Like any other key, a held one cancels an armed X.
+  await page.keyboard.press('x');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
   await page.keyboard.press('Escape');
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('button', { name: /^Undo/ })).toBeEnabled();
