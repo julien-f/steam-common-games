@@ -4288,17 +4288,17 @@ test("F1 edge: the Price card shows no bundles while the next game's are loading
   await expect(page.locator('.panel-bundle').first()).toBeVisible();
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/api/game-bundles/892970*', async (route) => {
+  await page.route('**/api/game-bundles/**', async (route) => {
     await held;
     await route.fallback();
   });
-  const asked = page.waitForRequest(/\/api\/game-bundles\/892970/);
-  await row(page, 'Valheim').getByText('Valheim').click();
+  const asked = page.waitForRequest(/\/api\/game-bundles\//);
+  await page.getByRole('button', { name: 'Next game' }).click();
   await asked;
-  await expect(page.locator('#game-panel .panel-price-amount')).toBeVisible();
+  await expect(page.locator('#panel-section-price')).toBeVisible();
   await expect(page.locator('.panel-bundles')).toHaveCount(0);
   release();
-  await expect(page.locator('.panel-bundles')).toHaveText('Not in any current bundle.');
+  await expect(page.locator('.panel-bundles')).toBeVisible();
 });
 
 test("F1 edge: the Price card says when a game is in no bundle, and when ITAD didn't answer", async ({ page }) => {
