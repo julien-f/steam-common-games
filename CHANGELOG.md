@@ -84,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game whose lookup fails says its sources didn't answer, with Refresh to retry, instead of loading forever
 - Closing a game looked up from Home, Bundles or About returns to that page instead of Recently Looked Up
 - The search page's box no longer drops a trailing space typed while results load
+- A game whose lookup failed joins Recently Looked Up once Refresh details brings it in
 
 ### Development
 

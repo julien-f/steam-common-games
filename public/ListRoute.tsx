@@ -1932,6 +1932,8 @@ export default function ListRoute() {
           game.appid,
           produce((draft) => applyDetailsEvent(draft, data)),
         );
+        // A lookup that failed lands only now.
+        addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
       }
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);

@@ -183,8 +183,11 @@ export default function SearchRoute() {
         undefined,
         'Refresh failed',
       );
-      setGames(game.appid, detailsFields(data));
+      const name = data.meta?.name || game.name;
+      setGames(game.appid, { ...detailsFields(data), name });
       setStatusText('');
+      // A lookup that failed lands only now.
+      addRecentGame(game.appid, name, data.meta?.capsule || null);
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
     }

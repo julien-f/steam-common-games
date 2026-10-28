@@ -5995,6 +5995,9 @@ test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
   await page.unrouteAll();
   await page.getByRole('button', { name: 'Refresh details' }).click();
   await expect(page.locator('.panel-glance')).not.toContainText("didn't answer");
+  // Looked up after all: it joins Recently Looked Up.
+  await page.goto('/game');
+  await expect(row(page, 'Hades')).toBeVisible();
 });
 
 test('F2 edge: on /search, a failed refresh says so until one succeeds', async ({ page }) => {
@@ -6753,6 +6756,9 @@ test("F1 edge: a lookup that fails says the sources didn't answer, and ↻ retri
   await expect(page.locator('.panel-glance')).toContainText("didn't answer");
   await page.getByRole('button', { name: 'Refresh details' }).click();
   await expect(page.locator('.panel-glance')).not.toContainText("didn't answer");
+  const name = (await page.locator('#panel-title').textContent())!;
+  await page.goto('/game');
+  await expect(row(page, name)).toBeVisible();
 });
 
 test('I2 edge: a game outside the list shows the age of its details', async ({ page }) => {
