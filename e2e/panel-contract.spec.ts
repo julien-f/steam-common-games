@@ -85,7 +85,7 @@ const HOSTS: Host[] = [
     closedUrl: /\/search\?q=dead$/,
     hasList: true,
     keepsFocus: true,
-    knownFailures: ['refresh', 'leave'],
+    knownFailures: ['refresh'],
   },
   {
     name: 'Rank',

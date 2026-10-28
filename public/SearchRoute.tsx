@@ -11,7 +11,7 @@ import type { ColumnDef } from '@vates/data-table-solid';
 import { useBaseTitle } from './pageTitle.ts';
 import { ListHero } from './ListHero.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
-import { panelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
+import { panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
 import { renderPanelNav, stepGameList } from './panelNav.ts';
 import { setPanelParam, setSearchQueryParam, parseUrlState } from './urlState.ts';
 import { addRecentGame } from './recentGames.ts';
@@ -227,7 +227,10 @@ export default function SearchRoute() {
       pickRandom: pickRandomGame,
       gamePosition,
     });
-    onCleanup(unregister);
+    onCleanup(() => {
+      unregister();
+      if (isPanelOpen()) panelClose({ leavingRoute: true });
+    });
   });
 
   return (
