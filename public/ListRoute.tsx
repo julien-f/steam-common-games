@@ -1538,7 +1538,6 @@ export default function ListRoute() {
     table = null;
     setGroupCount(0);
     setRowsStore([]);
-    setLoadedRows(null);
     rowStore.reset();
     tableContainer.innerHTML = '';
   }
@@ -2209,7 +2208,11 @@ export default function ListRoute() {
     // list is in, then only streams the games new to it.
     const kept = refresh ? new Map(rowsStore.map((r) => [r.appid, r])) : null;
     const keptSelection = refresh ? new Set(selectedRows().map((r) => r.appid)) : null;
-    if (!kept) clearTable();
+    if (!kept) {
+      clearTable();
+      // A refresh keeps the previous load's until its own, so the profile doesn't blink.
+      setLoadedRows(null);
+    }
     setEmptyText('');
     total = 0;
     loaded = 0;

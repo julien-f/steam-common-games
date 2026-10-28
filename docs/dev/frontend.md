@@ -226,7 +226,7 @@ Default sort is Weighted Rating descending, except a bundle (cheapest tier first
 
 **Players** (compare only, `playersSection`, `ListHero`'s `section` slot): per player, `topPlayedTags` and `playStyle` with that player's hours (`playerHours`, summed over a Family's members) instead of the rows' own playtime.
 
-- Computed once details finish loading, rows untracked (`playerProfiles`), so price loading doesn't redo it; only on Grouped or Union (`profilesShown`), whose rows hold every library.
+- Computed from `loadedRows` (see Owned's profile above, `playerProfiles`); only on Grouped or Union (`profilesShown`), whose rows hold every library.
 - A `<details>` whose open state is a route-level signal, open by default from 768 px. A tag tapped in it scrolls the table's toolbar up when it's in the lower half of the screen, since an open section pushes it off a phone's.
 - Each player a card (`players-card`): `PlayerAvatar` (the account's `avatarUrl`, a Family's first member's, else the initial), `ProfileBadge` and `archetypeOf` (with that player's `storyGames`; none for a Family), then their tags. Under them one shared-ground card, its labels in a left column (above, at 600 px and below), games as `gameArt` buttons (`thumb ?? capsule`, lazy).
 - In it, `tagTaste.ts`'s `commonGround`: the top tags each pair shares (in the summary for two players; closest pair and odd one out for more), tags in common, each player's own (shown on their line in place of their top tags), and favourites everyone played a lot, each opening its panel.
