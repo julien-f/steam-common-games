@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Steam review scores load again for games without a cached score: Steam retired the endpoint the app used
 - A shared layout link with one outdated setting keeps the rest of its layout instead of falling back to yours.
 - The server no longer stalls for every visitor while recording a busy hour's metrics
+- Marking which games you own or wishlist (✓/☆) on a long list takes far less time
 
 ### Development
 

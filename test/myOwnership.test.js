@@ -90,10 +90,10 @@ test('a failed owned fetch reads as unknown, not as owning nothing', async (t) =
   withFetch(t, fakeAccountFetch({ wishlistAppids: [620], failOwned: true }));
   setCurrentAccount(makeAccount('1'));
 
-  const { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime } = createMyOwnershipCache();
+  const { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyOwnership } = createMyOwnershipCache();
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: null, onWishlist: false });
   assert.deepEqual(peekMyOwnershipStatus(620), { inLibrary: null, onWishlist: true });
-  assert.equal(peekMyPlaytime(440), undefined);
+  assert.equal(peekMyOwnership().playtime(440), undefined);
 });
 
 test('getMyOwnershipStatus: only fetches once per loaded account — a second appid check reuses the cached sets', async (t) => {
@@ -287,7 +287,7 @@ test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not th
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
 });
 
-test('peekMyPlaytime: undefined while loading, then summed hours / latest date for owned games, null otherwise', async (t) => {
+test('peekMyOwnership().playtime: undefined while loading, then summed hours / latest date for owned games, null otherwise', async (t) => {
   withFetch(t, async (url) => {
     if (url === '/api/common-games') {
       return {
@@ -307,10 +307,50 @@ test('peekMyPlaytime: undefined while loading, then summed hours / latest date f
   });
   setCurrentAccount(makeAccount('1', { members: ['1', '2'] }));
 
-  const { peekMyPlaytime, getMyOwnershipStatus } = createMyOwnershipCache();
-  assert.equal(peekMyPlaytime(620), undefined);
+  const { peekMyOwnership, getMyOwnershipStatus } = createMyOwnershipCache();
+  assert.equal(peekMyOwnership().playtime(620), undefined);
   await getMyOwnershipStatus(620);
-  assert.deepEqual(peekMyPlaytime(620), { playtime: 6, lastPlayed: '2023-11-14' });
-  assert.deepEqual(peekMyPlaytime(440), { playtime: 0, lastPlayed: '' });
-  assert.equal(peekMyPlaytime(999), null);
+  assert.deepEqual(peekMyOwnership().playtime(620), { playtime: 6, lastPlayed: '2023-11-14' });
+  assert.deepEqual(peekMyOwnership().playtime(440), { playtime: 0, lastPlayed: '' });
+  assert.equal(peekMyOwnership().playtime(999), null);
+});
+
+test('peekMyOwnership: reads the current account once for any number of rows (C204)', async (t) => {
+  withFetch(t, fakeAccountFetch({ ownedAppids: [440], wishlistAppids: [620] }));
+  setCurrentAccount(makeAccount('1'));
+  const { peekMyOwnership, getMyOwnershipStatus } = createMyOwnershipCache();
+  await getMyOwnershipStatus(440);
+
+  const getItem = localStorage.getItem;
+  let reads = 0;
+  localStorage.getItem = (k) => (reads++, getItem(k));
+  const readsFor = (rows) => {
+    reads = 0;
+    const peek = peekMyOwnership();
+    for (let appid = 0; appid < rows; appid++) {
+      peek.status(appid);
+      peek.playtime(appid);
+    }
+    return reads;
+  };
+
+  assert.equal(readsFor(1000), readsFor(1));
+  const peek = peekMyOwnership();
+  assert.deepEqual(peek.status(440), { inLibrary: true, onWishlist: false });
+  assert.deepEqual(peek.status(620), { inLibrary: false, onWishlist: true });
+  assert.deepEqual(peek.playtime(440), { playtime: 0, lastPlayed: '' });
+});
+
+test('peekMyOwnership: a peek with no lookups starts no fetch (an empty list or search)', async (t) => {
+  let fetches = 0;
+  withFetch(t, (...args) => {
+    fetches++;
+    return fakeAccountFetch()(...args);
+  });
+  setCurrentAccount(makeAccount('1'));
+  const { peekMyOwnership } = createMyOwnershipCache();
+
+  peekMyOwnership();
+
+  assert.equal(fetches, 0);
 });

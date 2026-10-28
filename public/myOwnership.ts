@@ -42,6 +42,14 @@ export interface MyPlaytime {
   lastPlayed: string;
 }
 
+export interface MyOwnershipPeek {
+  // `null` for "no account" or "still loading": a tracked reader re-runs once it lands.
+  status(appid: number): OwnershipStatus | null;
+  // Summed across a Family's members, latest play date wins (as the Owned list computes it).
+  // `undefined` while loading, with no account or after a failed fetch; `null` for a game not owned.
+  playtime(appid: number): MyPlaytime | null | undefined;
+}
+
 // A factory, not a bare module-level singleton — same "testable cache" shape as
 // `staleGuard.ts`'s `createStaleGuard`/`streamBatcher.ts`'s `createStreamBatcher`/
 // `lib/dedup.js`'s `createDedup`, for the same reason: this file's real state (the cached
@@ -134,12 +142,27 @@ export function createMyOwnershipCache() {
     };
   }
 
-  // Sync and tracked; starts loading. `null` for "no account" or "still loading": a tracked reader re-runs once it lands.
-  function peekMyOwnershipStatus(appid: number): OwnershipStatus | null {
+  // Sync and tracked; a lookup starts loading. One peek per list of rows: reading the account parses the whole prefs blob.
+  function peekMyOwnership(): MyOwnershipPeek {
     loaded();
-    if (!ensureLoading()) return null;
-    if (!ownedGames || !wishlistSet) return null;
-    return statusOf(appid);
+    // On the first lookup, so an empty list or search starts no fetch.
+    let ready: boolean | undefined;
+    const isReady = (): boolean => (ready ??= ensureLoading());
+    return {
+      status: (appid) => (isReady() && ownedGames && wishlistSet ? statusOf(appid) : null),
+      playtime: (appid) => {
+        const games = isReady() && !ownedFailed ? ownedGames : null;
+        if (!games) return undefined;
+        const game = games.get(appid);
+        if (!game) return null;
+        return { playtime: hoursFromMinutes(game.playtimeMinutes), lastPlayed: fmtLastPlayed(game.lastPlayedUnix) };
+      },
+    };
+  }
+
+  // One row's status, for a reader rendering a single cell.
+  function peekMyOwnershipStatus(appid: number): OwnershipStatus | null {
+    return peekMyOwnership().status(appid);
   }
 
   // Who — among the current account's members — owns this game, and how much each has played it.
@@ -152,30 +175,18 @@ export function createMyOwnershipCache() {
     return ownersMap.get(appid) ?? [];
   }
 
-  // The current account's playtime for a game (summed across a Family's members, latest play
-  // date wins — as the Owned list computes it), for user-list rows' Played/Last Played columns.
-  // `undefined` while loading, with no account or after a failed fetch, `null` for a game the
-  // account doesn't own.
-  function peekMyPlaytime(appid: number): MyPlaytime | null | undefined {
-    loaded();
-    if (!ensureLoading() || !ownedGames || ownedFailed) return undefined;
-    const game = ownedGames.get(appid);
-    if (!game) return null;
-    return { playtime: hoursFromMinutes(game.playtimeMinutes), lastPlayed: fmtLastPlayed(game.lastPlayedUnix) };
-  }
-
   // Subscribes an imperative consumer's effect to what the peeks depend on, before it has anything to peek.
   function trackMyOwnership(): void {
     loaded();
     getEffectiveCurrentAccount();
   }
 
-  return { getMyOwnershipStatus, peekMyOwnershipStatus, peekMyPlaytime, getOwnersFor, trackMyOwnership };
+  return { getMyOwnershipStatus, peekMyOwnership, peekMyOwnershipStatus, getOwnersFor, trackMyOwnership };
 }
 
 const defaultCache = createMyOwnershipCache();
 export const getMyOwnershipStatus = defaultCache.getMyOwnershipStatus;
+export const peekMyOwnership = defaultCache.peekMyOwnership;
 export const peekMyOwnershipStatus = defaultCache.peekMyOwnershipStatus;
-export const peekMyPlaytime = defaultCache.peekMyPlaytime;
 export const getOwnersFor = defaultCache.getOwnersFor;
 export const trackMyOwnership = defaultCache.trackMyOwnership;

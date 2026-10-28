@@ -283,7 +283,7 @@ import {
 } from './listResolve.ts';
 import { CombineForm, sourceOptions, refKey, type SourceOption } from './CombineForm.tsx';
 import type { MembershipGroup } from './combine.ts';
-import { peekMyOwnershipStatus, peekMyPlaytime, trackMyOwnership } from './myOwnership.ts';
+import { peekMyOwnership, trackMyOwnership } from './myOwnership.ts';
 import { creatorTitle, fetchCreatorGames, steamSearchUrl, type CreatorRole } from './creatorData.ts';
 import { fetchGamePass, GAME_PASS_PATH, GAME_PASS_TITLE, xboxStoreUrl, type GamePassData } from './gamePassData.ts';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
@@ -1944,9 +1944,10 @@ export default function ListRoute() {
 
   // Stamps ✓/☆ (and a user list's playtime) onto every row in `rowsStore` from myOwnership.ts's cached sets; a still-loading peek is skipped.
   function stampMyOwnership(): void {
+    const peek = peekMyOwnership();
     batch(() => {
       for (const item of rowsStore) {
-        const status = peekMyOwnershipStatus(item.appid);
+        const status = peek.status(item.appid);
         if (status) {
           rowStore.mutateRow(item.appid, (draft) => {
             draft.inLibrary = status.inLibrary;
@@ -1954,7 +1955,7 @@ export default function ListRoute() {
           });
         }
         if (kind !== 'user') continue;
-        const played = peekMyPlaytime(item.appid);
+        const played = peek.playtime(item.appid);
         if (played === undefined) continue;
         rowStore.mutateRow(item.appid, (draft) => {
           draft.playtime = played?.playtime;
