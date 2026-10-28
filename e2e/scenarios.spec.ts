@@ -4,6 +4,7 @@ import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { HEARTBEAT_MS, PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
 import { hookPresentation, type PresTest } from './presentationHooks.ts';
 import { asPlayer, shot } from './state.ts';
+import { row, rows } from './rows.ts';
 import {
   ALICE,
   BOB,
@@ -27,8 +28,6 @@ test.afterEach(() => {
   expect(pageErrors, 'uncaught page errors').toEqual([]);
 });
 
-const rows = (page: Page) => page.locator('tbody tr:not(.dt-group-row)');
-const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
 const groupRows = (page: Page) => page.locator('.dt-group-row');
 // A Home tree row's ⋯, which holds its Move, Rename and Delete.
 const rowMenu = (page: Page, name: string) => page.getByRole('button', { name: `More actions for ${name}` });
