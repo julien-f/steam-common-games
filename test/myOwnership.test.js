@@ -307,6 +307,33 @@ test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not th
   assert.deepEqual(await getMyOwnershipStatus(440), { inLibrary: false, onWishlist: false });
 });
 
+test("peekMyOwnership: a peek first looked up after an account switch loads the current account, not its creation's", async (t) => {
+  withFetch(t, async (url, opts) => {
+    const member = JSON.parse(opts.body).members[0];
+    if (url === '/api/common-games')
+      return {
+        ok: true,
+        json: async () => ({
+          games: [{ appid: member === '1' ? 440 : 620, name: 'App' }],
+          players: [{ steamid: member }],
+          playtime: {},
+          lastPlayed: {},
+        }),
+      };
+    return { ok: true, json: async () => ({ items: [] }) };
+  });
+  setCurrentAccount(makeAccount('1'));
+  const { peekMyOwnership } = createMyOwnershipCache();
+  const before = peekMyOwnership();
+  setCurrentAccount(makeAccount('2'));
+  const current = peekMyOwnership();
+  current.status(620);
+  before.status(620);
+
+  for (let i = 0; i < 5; i++) await new Promise(setImmediate); // both fetches land
+  assert.deepEqual(current.status(620), { inLibrary: true, onWishlist: false });
+});
+
 test('peekMyOwnership().playtime: undefined while loading, then summed hours / latest date for owned games, null otherwise', async (t) => {
   withFetch(t, async (url) => {
     if (url === '/api/common-games') {
