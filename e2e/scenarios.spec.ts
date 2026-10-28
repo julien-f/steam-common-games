@@ -3399,6 +3399,25 @@ test("R1 edge: closing the ranking's side panel returns focus to its Details but
   await expect(page.getByRole('button', { name: 'Details', exact: true }).nth(1)).toBeFocused();
 });
 
+test("R1 edge: the answer keys wait while the ranking's side panel is open", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  const tie = page.getByRole('button', { name: /^Tie/ });
+  await expect(tie).toContainText('↓');
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
+  await expect(page.locator('.game-panel')).toBeVisible();
+  // Its key hints go too: the keys don't answer now.
+  await expect(tie).not.toContainText('↓');
+  for (const key of ['ArrowDown', 's', 'z']) await page.keyboard.press(key);
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeEnabled();
+});
+
 test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');

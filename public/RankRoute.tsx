@@ -32,6 +32,8 @@ import Kbd from './Kbd.tsx';
 import type { Game, GameDetails, GameDetailsReply } from './types.ts';
 
 const MAX_UNDO = 100;
+// Tie, Skip and Undo's keys, which wait while the details panel is open.
+const ANSWER_KEYS = new Set(['ArrowDown', '=', 's', 'S', 'z', 'Z', 'Backspace']);
 
 function headerImage(appid: number): string {
   return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`;
@@ -206,6 +208,8 @@ export default function RankRoute() {
         navigate(listHref());
       return;
     }
+    // The open panel has the keyboard (↓ scrolls it); an answer would also close it under the reader.
+    if (isPanelOpen() && ANSWER_KEYS.has(key)) return;
     if (key === 'z' || key === 'Z' || key === 'Backspace') {
       e.preventDefault();
       undo();
@@ -434,13 +438,22 @@ export default function RankRoute() {
             </div>
             <div class="rank-actions">
               <button type="button" class="btn" onClick={() => respond('tie')}>
-                Tie <Kbd k="↓" />
+                Tie{' '}
+                <Show when={!isPanelOpen()}>
+                  <Kbd k="↓" />
+                </Show>
               </button>
               <button type="button" class="btn" onClick={() => respond('skip')}>
-                Skip, ask later <kbd>S</kbd>
+                Skip, ask later{' '}
+                <Show when={!isPanelOpen()}>
+                  <kbd>S</kbd>
+                </Show>
               </button>
               <button type="button" class="btn" disabled={!undoStack().length} onClick={undo}>
-                Undo <kbd>Z</kbd>
+                Undo{' '}
+                <Show when={!isPanelOpen()}>
+                  <kbd>Z</kbd>
+                </Show>
               </button>
             </div>
             <p class="rank-hint">
