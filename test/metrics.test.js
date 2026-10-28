@@ -282,6 +282,23 @@ test('getMetrics: lastHour keeps exactly the last hour as the window rolls over'
   assert.deepEqual(lastHour.cacheHits.library, { hits: 30, misses: 30, forced: 0 });
 });
 
+test('getMetrics: lastHour drops an event at the start of its 60th minute', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  recordDedupHit('steam');
+  t.mock.timers.setTime(60 * 60 * 1000 - 1);
+  assert.equal(getMetrics().lastHour.dedupHits.steam, 1);
+  t.mock.timers.setTime(60 * 60 * 1000);
+  assert.equal(getMetrics().lastHour.dedupHits.steam, 0);
+});
+
+test('getMetrics: lastHour ignores minutes ahead of a clock stepped back', (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  t.mock.timers.setTime(30 * 60 * 1000);
+  recordDedupHit('steam');
+  t.mock.timers.setTime(10 * 60 * 1000);
+  assert.equal(getMetrics().lastHour.dedupHits.steam, 0);
+});
+
 test('getMetrics: includes a stable "since" timestamp', () => {
   const { since } = getMetrics();
   assert.equal(typeof since, 'number');
