@@ -636,7 +636,7 @@ const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
 // version of the *other* ownership badge in this app (panel.tsx's, plain "In library"/"On
 // wishlist") was deliberately kept free of "your"/"my" wording for. `null` (rendered "—") covers
 // both "no account loaded" and "still loading" — same ambiguity myOwnership.ts's own
-// peekMyOwnershipStatus already accepts, for the same reason: a synchronous cell render can't
+// MyOwnershipPeek.status already accepts, for the same reason: a synchronous cell render can't
 // await, and stampMyOwnership re-stamps every row once the real sets land. Not part of
 // CORE_COLUMNS — an Owned/Wishlist list's own rows are always trivially 'Owned'/'Wishlisted', so
 // this only earns a place on ListRoute.tsx's BUNDLE_COLUMNS/RECENT_COLUMNS (which 'user' also

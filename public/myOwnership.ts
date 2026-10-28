@@ -81,8 +81,7 @@ export function createMyOwnershipCache() {
 
   // Starts (or reuses) the two fetches for whatever `currentAccount` currently is. Returns false
   // with no fetch at all when nothing is loaded — the "no badge" case throughout this module.
-  function ensureLoading(): boolean {
-    const account = getEffectiveCurrentAccount();
+  function ensureLoading(account = getEffectiveCurrentAccount()): boolean {
     if (!account) {
       cachedAccountId = null;
       ownedPromise = wishlistPromise = null;
@@ -143,11 +142,13 @@ export function createMyOwnershipCache() {
   }
 
   // Sync and tracked; a lookup starts loading. One peek per list of rows: reading the account parses the whole prefs blob.
+  // Meant for one run: it answers for the account read at creation.
   function peekMyOwnership(): MyOwnershipPeek {
     loaded();
+    const account = getEffectiveCurrentAccount();
     // On the first lookup, so an empty list or search starts no fetch.
     let ready: boolean | undefined;
-    const isReady = (): boolean => (ready ??= ensureLoading());
+    const isReady = (): boolean => (ready ??= ensureLoading(account));
     return {
       status: (appid) => (isReady() && ownedGames && wishlistSet ? statusOf(appid) : null),
       playtime: (appid) => {

@@ -261,6 +261,26 @@ test('trackMyOwnership: re-runs on an account switch, without starting a fetch',
   assert.equal(fetches, 0);
 });
 
+test('peekMyOwnership: a peek with no lookups still re-runs its tracked scope on an account switch', async (t) => {
+  let fetches = 0;
+  withFetch(t, (...args) => {
+    fetches++;
+    return fakeAccountFetch()(...args);
+  });
+  const { peekMyOwnership } = createMyOwnershipCache();
+  let runs = 0;
+  const { dispose } = await track(() => {
+    peekMyOwnership();
+    runs++;
+  });
+
+  setCurrentAccount(makeAccount('2'));
+  dispose();
+
+  assert.equal(runs, 2);
+  assert.equal(fetches, 0);
+});
+
 test('getMyOwnershipStatus: a ?u= override is what ownership answers for, not the stored account', async (t) => {
   // Owned games differ per account, so the answer says which one was actually asked about.
   withFetch(t, async (url, opts) => {
@@ -334,6 +354,7 @@ test('peekMyOwnership: reads the current account once for any number of rows (C2
     return reads;
   };
 
+  assert.ok(readsFor(1) > 0);
   assert.equal(readsFor(1000), readsFor(1));
   const peek = peekMyOwnership();
   assert.deepEqual(peek.status(440), { inLibrary: true, onWishlist: false });
