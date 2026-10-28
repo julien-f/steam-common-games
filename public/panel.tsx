@@ -1673,7 +1673,13 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
 // Nothing while loading or without ITAD (the price lines say that); otherwise none and failed are said apart.
 function PanelBundleLines(props: { game: ReadonlyGame }): JSX.Element {
   return (
-    <Show when={panelData.bundles() !== undefined && !(panelData.bundles() === null && isItadOff())}>
+    <Show
+      when={
+        !panelData.bundles.loading &&
+        panelData.bundles() !== undefined &&
+        !(panelData.bundles() === null && isItadOff())
+      }
+    >
       <div class="panel-bundles">
         <Show when={panelData.bundles() === null}>
           <div class="panel-no-data">
