@@ -7,6 +7,7 @@ const {
   achievementsAccountKey,
   achievementsRequestUrl,
   achievementsSteamUrl,
+  PANEL_SETTLE_MS,
 } = require('../public/panelData.ts');
 
 const meta = (id) => ({ name: `DLC ${id}`, capsule: `c${id}.jpg`, releaseDate: '1 Jan, 2020', comingSoon: false });
@@ -157,6 +158,55 @@ test("a lookup refused past this client's share keeps the server's message until
   await Promise.all([cache.fetchAchievements(620, members, force), cache.fetchPrice(620, 'FR', force)]);
   assert.equal(cache.achievementsRefusal(620, members), undefined);
   assert.equal(cache.priceRefusal(620, 'FR'), undefined);
+});
+
+test('a refused bundles lookup keeps the server message', async (t) => {
+  const state = mockPanelRoutes(t, DATA);
+  state.limited = true;
+  const cache = createPanelDataCache();
+  assert.equal(await cache.fetchBundles(620, 'FR'), null);
+  assert.equal(cache.bundlesRefusal(620, 'FR'), LIMITED);
+  state.limited = false;
+  await cache.fetchBundles(620, 'FR', { force: true });
+  assert.equal(cache.bundlesRefusal(620, 'FR'), undefined);
+});
+
+// Holding ↓ in the table or lightbox passes a game every few dozen ms (panel.tsx passes `settled`).
+test('settled: only the game still open after the pause is fetched; a cached one answers at once', async (t) => {
+  const state = mockPanelRoutes(t, DATA);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const cache = createPanelDataCache();
+  let open = null;
+  const members = ['76561198000000001'];
+  const loadAll = (appid) => {
+    const settled = () => open === appid;
+    return Promise.all([
+      cache.fetchNews(appid, { settled }),
+      cache.fetchAchievements(appid, members, { settled }),
+      cache.fetchPrice(appid, 'FR', { settled }),
+      cache.fetchBundles(appid, 'FR', { settled }),
+    ]);
+  };
+  const passed = [];
+  for (let appid = 1; appid <= 10; appid++) {
+    open = appid;
+    passed.push(loadAll(appid));
+    t.mock.timers.tick(50);
+    await new Promise(setImmediate);
+  }
+  t.mock.timers.tick(PANEL_SETTLE_MS);
+  await Promise.all(passed);
+  const requests = () => state.urls.filter((url) => url !== '/api/health');
+  assert.deepEqual(requests(), [
+    '/api/game-news/10',
+    '/api/achievements/10?steamids=76561198000000001',
+    '/api/prices?country=FR',
+    '/api/game-bundles/10?country=FR',
+  ]);
+
+  open = 10;
+  assert.notEqual(cache.fetchNews(10, { settled: () => true }) instanceof Promise, true, 'answered synchronously');
+  assert.equal(requests().length, 4);
 });
 
 test('fetchAchievements: achievementCount 0 answers "no achievements" without a request', async (t) => {

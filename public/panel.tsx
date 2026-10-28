@@ -35,6 +35,7 @@ import {
   fetchPrice,
   priceRefusal,
   fetchBundles,
+  bundlesRefusal,
   fetchDlc,
   isItadOff,
 } from './panelData.ts';
@@ -518,12 +519,12 @@ const panelData = createRoot(() => {
   const [news, { refetch: refetchNews }] = createResource<PanelNews, number>(openAppid, (appid, info) => {
     // A cached value comes back synchronously, so reopening a game paints its real News card
     // instead of flashing the loading skeleton at it again.
-    return fetchNews(appid, { force: isForced(info) });
+    return fetchNews(appid, { force: isForced(info), settled: () => openAppid() === appid });
   });
 
   const [achievements, { refetch: refetchAchievements }] = createResource<PanelAchievements, string>(
     appidAndAccount,
-    (_key, info) => {
+    (key, info) => {
       // Read off the current game rather than packed into the source key: the key only has to
       // change when the *identity* of what's being fetched changes (this appid, this account), and
       // a resource fetcher runs untracked, so reading the game here subscribes to nothing.
@@ -531,6 +532,7 @@ const panelData = createRoot(() => {
       if (!g) return null;
       return fetchAchievements(g.appid, currentMembers(), {
         force: isForced(info),
+        settled: () => appidAndAccount() === key,
         achievementCount: g.details?.meta?.achievementCount,
       });
     },
@@ -567,13 +569,13 @@ const panelData = createRoot(() => {
 
   const [price, { refetch: refetchPrice }] = createResource<PanelPrice, string>(priceSource, (key, info) => {
     const [appid, region] = key.split(':');
-    return fetchPrice(Number(appid), region, { force: isForced(info) });
+    return fetchPrice(Number(appid), region, { force: isForced(info), settled: () => priceSource() === key });
   });
 
   const bundlesSource = createMemo(() => (openAppid() == null ? null : `${openAppid()}:${currentRegion()}`));
   const [bundles, { refetch: refetchBundles }] = createResource<PanelBundles, string>(bundlesSource, (key, info) => {
     const [appid, region] = key.split(':');
-    return fetchBundles(Number(appid), region, { force: isForced(info) });
+    return fetchBundles(Number(appid), region, { force: isForced(info), settled: () => bundlesSource() === key });
   });
 
   // DLC is the one card whose fetch is gated behind actually expanding it (see panelData.ts's
@@ -1654,7 +1656,7 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
                 </div>
               </Show>
             </Show>
-            <PanelBundleLines />
+            <PanelBundleLines game={props.game} />
           </section>
         </Show>
       }
@@ -1669,12 +1671,14 @@ function PriceSection(props: { game: ReadonlyGame }): JSX.Element {
 
 // The current bundles the open game is in, under the Price card's own lines.
 // Nothing while loading or without ITAD (the price lines say that); otherwise none and failed are said apart.
-function PanelBundleLines(): JSX.Element {
+function PanelBundleLines(props: { game: ReadonlyGame }): JSX.Element {
   return (
     <Show when={panelData.bundles() !== undefined && !(panelData.bundles() === null && isItadOff())}>
       <div class="panel-bundles">
         <Show when={panelData.bundles() === null}>
-          <div class="panel-no-data">Bundles: IsThereAnyDeal didn't answer.</div>
+          <div class="panel-no-data">
+            Bundles: {bundlesRefusal(props.game.appid, currentRegion()) ?? "IsThereAnyDeal didn't answer."}
+          </div>
         </Show>
         <Show when={panelData.bundles()?.length === 0}>
           <div class="panel-no-data">Not in any current bundle.</div>
