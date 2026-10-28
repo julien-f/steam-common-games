@@ -725,6 +725,39 @@ test('A5 edge: the profile stays on screen through a refresh that keeps every ga
   expect(await page.evaluate(() => (window as unknown as { profileGone: boolean }).profileGone)).toBe(false);
 });
 
+test('A5 edge: the profile stays on screen while a refresh streams in a new game', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  let refreshed = false;
+  // 10 h on each game: enough for Plays mostly; the refresh adds Don't Starve Together (322330).
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    if (refreshed) {
+      body.games.push({ appid: 322330, name: "Don't Starve Together" });
+      body.playtime[322330] = { [ALICE.steamid]: 0 };
+    }
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/owned');
+  await expect(page.locator('.profile').getByRole('heading')).toHaveText('Plays mostly');
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/game-details/stream', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  refreshed = true;
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
+  await expect(page.locator('.list-status')).toContainText('6 / 7 games loaded');
+  await expect(page.locator('.profile').getByRole('heading')).toHaveText('Plays mostly');
+  release();
+  await expect(rows(page)).toHaveCount(7);
+  await expect(page.locator('.list-status')).not.toContainText('games loaded');
+  await expect(page.locator('.profile').getByRole('heading')).toHaveText('Plays mostly');
+});
+
 test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
   page,
 }) => {
@@ -4359,6 +4392,25 @@ test('D2 edge: a details stream cut short marks the games it never sent failed',
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('.list-status')).toContainText("didn't answer for 4 games");
   await expect(page.locator('.list-status')).not.toContainText('/ 6 games loaded');
+});
+
+test("F1 edge: the Price card shows no bundles while the next game's are loading", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=620');
+  await expect(page.locator('.panel-bundle').first()).toBeVisible();
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/game-bundles/**', async (route) => {
+    await held;
+    await route.fallback();
+  });
+  const asked = page.waitForRequest(/\/api\/game-bundles\//);
+  await page.getByRole('button', { name: 'Next game' }).click();
+  await asked;
+  await expect(page.locator('#panel-section-price')).toBeVisible();
+  await expect(page.locator('.panel-bundles')).toHaveCount(0);
+  release();
+  await expect(page.locator('.panel-bundles')).toBeVisible();
 });
 
 test("F1 edge: the Price card says when a game is in no bundle, and when ITAD didn't answer", async ({ page }) => {

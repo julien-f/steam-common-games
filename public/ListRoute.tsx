@@ -1460,8 +1460,9 @@ export default function ListRoute() {
   // must not clobber it.
   let standaloneLookupToken = 0;
 
+  const isListed = (r: Game): boolean => !r.loading;
   function tableData(): Game[] {
-    return rowsStore.filter((r) => !r.loading);
+    return rowsStore.filter(isListed);
   }
 
   // Reads tableReady so a caller tracking this list (the panel's nav bar) follows a table rebuild.
@@ -1544,7 +1545,6 @@ export default function ListRoute() {
       setStatusText(`${loaded} / ${total} games loaded${eta != null ? ` · ${formatEta(eta)}` : '…'}${why}`);
       setLoadFraction(loaded / total);
       loadedRowsDue = true;
-      setLoadedRows(null);
       return;
     }
     setStatusText('');
@@ -1554,7 +1554,7 @@ export default function ListRoute() {
     clearTimeout(loadedRowsTimer);
     // A task of its own, so the stream's last flush paints first; a load started since retakes it.
     loadedRowsTimer = setTimeout(() => {
-      if (!loadedRowsDue) setLoadedRows(unwrap(rowsStore).filter((r) => !r.loading));
+      if (!loadedRowsDue) setLoadedRows(unwrap(rowsStore).filter(isListed));
     });
   }
 

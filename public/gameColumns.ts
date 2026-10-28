@@ -321,7 +321,7 @@ export function releaseSortTimestamp(str: string): number {
   return endOfReleasePeriod(s);
 }
 
-// A sort parses each value ~4 times per comparison; capped as Last Played and Bundles' datetimes are near-unique.
+// A sort parses each value ~4 times per comparison; capped as Bundles' publish/expiry datetimes are near-unique.
 const SORT_TIMESTAMPS_MAX = 10_000;
 const sortTimestamps = new Map<string, number>();
 function cachedSortTimestamp(v: unknown): number {
@@ -637,7 +637,7 @@ const PRICE_STATUS_COLUMN: ColumnDef<Row> = {
 // version of the *other* ownership badge in this app (panel.tsx's, plain "In library"/"On
 // wishlist") was deliberately kept free of "your"/"my" wording for. `null` (rendered "—") covers
 // both "no account loaded" and "still loading" — same ambiguity myOwnership.ts's own
-// peekMyOwnershipStatus already accepts, for the same reason: a synchronous cell render can't
+// MyOwnershipPeek.status already accepts, for the same reason: a synchronous cell render can't
 // await, and stampMyOwnership re-stamps every row once the real sets land. Not part of
 // CORE_COLUMNS — an Owned/Wishlist list's own rows are always trivially 'Owned'/'Wishlisted', so
 // this only earns a place on ListRoute.tsx's BUNDLE_COLUMNS/RECENT_COLUMNS (which 'user' also

@@ -143,8 +143,9 @@ export function createMyOwnershipCache() {
   }
 
   // Sync and tracked; a lookup starts loading. One peek per list of rows: reading the account parses the whole prefs blob.
+  // Meant for one run; subscribes at creation, so a tracked scope with no lookups still follows the account.
   function peekMyOwnership(): MyOwnershipPeek {
-    loaded();
+    trackMyOwnership();
     // On the first lookup, so an empty list or search starts no fetch.
     let ready: boolean | undefined;
     const isReady = (): boolean => (ready ??= ensureLoading());

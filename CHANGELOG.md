@@ -86,6 +86,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The search page's box no longer drops a trailing space typed while results load
 - A game whose lookup failed joins Recently Looked Up once Refresh details brings it in
 - A game whose details didn't load no longer claims they were refreshed just now, and a shared link's screenshot opens once Refresh details brings them in
+- The side panel no longer shows the previous game's bundles while the next game's bundles load
 
 ### Development
 
