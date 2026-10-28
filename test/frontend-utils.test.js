@@ -12,6 +12,7 @@ const {
   fmtPlaytime,
   fmtLastPlayed,
   fmtLocalDate,
+  fmtReleaseDate,
   countryFlag,
   esc,
   computeSteamdbRating,
@@ -192,6 +193,12 @@ test('fmtLocalDate: the local calendar day, not the UTC one', () => {
     if (tz === undefined) delete process.env.TZ;
     else process.env.TZ = tz;
   }
+});
+
+test('fmtReleaseDate: a day-precise release reads as an ISO date, a coarse one as Steam wrote it', () => {
+  assert.equal(fmtReleaseDate('Oct 13, 2026'), '2026-10-13');
+  assert.equal(fmtReleaseDate('13 Oct, 2026'), '2026-10-13');
+  for (const s of ['Q4 2026', 'Fall 2026', 'October 2026', '2026', 'Coming soon']) assert.equal(fmtReleaseDate(s), s);
 });
 
 // ── countryFlag ────────────────────────────────────────────────────────────────

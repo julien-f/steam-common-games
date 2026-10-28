@@ -48,7 +48,7 @@ import {
   PROTON_TIER_COLORS,
   PROTON_TIER_UNKNOWN,
   fadeInOnLoad,
-  fmtLocalDate,
+  fmtReleaseDate,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -302,13 +302,6 @@ export function endOfReleasePeriod(str: string): number {
   return new Date(s).getTime();
 }
 
-// A day-precise release as YYYY-MM-DD, like every other date in the app; coarse ones ("Q4 2026") as Steam wrote them.
-export function fmtReleaseDate(str: string): string {
-  const d = /\b\d{1,2}\b/.test(str) ? new Date(str) : null;
-  if (!d || isNaN(d.getTime())) return str;
-  return fmtLocalDate(d);
-}
-
 // Sort-only view of the Released column. "Coming soon" (some info — it's presumably nearer than a
 // distant bare year) and "To be announced"/"TBA" (no info whatsoever) both need to sort after
 // every real or coarse date — including a far-future bare year like "2028" — while still
@@ -327,6 +320,19 @@ export function releaseSortTimestamp(str: string): number {
   return endOfReleasePeriod(s);
 }
 
+// A sort parses each value ~4 times per comparison; capped as Last Played and Bundles' datetimes are near-unique.
+const SORT_TIMESTAMPS_MAX = 10_000;
+const sortTimestamps = new Map<string, number>();
+function cachedSortTimestamp(v: unknown): number {
+  const s = String(v);
+  let t = sortTimestamps.get(s);
+  if (t === undefined) {
+    if (sortTimestamps.size >= SORT_TIMESTAMPS_MAX) sortTimestamps.clear();
+    sortTimestamps.set(s, (t = releaseSortTimestamp(s)));
+  }
+  return t;
+}
+
 // Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
 // `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
 // otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
@@ -336,8 +342,8 @@ export function releaseSortTimestamp(str: string): number {
 // NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
 // they sort deterministically after every dated/coarse entry instead of landing in this bucket.
 export const compareDateMissingLast = compareMissingLast(
-  (a, b) => releaseSortTimestamp(String(a)) - releaseSortTimestamp(String(b)),
-  (v) => v == null || v === '' || isNaN(releaseSortTimestamp(String(v))),
+  (a, b) => cachedSortTimestamp(a) - cachedSortTimestamp(b),
+  (v) => v == null || v === '' || isNaN(cachedSortTimestamp(v)),
 );
 
 // A still-unreleased game in `--warn`, like a middling score: notable, not final. By Steam's

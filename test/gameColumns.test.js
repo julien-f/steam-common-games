@@ -14,8 +14,8 @@ registerHooks({
 
 const {
   endOfReleasePeriod,
-  fmtReleaseDate,
   releaseSortTimestamp,
+  compareDateMissingLast,
   computePriceStatus,
   computeOwnershipStatus,
   priceTierBucket,
@@ -27,13 +27,9 @@ const {
   CORE_COLUMNS,
 } = require('../public/gameColumns.ts');
 
-const day = (y, m, d) => new Date(y, m - 1, d).getTime();
+const { fmtLocalDate } = require('../public/utils.ts');
 
-test('fmtReleaseDate: a day-precise release reads as an ISO date, a coarse one as Steam wrote it', () => {
-  assert.equal(fmtReleaseDate('Oct 13, 2026'), '2026-10-13');
-  assert.equal(fmtReleaseDate('13 Oct, 2026'), '2026-10-13');
-  for (const s of ['Q4 2026', 'Fall 2026', 'October 2026', '2026', 'Coming soon']) assert.equal(fmtReleaseDate(s), s);
-});
+const day = (y, m, d) => new Date(y, m - 1, d).getTime();
 
 test('endOfReleasePeriod: anchors a coarse date at the end of its period', () => {
   for (const [input, expected] of [
@@ -88,6 +84,24 @@ test('releaseSortTimestamp: placeholder spellings and plain dates', () => {
   assert.equal(releaseSortTimestamp(' tba '), releaseSortTimestamp('TBA'));
   assert.equal(releaseSortTimestamp('Q3 2026'), day(2026, 9, 30));
   assert.ok(Number.isNaN(releaseSortTimestamp('nonsense')));
+});
+
+test('compareDateMissingLast: dated, then placeholders, then missing, the same on a repeat sort', () => {
+  const dated = ['Oct 14, 2026', 'Q4 2026', '2026', 'Coming soon', 'TBA'];
+  const input = [null, 'TBA', 'nonsense', '2026', '', 'Oct 14, 2026', 'Coming soon', 'Q4 2026'];
+  for (let i = 0; i < 2; i++) {
+    const asc = [...input].sort((a, b) => compareDateMissingLast(a, b, 'asc'));
+    assert.deepEqual(asc.slice(0, 5), dated);
+    const desc = [...input].sort((a, b) => -compareDateMissingLast(a, b, 'desc')); // the table flips the sign for desc
+    assert.deepEqual(desc.slice(0, 5), [...dated].reverse());
+    for (const sorted of [asc, desc]) assert.deepEqual(new Set(sorted.slice(5)), new Set([null, '', 'nonsense']));
+  }
+});
+
+test('compareDateMissingLast: still in date order past more distinct dates than its memo keeps', () => {
+  const days = Array.from({ length: 12_000 }, (_, i) => fmtLocalDate(new Date(2000, 0, 1 + i)));
+  const sorted = [...days].reverse().sort((a, b) => compareDateMissingLast(a, b, 'asc'));
+  assert.deepEqual(sorted, days);
 });
 
 test('computePriceStatus: loading, no data, record tiers, sale, full price', () => {
