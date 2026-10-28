@@ -6678,6 +6678,13 @@ test('I2 edge: closing a game with no row returns focus to the row it was opened
   await expect(row(page, 'Hades')).toBeFocused();
 });
 
+test('I2 edge: a game outside the list shows the age of its details', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1426210');
+  await expect(page.locator('#panel-title')).not.toBeEmpty();
+  await expect(page.locator('.panel-refresh-age')).not.toBeEmpty();
+});
+
 test("I3 edge: a DLC's panel names its way back after the game it came from", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>

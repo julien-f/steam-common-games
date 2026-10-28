@@ -78,7 +78,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Leaving the search page with a game open no longer keeps its panel open on the next page
 - On the search page, a game opened from the panel keeps its way back to the game before it
 - On the search page, a game whose details fail to load says so instead of loading forever
-- The panel's Refresh details reloads the game on the search page, and shows how old the details are there and on the ranking screen
+- The panel's Refresh details reloads the game on the search page, and shows how old the details are there, on the ranking screen and for a game looked up outside a list
 - On the ranking screen, ↓, S and Z no longer answer the pair while a game's details panel is open
 - On the search page, a game opened from its panel that isn't among the results no longer offers a random pick from them
 
