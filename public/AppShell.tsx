@@ -45,7 +45,7 @@ import X from 'lucide-solid/icons/x';
 // registered rather than each route needing to rebind the whole document-level keydown listener
 // itself, or the shell needing to know which routes are "list-shaped" at all.
 //
-// `openGame(appid)`: only ListRoute registers this (every one of its kinds can place a looked-up
+// `openGame(appid)`: ListRoute and SearchRoute (beside its results) register this (every ListRoute kind can place a looked-up
 // game somewhere sensible — its own row if it has one, otherwise a standalone panel docked to
 // that same route — see ListRoute's own comment on `handleOpenGameRequest`), so it always returns
 // true there. Home/BundlesBrowseRoute/AboutRoute/RankRoute never register it — there's no list/table for a

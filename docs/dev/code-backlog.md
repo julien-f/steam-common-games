@@ -79,4 +79,4 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 
 ## Docs
 
-- **C208 · cleanup · S** — stale comments on the panel's hosts: `public/AppShell.tsx:48` says only ListRoute registers `openGame` (SearchRoute does too, `public/SearchRoute.tsx:222`), and `public/panel.tsx:118` names ListRoute and RankRoute as the callers of `panelOpen`, leaving out SearchRoute. Name all three.
+None open.
