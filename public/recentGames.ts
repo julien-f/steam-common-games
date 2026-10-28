@@ -31,6 +31,8 @@ export function loadRecentGames(): RecentGame[] {
 }
 
 function saveRecentGames(list: RecentGame[]): void {
+  // A lookup writes its entry again once its details land; most of those change nothing.
+  if (JSON.stringify(list) === JSON.stringify(loadRecentGames())) return;
   setPref(RECENT_GAMES_PREF_KEY, list);
 }
 

@@ -123,3 +123,38 @@ test('renameRecentGame: a game that is not in the list is left out of it, not ad
   renameRecentGame(440, 'Team Fortress 2', null);
   assert.deepEqual(loadRecentGames(), []);
 });
+
+// ── Server push ──────────────────────────────────────────────────────────────
+
+// A search-box pick writes the entry, then again once its details land (AppShell.tsx, SearchRoute.tsx).
+test('addRecentGame: lookups in a row push recentGames once after a pause, and an unchanged write not at all', async (t) => {
+  const restore = globalThis.fetch;
+  const puts = [];
+  globalThis.fetch = async (url, opts) => {
+    puts.push({ url, value: JSON.parse(opts.body).value });
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const prefs = require('../public/prefs.ts');
+  prefs._resetPrefsState();
+  prefs.setSignedInSteamid('76561198000000001');
+  const { addRecentGame } = mod();
+
+  for (let i = 0; i < 5; i++) {
+    addRecentGame(i, `Game ${i}`, null);
+    addRecentGame(i, `Game ${i}`, null);
+  }
+  t.mock.timers.tick(3000);
+  assert.deepEqual(
+    puts.map((p) => [p.url, p.value.length]),
+    [['/api/me/prefs/recentGames', 5]],
+  );
+
+  addRecentGame(4, 'Game 4', null); // already first, nothing changed
+  t.mock.timers.tick(3000);
+  assert.equal(puts.length, 1);
+  prefs._resetPrefsState();
+});
