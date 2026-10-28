@@ -855,6 +855,24 @@ test('GET /api/game-details/:appid: 200 with null meta when appdetails fetch fai
   assert.deepEqual(res.body.failed, ['hltb', 'meta'], "HLTB needs meta's name, so it failed too, not 'no data'");
 });
 
+test('GET /api/game-details/:appid: a failed store browse item logs once, for tags, not again for the demo', async (t) => {
+  _reset();
+  _resetAuth();
+  const detailsFetch = makeDetailsFetch();
+  t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('IStoreBrowseService') ? { ok: false, status: 503 } : detailsFetch(url),
+  );
+  const warn = t.mock.method(console, 'warn', () => {});
+
+  const res = await api.get('/api/game-details/408');
+  assert.deepEqual(res.body.failed, ['tags']);
+  const lines = warn.mock.calls.map((c) => String(c.arguments[0]));
+  assert.deepEqual(
+    lines.filter((l) => l.startsWith('[game-details]')),
+    ['[game-details] tags (appid 408):'],
+  );
+});
+
 test('GET /api/game-details/:appid: names a failed source in `failed`, unlike one with no data', async (t) => {
   _reset();
   _resetAuth();

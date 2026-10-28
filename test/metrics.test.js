@@ -107,13 +107,21 @@ test('getMetrics: lastHour mirrors sinceRestart while everything happened within
   globalThis.fetch = async () => ({ ok: true, status: 200 });
   try {
     await createTrackedFetch('hltb')('search', 'u1');
+    recordLimiterTrip('details');
+    recordDedupHit('steam');
+    recordCacheEvent('library', 'hits');
     t.mock.timers.tick(10 * 60 * 1000); // 10 minutes later
-    await createTrackedFetch('hltb')('search', 'u2');
+    globalThis.fetch = async () => {
+      t.mock.timers.tick(40);
+      throw new Error('timeout');
+    };
+    await assert.rejects(() => createTrackedFetch('hltb')('search', 'u2'));
+    recordCacheEvent('library', 'forced');
 
+    // Whole objects, so a field the last-hour sum misses shows up here.
     const { sinceRestart, lastHour } = getMetrics();
     assert.equal(sinceRestart.groups.hltb.search.requests, 2);
-    assert.equal(lastHour.groups.hltb.search.requests, 2);
-    assert.deepEqual(lastHour.groups.hltb.search.statusCounts, { 200: 2 });
+    assert.deepEqual(lastHour, sinceRestart);
   } finally {
     globalThis.fetch = restore;
   }
@@ -282,7 +290,7 @@ test('getMetrics: lastHour keeps exactly the last hour as the window rolls over'
   assert.deepEqual(lastHour.cacheHits.library, { hits: 30, misses: 30, forced: 0 });
 });
 
-test('getMetrics: lastHour drops an event at the start of its 60th minute', (t) => {
+test('getMetrics: lastHour drops an event at the start of its 61st minute', (t) => {
   t.mock.timers.enable({ apis: ['Date'] });
   recordDedupHit('steam');
   t.mock.timers.setTime(60 * 60 * 1000 - 1);

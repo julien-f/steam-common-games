@@ -1202,7 +1202,7 @@ test('getAppDetails: caps movies at 5', async (t) => {
 // Both read the same cached IStoreBrowseService item (see getStoreBrowseItem in
 // lib/steam.js) — tags via its `tagids` field, the demo link via `related_items.demo_appid`
 // — so they're tested together here rather than in separate sections.
-const steamTags = async (appid) => resolveSteamTags(await getStoreBrowseItem(appid));
+const steamTags = (appid) => resolveSteamTags(getStoreBrowseItem(appid));
 const gameDemo = async (appid) => extractDemoAppid(await getStoreBrowseItem(appid));
 
 // Routes the shared fetch mock by URL: IStoreBrowseService for the per-app store browse item
@@ -1384,10 +1384,10 @@ test('extractDemoAppid: returns null when the store item lookup is unsuccessful'
 test('resolveSteamTags: parses the tag name map once while its row is live', async (t) => {
   _reset();
   mockTagEndpoints(t, { nameMap: { 1: 'Action' } });
-  await resolveSteamTags({ tagids: [1] });
+  await resolveSteamTags(Promise.resolve({ tagids: [1] }));
 
   const parse = t.mock.method(JSON, 'parse');
-  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Action', weight: null }]);
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'Action', weight: null }]);
   assert.equal(parse.mock.callCount(), 0);
 });
 
@@ -1417,20 +1417,30 @@ test('resolveSteamTags: fetches the tag name map alongside a pending store brows
 test('resolveSteamTags: re-fetches the tag name map once its row expires', async (t) => {
   const now = Date.now();
   _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now }]]);
-  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Old', weight: null }]);
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'Old', weight: null }]);
 
   _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now - META_CACHE_TTL_MS - 1 }]]);
   mockTagEndpoints(t, { nameMap: { 1: 'New' } });
-  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'New', weight: null }]);
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'New', weight: null }]);
 });
 
 test('resolveSteamTags: reads a tag name map row rewritten since the last read', async () => {
   const now = Date.now();
   _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now - 1000 }]]);
-  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'Old', weight: null }]);
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'Old', weight: null }]);
 
   _reset([['tagnames:all', { value: { 1: 'New' }, ts: now }]]);
-  assert.deepEqual(await resolveSteamTags({ tagids: [1] }), [{ name: 'New', weight: null }]);
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'New', weight: null }]);
+});
+
+test('resolveSteamTags: does not pair a map with a row rewritten while it was being read', async () => {
+  const now = Date.now();
+  _reset([['tagnames:all', { value: { 1: 'Old' }, ts: now - 5000 }]]);
+  const first = resolveSteamTags(Promise.resolve({ tagids: [1] }));
+  _reset([['tagnames:all', { value: { 1: 'New' }, ts: now - 4000 }]]);
+  assert.deepEqual(await first, [{ name: 'Old', weight: null }]);
+
+  assert.deepEqual(await resolveSteamTags(Promise.resolve({ tagids: [1] })), [{ name: 'New', weight: null }]);
 });
 
 // ── resolveSteamPackageAppids / resolveSteamBundleAppids ────────────────────────
