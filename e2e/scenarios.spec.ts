@@ -5948,6 +5948,21 @@ test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
   await expect(page.getByRole('status').filter({ hasText: 'Lookup failed' })).toContainText('Steam store error 500');
 });
 
+test('F2 edge: on /search, a failed refresh says so until one succeeds', async ({ page }) => {
+  let fail = true;
+  await page.route(/\/api\/game-details\/1145360\?refresh=1$/, (route) =>
+    fail ? route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }) : route.fallback(),
+  );
+  await page.goto('/search?q=hades');
+  const refresh = page.getByRole('button', { name: 'Refresh details' });
+  await refresh.click();
+  const status = page.getByRole('status').filter({ hasText: 'Refresh failed' });
+  await expect(status).toBeVisible();
+  fail = false;
+  await refresh.click();
+  await expect(status).toHaveCount(0);
+});
+
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
   await page.route('**/api/search-games?q=portal*', (route) =>
     route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),

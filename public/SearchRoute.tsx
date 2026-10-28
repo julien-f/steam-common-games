@@ -182,6 +182,7 @@ export default function SearchRoute() {
         'Refresh failed',
       );
       setGames(game.appid, detailsFields(data));
+      setStatusText('');
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
     }
