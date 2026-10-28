@@ -134,11 +134,12 @@ test('addRecentGame: lookups in a row push recentGames once after a pause, and a
     puts.push({ url, value: JSON.parse(opts.body).value });
     return { ok: true, json: async () => ({}) };
   };
+  const prefs = require('../public/prefs.ts');
   t.after(() => {
     globalThis.fetch = restore;
+    prefs._resetPrefsState();
   });
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const prefs = require('../public/prefs.ts');
   prefs._resetPrefsState();
   prefs.setSignedInSteamid('76561198000000001');
   const { addRecentGame } = mod();
@@ -156,5 +157,4 @@ test('addRecentGame: lookups in a row push recentGames once after a pause, and a
   addRecentGame(4, 'Game 4', null); // already first, nothing changed
   t.mock.timers.tick(3000);
   assert.equal(puts.length, 1);
-  prefs._resetPrefsState();
 });
