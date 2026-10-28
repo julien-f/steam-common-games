@@ -43,6 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Suggested views show only the columns that matter to them, the one they sort or filter on first
 - The screenshot and trailer viewer gives the screen to the media: its controls show only for the mouse or a tap, it follows photo and video players' keys and gestures, and trailers remember muting and offer a replay.
 - Home's Explore cards sit in two even rows of three
+- Owned's profile and taste, and a comparison's player profiles, no longer hold up the page as the last game details land, and a game's Refresh details no longer recomputes them
 
 ### Fixed
 

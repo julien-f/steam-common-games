@@ -846,6 +846,25 @@ test('B2 edge: Taste fit says an opened Owned has too few games played, and stay
   await expect(note).toHaveText('Taste fit: Bob has too few games played');
 });
 
+test("B2 edge: a panel Refresh on Owned doesn't relearn its taste", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const stored = () =>
+    page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) => k.startsWith('steam.isonoe.net:taste:'));
+      return key ? localStorage.getItem(key) : null;
+    });
+  await expect.poll(stored).not.toBeNull();
+  const learned = await stored();
+
+  await row(page, 'Hades').getByText('Hades').click();
+  const refetch = page.waitForResponse((res) => /\/api\/game-details\/\d+\?refresh=1$/.test(res.url()));
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await refetch;
+  await expect(page.getByRole('button', { name: 'Refresh details' })).toBeEnabled();
+  expect(await stored()).toBe(learned);
+});
+
 test("B2 edge: a link to my own ★ account still says to open its Owned, whoever's current", async ({ page }) => {
   await asPlayer(page, ALICE);
   // No current account: only the ★ one says the link is the viewer's own.
