@@ -178,13 +178,83 @@ test('settled: an answer known without a request skips the pause', async (t) => 
   await cache.isItadConfigured();
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const settled = () => true;
-  assert.equal(await cache.fetchBundles(620, 'FR', { settled }), null);
-  assert.equal(await cache.fetchPrice(620, 'FR', { settled }), null);
-  assert.equal((await cache.fetchAchievements(620, [], { settled, achievementCount: 0 })).total, 0);
+  // The mocked timer never fires: a paused load fails here rather than hanging the test.
+  const unpaused = (p) =>
+    Promise.race([p, new Promise((_, reject) => setImmediate(() => reject(new Error('paused'))))]);
+  assert.equal(await unpaused(cache.fetchBundles(620, 'FR', { settled })), null);
+  assert.equal(await unpaused(cache.fetchPrice(620, 'FR', { settled })), null);
+  assert.equal((await unpaused(cache.fetchAchievements(620, [], { settled, achievementCount: 0 }))).total, 0);
   assert.deepEqual(state.urls, ['/api/health']);
 });
 
-// Holding ↓ in the table or lightbox passes a game every few dozen ms (panel.tsx passes `settled`).
+test('settled: a game left and come back to within the pause is fetched once', async (t) => {
+  const state = mockPanelRoutes(t, DATA);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const cache = createPanelDataCache();
+  let open = null;
+  const members = ['76561198000000001'];
+  const loadAll = (appid) => {
+    open = appid;
+    const settled = () => open === appid;
+    return Promise.all([
+      cache.fetchNews(appid, { settled }),
+      cache.fetchAchievements(appid, members, { settled }),
+      cache.fetchPrice(appid, 'FR', { settled }),
+      cache.fetchBundles(appid, 'FR', { settled }),
+    ]);
+  };
+  const passed = [];
+  for (const appid of [1, 2, 1]) {
+    passed.push(loadAll(appid));
+    t.mock.timers.tick(50);
+    await new Promise(setImmediate);
+  }
+  t.mock.timers.tick(PANEL_SETTLE_MS);
+  await Promise.all(passed);
+  assert.deepEqual(
+    state.urls.filter((url) => url !== '/api/health'),
+    [
+      '/api/game-news/1',
+      '/api/achievements/1?steamids=76561198000000001',
+      '/api/prices?country=FR',
+      '/api/game-bundles/1?country=FR',
+    ],
+  );
+});
+
+test('settled: a ↻ during the pause wins over the paused load', async (t) => {
+  const answers = new Map(); // url → its response, sent when the test says
+  t.mock.method(
+    globalThis,
+    'fetch',
+    (url) =>
+      new Promise((resolve) =>
+        answers.set(url, () =>
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ news: [url.includes('refresh=1') ? 'fresh' : 'stale'] }),
+          }),
+        ),
+      ),
+  );
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const cache = createPanelDataCache();
+  const paused = cache.fetchNews(620, { settled: () => true });
+  const forced = cache.fetchNews(620, { force: true });
+  t.mock.timers.tick(PANEL_SETTLE_MS);
+  await new Promise(setImmediate);
+  // The forced answer first, then any the paused load sent.
+  for (const answer of answers.values()) {
+    answer();
+    await new Promise(setImmediate);
+  }
+  assert.deepEqual(await forced, ['fresh']);
+  await paused;
+  assert.deepEqual(cache.fetchNews(620), ['fresh']);
+  assert.deepEqual([...answers.keys()], ['/api/game-news/620?refresh=1']);
+});
+
 test('settled: only the game still open after the pause is fetched; a cached one answers at once', async (t) => {
   const state = mockPanelRoutes(t, DATA);
   t.mock.timers.enable({ apis: ['setTimeout'] });

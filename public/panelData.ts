@@ -99,11 +99,15 @@ export const PANEL_SETTLE_MS = 250;
 // `settled`: whether the game a load was asked for is still the one open, once PANEL_SETTLE_MS has passed.
 type LoadOptions = { force?: boolean; settled?: () => boolean };
 
+// Each cache's latest load per key, until it settles: an unforced call joins it, a forced one replaces it.
+const pendingLoads = new WeakMap<Map<unknown, unknown>, Map<unknown, Promise<unknown>>>();
+
 // The cached value when there is one and `force` is unset, else a load that caches its result. A
 // failed load keeps whatever was last loaded rather than wiping it on a failed forced refresh;
 // `null` ("couldn't load") only the first time, when there's no fallback. `refusals` keeps the
 // server's message for the key's last load when it was a 429 (refusalMessage), left uncached. With
 // `settled`, a load the panel moved on from is never sent; its caller discards the uncached null.
+// A load superseded by a later forced one for its key isn't sent, or doesn't write if already sent.
 function sessionCached<K, V>(
   cache: Map<K, V | null>,
   key: K,
@@ -113,26 +117,39 @@ function sessionCached<K, V>(
 ): V | null | Promise<V | null> {
   const cached = cache.get(key);
   if (!force && cached !== undefined) return cached;
-  if (!force && settled)
-    return new Promise((resolve) => setTimeout(resolve, PANEL_SETTLE_MS)).then(() =>
-      settled() ? sessionCached(cache, key, load, { force }, refusals) : null,
+  let pending = pendingLoads.get(cache) as Map<K, Promise<V | null>> | undefined;
+  if (!pending) pendingLoads.set(cache, (pending = new Map()));
+  const joined = pending.get(key);
+  if (!force && joined) return joined;
+  const latest = () => pending.get(key) === call;
+  const run = () =>
+    load().then(
+      (value) => {
+        if (!latest()) return value;
+        refusals?.delete(key);
+        cache.set(key, value);
+        return value;
+      },
+      (err: unknown) => {
+        const value = cache.get(key) ?? null;
+        if (!latest()) return value;
+        const refusal = refusalMessage(err);
+        if (refusal) refusals?.set(key, refusal);
+        else refusals?.delete(key);
+        // A refusal passes with its window: the next open asks again.
+        if (!refusal || cache.has(key)) cache.set(key, value);
+        return value;
+      },
     );
-  return load().then(
-    (value) => {
-      refusals?.delete(key);
-      cache.set(key, value);
-      return value;
-    },
-    (err: unknown) => {
-      const refusal = refusalMessage(err);
-      if (refusal) refusals?.set(key, refusal);
-      else refusals?.delete(key);
-      const value = cache.get(key) ?? null;
-      // A refusal passes with its window: the next open asks again.
-      if (!refusal || cache.has(key)) cache.set(key, value);
-      return value;
-    },
-  );
+  const call: Promise<V | null> =
+    !force && settled
+      ? new Promise((resolve) => setTimeout(resolve, PANEL_SETTLE_MS)).then(() =>
+          settled() && latest() ? run() : null,
+        )
+      : run();
+  pending.set(key, call);
+  void call.then(() => latest() && pending.delete(key));
+  return call;
 }
 
 export function createPanelDataCache() {
