@@ -5913,6 +5913,19 @@ test("F2 edge: on /search, a DLC's panel keeps its way back once its details lan
   await expect(back).toBeVisible();
 });
 
+test('F2 edge: on /search, a game outside the results gets no list nav, as on a list page', async ({ page }) => {
+  await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>
+    route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(page.locator('#panel-reroll')).toBeVisible();
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  await expect(page.getByRole('button', { name: 'Back to Hades', exact: true })).toBeVisible();
+  await expect(page.locator('#panel-nav button')).toHaveCount(0);
+});
+
 test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
   await page.route(/\/api\/game-details\/1145360$/, (route) =>
     route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }),

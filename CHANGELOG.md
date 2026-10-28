@@ -80,6 +80,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On the search page, a game whose details fail to load says so instead of loading forever
 - The panel's Refresh details reloads the game on the search page, and shows how old the details are there and on the ranking screen
 - On the ranking screen, ↓, S and Z no longer answer the pair while a game's details panel is open
+- On the search page, a game opened from its panel that isn't among the results no longer offers a random pick from them
 
 ### Development
 

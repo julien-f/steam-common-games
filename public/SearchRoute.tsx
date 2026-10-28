@@ -151,7 +151,9 @@ export default function SearchRoute() {
   async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
     const token = ++lookupToken;
     setStatusText('');
-    setGames(appid, { appid, name, loading: true, details: null });
+    // A game reached from the panel (a DLC, a similar game) isn't one of the results: no list nav, as on a list page.
+    const standalone = !results().some((r) => r.appid === appid);
+    setGames(appid, { appid, name, loading: true, details: null, standalone });
     const game = games[appid];
     panelOpen(game);
     setPanelParam(appid);
