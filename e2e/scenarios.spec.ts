@@ -4,6 +4,7 @@ import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { HEARTBEAT_MS, PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
 import { hookPresentation, type PresTest } from './presentationHooks.ts';
 import { asPlayer, shot } from './state.ts';
+import { row, rows } from './rows.ts';
 import {
   ALICE,
   BOB,
@@ -27,8 +28,6 @@ test.afterEach(() => {
   expect(pageErrors, 'uncaught page errors').toEqual([]);
 });
 
-const rows = (page: Page) => page.locator('tbody tr:not(.dt-group-row)');
-const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
 const groupRows = (page: Page) => page.locator('.dt-group-row');
 // A Home tree row's ⋯, which holds its Move, Rename and Delete.
 const rowMenu = (page: Page, name: string) => page.getByRole('button', { name: `More actions for ${name}` });
@@ -3400,6 +3399,31 @@ test("R1 edge: closing the ranking's side panel returns focus to its Details but
   await expect(page.getByRole('button', { name: 'Details', exact: true }).nth(1)).toBeFocused();
 });
 
+test("R1 edge: the answer keys wait while the ranking's side panel is open", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  for (const name of ['Portal 2', 'Hades']) await row(page, name).getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Rank 2 games' }).click();
+  const tie = page.getByRole('button', { name: /^Tie/ });
+  await expect(tie).toContainText('↓');
+  await page.getByRole('button', { name: 'Details', exact: true }).first().click();
+  await expect(page.locator('.game-panel')).toBeVisible();
+  // Its key hints go too: the keys don't answer now.
+  await expect(tie).not.toContainText('↓');
+  for (const key of ['ArrowDown', 's', 'z']) await page.keyboard.press(key);
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+  // Like any other key, a held one cancels an armed X.
+  await page.keyboard.press('x');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.game-panel')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: /^Undo/ })).toBeEnabled();
+});
+
 test('R1 edge: Esc closing a nav popover stays on the ranking', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
@@ -5873,6 +5897,72 @@ test('F2 edge: on /search, ↓ moves from the box into the results, and an opene
   await expect(rows(page).first()).toBeFocused();
 });
 
+test("F2 edge: on /search, a DLC's panel keeps its way back once its details land", async ({ page }) => {
+  let landDetails = () => {};
+  const landed = new Promise<void>((resolve) => (landDetails = resolve));
+  await page.route(/\/api\/game-details\/9000\d\d$/, async (route) => {
+    await landed;
+    await route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } });
+  });
+  await page.goto('/search?q=hades');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  const back = page.getByRole('button', { name: 'Back to Hades', exact: true });
+  await expect(back).toBeVisible();
+  const lookup = page.waitForResponse(/\/api\/game-details\/9000\d\d$/);
+  landDetails();
+  await lookup;
+  // The page applies them right after the body parses: two frames is past that.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await expect(back).toBeVisible();
+});
+
+test('F2 edge: on /search, a game outside the results gets no list nav, as on a list page', async ({ page }) => {
+  await page.route(/\/api\/game-details\/9000\d\d$/, (route) =>
+    route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(page.locator('#panel-reroll')).toBeVisible();
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  await expect(page.getByRole('button', { name: 'Back to Hades', exact: true })).toBeVisible();
+  await expect(page.locator('#panel-nav button')).toHaveCount(0);
+  const dlc = await page.locator('#panel-title').textContent();
+  await page.keyboard.press('r');
+  await expect(page.locator('#panel-title')).toHaveText(dlc!);
+
+  // A result restored from the address, before the results land, keeps its nav.
+  await page.goto('/search?q=dead&game=550');
+  await expect(page.locator('#panel-title')).toHaveText('Left 4 Dead 2');
+  await expect(page.locator('#panel-reroll')).toBeVisible();
+});
+
+test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
+  await page.route(/\/api\/game-details\/1145360$/, (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(page.getByRole('status').filter({ hasText: 'Lookup failed' })).toContainText('Steam store error 500');
+});
+
+test('F2 edge: on /search, a failed refresh says so until one succeeds', async ({ page }) => {
+  let fail = true;
+  await page.route(/\/api\/game-details\/1145360\?refresh=1$/, (route) =>
+    fail ? route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }) : route.fallback(),
+  );
+  await page.goto('/search?q=hades');
+  const refresh = page.getByRole('button', { name: 'Refresh details' });
+  await refresh.click();
+  const status = page.getByRole('status').filter({ hasText: 'Refresh failed' });
+  await expect(status).toBeVisible();
+  fail = false;
+  await refresh.click();
+  await expect(status).toHaveCount(0);
+});
+
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
   await page.route('**/api/search-games?q=portal*', (route) =>
     route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
@@ -6601,6 +6691,13 @@ test('I2 edge: closing a game with no row returns focus to the row it was opened
   await page.keyboard.press('Escape');
   await expect(page.locator('.game-panel')).toBeHidden();
   await expect(row(page, 'Hades')).toBeFocused();
+});
+
+test('I2 edge: a game outside the list shows the age of its details', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1426210');
+  await expect(page.locator('#panel-title')).not.toBeEmpty();
+  await expect(page.locator('.panel-refresh-age')).not.toBeEmpty();
 });
 
 test("I3 edge: a DLC's panel names its way back after the game it came from", async ({ page }) => {

@@ -105,6 +105,7 @@ import {
   ApiError,
   computeSteamdbRating,
   computeProductionTier,
+  detailsFields,
   fetchJson,
   fmtAge,
   fmtLastPlayed,
@@ -240,19 +241,7 @@ import {
 import { encodeListFormula, decodeListFormula, shareListUrl, inMemoryDynamicList } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type {
-  AccountSlot,
-  DetailsAges,
-  GameDetails,
-  Game,
-  Rating,
-  Hltb,
-  GameMeta,
-  ProtonDb,
-  GameList,
-  CombineOp,
-  ListRef,
-} from './types.ts';
+import type { AccountSlot, GameDetailsReply, Game, GameList, CombineOp, ListRef } from './types.ts';
 import {
   getList,
   getLists,
@@ -650,20 +639,10 @@ const DEFAULT_SORT: SortEntry[] = [{ key: 'steamdbRating', dir: 'desc' }];
 const MAX_PRICE_LOOKUP_GAMES = 500; // mirrors the server's own cap — see loadPrices below
 
 // The shape of one `data:` line in /api/game-details/stream's SSE response.
-interface DetailsEvent {
+interface DetailsEvent extends GameDetailsReply {
   appid: number;
   done?: boolean;
   limited?: string; // its own event, with no appid: see detailsLimited
-  fetchedAt?: number | null;
-  fetchedAts?: DetailsAges | null;
-  rating: Rating | null;
-  hltb: Hltb | null;
-  meta: GameMeta | null;
-  tags: string[] | null;
-  tagWeights?: Record<string, number | null> | null;
-  demo: { appid: number } | null;
-  protondb: ProtonDb | null;
-  failed?: string[];
 }
 
 const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
@@ -1697,13 +1676,12 @@ export default function ListRoute() {
     const game = standaloneRows[appid];
     openGame(game);
     try {
-      const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
+      const data = await fetchJson<GameDetailsReply>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== standaloneLookupToken) return; // a newer lookup has since taken over
       setStandaloneRows(
         appid,
         produce((draft) => {
-          draft.details = data;
-          draft.loading = false;
+          Object.assign(draft, detailsFields(data));
           if (data.meta?.name) draft.name = data.meta.name;
         }),
       );

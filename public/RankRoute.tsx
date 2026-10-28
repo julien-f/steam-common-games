@@ -26,12 +26,14 @@ import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
-import { computeSteamdbRating, fetchJson, isTextEntry, scoreColor } from './utils.ts';
+import { computeSteamdbRating, detailsFields, fetchJson, isTextEntry, scoreColor } from './utils.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import Kbd from './Kbd.tsx';
-import type { Game, GameDetails } from './types.ts';
+import type { Game, GameDetails, GameDetailsReply } from './types.ts';
 
 const MAX_UNDO = 100;
+// Tie, Skip and Undo's keys, which wait while the details panel is open.
+const ANSWER_KEYS = new Set(['ArrowDown', '=', 's', 'S', 'z', 'Z', 'Backspace']);
 
 function headerImage(appid: number): string {
   return `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`;
@@ -119,15 +121,15 @@ export default function RankRoute() {
     }
   }
 
-  function getDetails(appid: number, refresh = false): Promise<GameDetails> {
-    return fetchJson<GameDetails>(
+  function getDetails(appid: number, refresh = false): Promise<GameDetailsReply> {
+    return fetchJson<GameDetailsReply>(
       `/api/game-details/${appid}${refresh ? '?refresh=1' : ''}`,
       undefined,
       refresh ? 'Refresh failed' : 'Details failed',
     );
   }
-  function setDetails(appid: number, details: GameDetails): void {
-    setGames(appid, { name: details.meta?.name || `App ${appid}`, loading: false, details });
+  function setDetails(appid: number, data: GameDetailsReply): void {
+    setGames(appid, { ...detailsFields(data), name: data.meta?.name || `App ${appid}` });
   }
 
   // Cached per appid for this mount; the server's own cache makes a repeat cheap anyway.
@@ -204,6 +206,11 @@ export default function RankRoute() {
     if (key === 'Escape') {
       if (!e.defaultPrevented && !isPanelOpen() && !document.querySelector('.shortcuts-modal.open'))
         navigate(listHref());
+      return;
+    }
+    // The open panel has the keyboard (↓ scrolls it); an answer would also close it under the reader.
+    if (isPanelOpen() && ANSWER_KEYS.has(key)) {
+      setArmed(null);
       return;
     }
     if (key === 'z' || key === 'Z' || key === 'Backspace') {
@@ -434,13 +441,22 @@ export default function RankRoute() {
             </div>
             <div class="rank-actions">
               <button type="button" class="btn" onClick={() => respond('tie')}>
-                Tie <Kbd k="↓" />
+                Tie{' '}
+                <Show when={!isPanelOpen()}>
+                  <Kbd k="↓" />
+                </Show>
               </button>
               <button type="button" class="btn" onClick={() => respond('skip')}>
-                Skip, ask later <kbd>S</kbd>
+                Skip, ask later{' '}
+                <Show when={!isPanelOpen()}>
+                  <kbd>S</kbd>
+                </Show>
               </button>
               <button type="button" class="btn" disabled={!undoStack().length} onClick={undo}>
-                Undo <kbd>Z</kbd>
+                Undo{' '}
+                <Show when={!isPanelOpen()}>
+                  <kbd>Z</kbd>
+                </Show>
               </button>
             </div>
             <p class="rank-hint">

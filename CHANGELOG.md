@@ -75,6 +75,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Marking which games you own or wishlist (✓/☆) on a long list takes far less time
 - Looking up games in quick succession while signed in no longer exhausts the account's sync allowance, which made the next settings change or sign-in fail.
 - Skimming games with the arrow keys no longer looks up every game passed, which could exhaust the bundle lookups for the session; a refused bundle lookup now says why, and is tried again the next time the game opens.
+- Leaving the search page with a game open no longer keeps its panel open on the next page
+- On the search page, a game opened from the panel keeps its way back to the game before it
+- On the search page, a game whose details fail to load says so, as on list pages
+- The panel's Refresh details reloads the game on the search page, and shows how old the details are there, on the ranking screen and for a game looked up outside a list
+- On the ranking screen, ↓, S and Z no longer answer the pair while a game's details panel is open
+- On the search page, a game opened from its panel that isn't among the results no longer offers a random pick from them
 
 ### Development
 

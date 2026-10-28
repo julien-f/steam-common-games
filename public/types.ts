@@ -69,6 +69,13 @@ export interface GameDetails {
   demo: { appid: number } | null;
 }
 
+// /api/game-details/:appid's reply: the details, their ages, and the sources that errored.
+export interface GameDetailsReply extends GameDetails {
+  fetchedAt?: number | null;
+  fetchedAts?: DetailsAges | null;
+  failed?: string[];
+}
+
 // One game in a table/panel — the shared base every page's row extends. `appid` is a
 // number on the wire (Steam's own APIs and every one of this app's server responses carry
 // it as a JSON number; the server normalizes `req.params.appid` through `Number(...)`

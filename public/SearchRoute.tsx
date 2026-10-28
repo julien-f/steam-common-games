@@ -5,21 +5,22 @@
 // this page its keyboard row navigation for free; opening a result uses the same shared side
 // panel every other route uses, and participates in its usual step/random/lightbox nav.
 import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } from 'solid-js';
+import { createStore } from 'solid-js/store';
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { useBaseTitle } from './pageTitle.ts';
 import { ListHero } from './ListHero.tsx';
 import { registerRouteHandlers } from './AppShell.tsx';
-import { panelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
+import { panelOpen, panelClose, isPanelOpen, getPanelGame, pickRandomFrom } from './panel.tsx';
 import { renderPanelNav, stepGameList } from './panelNav.ts';
 import { setPanelParam, setSearchQueryParam, parseUrlState } from './urlState.ts';
 import { addRecentGame } from './recentGames.ts';
 import { peekMyOwnershipStatus } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
-import type { Game, GameDetails } from './types.ts';
-import { fetchJson } from './utils.ts';
+import type { Game, GameDetailsReply } from './types.ts';
+import { detailsFields, fetchJson } from './utils.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 
 // CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
@@ -143,33 +144,47 @@ export default function SearchRoute() {
     if (row) table.focus.moveTo(row, { focus: true });
   }
 
+  // Store-backed, so the panel updates in place when details land rather than reopening (which drops its DLC trail).
+  const [games, setGames] = createStore<Record<number, Game>>({});
+  const [statusText, setStatusText] = createSignal('');
   let lookupToken = 0;
-  async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
+  async function openResult(appid: number, name: string, tinyImage: string | null, standalone = false): Promise<void> {
     const token = ++lookupToken;
-    const placeholder: Game = { appid, name, loading: true, details: null } as Game;
-    panelOpen(placeholder);
+    setStatusText('');
+    setGames(appid, { appid, name, loading: true, details: null, standalone });
+    const game = games[appid];
+    panelOpen(game);
     setPanelParam(appid);
     renderPanelNav({
       hasList: true,
-      game: placeholder,
+      game,
       getGameList,
       onStep: stepGame,
       onReroll: pickRandomGame,
     });
     focusRow(appid);
     try {
-      const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
+      const data = await fetchJson<GameDetailsReply>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== lookupToken) return; // a newer pick has since taken over
-      const resolved: Game = { ...placeholder, details: data, loading: false, name: data.meta?.name || name };
-      panelOpen(resolved);
-      // panelOpen moves focus into the panel itself (its hero image) each time it's called —
-      // this second call, once the game's details actually land, would otherwise silently
-      // re-steal focus back out of the row focusRow just placed it on above.
-      focusRow(appid);
+      setGames(appid, { ...detailsFields(data), name: data.meta?.name || name });
       addRecentGame(appid, data.meta?.name || name, data.meta?.capsule || tinyImage);
-    } catch {
-      // Left showing the loading placeholder — same as ListRoute's openStandaloneInPlace, no
-      // separate status line here since this route has no status bar of its own.
+    } catch (err) {
+      if (token === lookupToken) setStatusText(`Lookup failed: ${(err as Error).message}`);
+    }
+  }
+
+  // The panel's ↻: forces fresh details onto the open game.
+  async function refreshGame(game: Game): Promise<void> {
+    try {
+      const data = await fetchJson<GameDetailsReply>(
+        `/api/game-details/${game.appid}?refresh=1`,
+        undefined,
+        'Refresh failed',
+      );
+      setGames(game.appid, detailsFields(data));
+      setStatusText('');
+    } catch (err) {
+      setStatusText(`Refresh failed: ${(err as Error).message}`);
     }
   }
 
@@ -181,6 +196,7 @@ export default function SearchRoute() {
   }
 
   function pickRandomGame(): boolean {
+    if (getPanelGame()?.standalone) return false;
     const list = getGameList();
     if (!list.length) return false;
     const pick = pickRandomFrom(list, RANDOM_QUEUE_KEY, getPanelGame()?.appid ?? 0) as Game | null;
@@ -219,15 +235,20 @@ export default function SearchRoute() {
 
   onMount(() => {
     const unregister = registerRouteHandlers({
+      // A game from the panel (a DLC, a similar game) or the nav box, outside the results: no list nav, as on a list page.
       openGame: (appid) => {
-        openResult(appid, '', null);
+        openResult(appid, '', null, !results().some((r) => r.appid === appid));
         return true;
       },
       stepGame,
       pickRandom: pickRandomGame,
       gamePosition,
+      refreshGame,
     });
-    onCleanup(unregister);
+    onCleanup(() => {
+      unregister();
+      if (isPanelOpen()) panelClose({ leavingRoute: true });
+    });
   });
 
   return (
@@ -267,6 +288,11 @@ export default function SearchRoute() {
         <SearchClearButton />
       </div>
 
+      <Show when={statusText()}>
+        <p class="search-page-status" role="status">
+          {statusText()}
+        </p>
+      </Show>
       <Show when={query()} fallback={<p class="search-page-status">Type a game name to search.</p>}>
         <Show when={query().length >= GAME_SEARCH_MIN_CHARS} fallback={<p class="search-page-status">Keep typing…</p>}>
           <Show when={!searching()} fallback={<p class="search-page-status">Searching…</p>}>

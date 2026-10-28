@@ -117,7 +117,7 @@ export interface PanelOptions {
 
 // ── Shared game side panel ──────────────────────────────────────────────────
 // Mounted once by AppShell.tsx's single `initPanel(options)` call (see docs/dev/frontend.md), not
-// per-route — ListRoute.tsx and RankRoute.tsx (the callers of `panelOpen`) just open/close it,
+// per-route — ListRoute.tsx, SearchRoute.tsx and RankRoute.tsx (the callers of `panelOpen`) just open/close it,
 // never configure it; `PanelOptions` are the shell's hooks, which relay to the mounted route. A
 // real Solid component (converted from the original panel.ts's hand-rolled innerHTML rebuilds):
 // `initPanel(options)` mounts it once into the static `#panel-body` element every page's own
