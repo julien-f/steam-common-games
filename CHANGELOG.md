@@ -67,6 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - With wider system fonts such as Ubuntu's, the shortcut keys no longer overflow their column, the phone table toolbar no longer takes an extra line, and list links and remove buttons keep a full tap area
 - Steam review scores load again for games without a cached score: Steam retired the endpoint the app used
 - A shared layout link with one outdated setting keeps the rest of its layout instead of falling back to yours.
+- The server no longer stalls for every visitor while recording a busy hour's metrics
 
 ### Development
 

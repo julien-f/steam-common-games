@@ -20,7 +20,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart, exc
   daily:           [{ day, group, label, status, count }] }
 ```
 
-- **Windows**: every windowed signal nests under `sinceRestart`/`lastHour`, always the outermost keys; nothing nests a window of its own. Live snapshots (`budgets`, `circuitBreakers`, `semaphores`, `cacheEntries`) and the persisted `daily` sit outside both. A name with no events yet is absent rather than zeroed.
+- **Windows**: every windowed signal nests under `sinceRestart`/`lastHour`, always the outermost keys; nothing nests a window of its own. `lastHour` sums 60 per-minute buckets, so an event leaves it 59–60 minutes after it happened: bounded memory and O(1) recording whatever the traffic. Live snapshots (`budgets`, `circuitBreakers`, `semaphores`, `cacheEntries`) and the persisted `daily` sit outside both. A name with no events yet is absent rather than zeroed.
 
 ### Outbound — `groups`
 
