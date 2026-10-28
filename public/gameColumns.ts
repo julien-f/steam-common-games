@@ -320,6 +320,19 @@ export function releaseSortTimestamp(str: string): number {
   return endOfReleasePeriod(s);
 }
 
+// A sort parses each value ~4 times per comparison; capped as Last Played and Bundles' datetimes are near-unique.
+const SORT_TIMESTAMPS_MAX = 10_000;
+const sortTimestamps = new Map<string, number>();
+function cachedSortTimestamp(v: unknown): number {
+  const s = String(v);
+  let t = sortTimestamps.get(s);
+  if (t === undefined) {
+    if (sortTimestamps.size >= SORT_TIMESTAMPS_MAX) sortTimestamps.clear();
+    sortTimestamps.set(s, (t = releaseSortTimestamp(s)));
+  }
+  return t;
+}
+
 // Same idea for `type: 'date'` columns (`releaseDate`, wishlist's `dateAdded`) — setting
 // `compare` bypasses the column's own `parseDate`/type coercion too, so a `null` date would
 // otherwise become epoch 1970 via `new Date(null).getTime()` and sort as impossibly old, and a
@@ -328,14 +341,6 @@ export function releaseSortTimestamp(str: string): number {
 // NaN comparisons — both need to be pinned last instead. "Coming soon" and "To be announced" are
 // NOT examples of that — `releaseSortTimestamp` gives them real sentinel positions (see above) so
 // they sort deterministically after every dated/coarse entry instead of landing in this bucket.
-// Memoized: a sort calls this ~4 times per comparison, and the distinct date strings are few.
-const sortTimestamps = new Map<string, number>();
-function cachedSortTimestamp(v: unknown): number {
-  const s = String(v);
-  let t = sortTimestamps.get(s);
-  if (t === undefined) sortTimestamps.set(s, (t = releaseSortTimestamp(s)));
-  return t;
-}
 export const compareDateMissingLast = compareMissingLast(
   (a, b) => cachedSortTimestamp(a) - cachedSortTimestamp(b),
   (v) => v == null || v === '' || isNaN(cachedSortTimestamp(v)),

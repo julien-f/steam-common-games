@@ -27,6 +27,8 @@ const {
   CORE_COLUMNS,
 } = require('../public/gameColumns.ts');
 
+const { fmtLocalDate } = require('../public/utils.ts');
+
 const day = (y, m, d) => new Date(y, m - 1, d).getTime();
 
 test('endOfReleasePeriod: anchors a coarse date at the end of its period', () => {
@@ -94,6 +96,12 @@ test('compareDateMissingLast: dated, then placeholders, then missing, the same o
     assert.deepEqual(desc.slice(0, 5), [...dated].reverse());
     for (const sorted of [asc, desc]) assert.deepEqual(new Set(sorted.slice(5)), new Set([null, '', 'nonsense']));
   }
+});
+
+test('compareDateMissingLast: still in date order past more distinct dates than its memo keeps', () => {
+  const days = Array.from({ length: 12_000 }, (_, i) => fmtLocalDate(new Date(2000, 0, 1 + i)));
+  const sorted = [...days].reverse().sort((a, b) => compareDateMissingLast(a, b, 'asc'));
+  assert.deepEqual(sorted, days);
 });
 
 test('computePriceStatus: loading, no data, record tiers, sale, full price', () => {
