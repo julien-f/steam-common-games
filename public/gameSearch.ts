@@ -1,7 +1,7 @@
 import { esc, fetchJson } from './utils.ts';
 import { createComponent, createEffect, untrack } from 'solid-js';
 import ArrowRight from 'lucide-solid/icons/arrow-right';
-import { peekMyOwnershipStatus, trackMyOwnership } from './myOwnership.ts';
+import { peekMyOwnership, trackMyOwnership } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
 export interface GameSearchResult {
@@ -46,7 +46,7 @@ export function parseDirectAppid(raw: string): number | null {
 // Small "already owned/wishlisted" markers next to a result — same `myOwnership.ts` status
 // (checked against `currentAccount`, whichever account's list is actually on screen) the side
 // panel's own ownership badge shows, so a lookup reports the same thing whether it's opened from
-// this dropdown or already open in the panel. `peekMyOwnershipStatus` never blocks (a search
+// this dropdown or already open in the panel. `peekMyOwnership` never blocks (a search
 // result list re-renders on every keystroke) — see its own comment for what `null` means here
 // (no `currentAccount` loaded, or the fetch simply hasn't landed yet).
 export function ownershipMarkersHtml(status: OwnershipStatus | null): string {
@@ -154,9 +154,8 @@ export function initGameSearch({
 
   function renderResults() {
     const moreActive = moreRowShown() && activeIdx === lastResults.length;
-    const options = lastResults
-      .map((r, i) => gameSearchResultHtml(r, i === activeIdx, peekMyOwnershipStatus(r.appid)))
-      .join('');
+    const peek = peekMyOwnership();
+    const options = lastResults.map((r, i) => gameSearchResultHtml(r, i === activeIdx, peek.status(r.appid))).join('');
     const moreHtml = !moreRowShown()
       ? ''
       : gameSearchMoreHtml(
