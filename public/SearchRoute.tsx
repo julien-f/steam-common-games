@@ -19,8 +19,8 @@ import { addRecentGame } from './recentGames.ts';
 import { peekMyOwnershipStatus } from './myOwnership.ts';
 import { GAME_SEARCH_DEBOUNCE_MS, GAME_SEARCH_MIN_CHARS, ownershipMarkersHtml, searchGames } from './gameSearch.ts';
 import type { GameSearchResult } from './gameSearch.ts';
-import type { Game, GameDetails } from './types.ts';
-import { fetchJson } from './utils.ts';
+import type { Game, GameDetailsReply } from './types.ts';
+import { detailsFields, fetchJson } from './utils.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 
 // CORE_COLUMNS' thumb + Name pair over a bare GameSearchResult; a cell is a tracked scope, so renderName's badge follows ownership landing.
@@ -146,11 +146,11 @@ export default function SearchRoute() {
 
   // Store-backed, so the panel updates in place when details land rather than reopening (which drops its DLC trail).
   const [games, setGames] = createStore<Record<number, Game>>({});
-  const [lookupError, setLookupError] = createSignal('');
+  const [statusText, setStatusText] = createSignal('');
   let lookupToken = 0;
   async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
     const token = ++lookupToken;
-    setLookupError('');
+    setStatusText('');
     setGames(appid, { appid, name, loading: true, details: null });
     const game = games[appid];
     panelOpen(game);
@@ -164,12 +164,26 @@ export default function SearchRoute() {
     });
     focusRow(appid);
     try {
-      const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
+      const data = await fetchJson<GameDetailsReply>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== lookupToken) return; // a newer pick has since taken over
-      setGames(appid, { details: data, loading: false, name: data.meta?.name || name });
+      setGames(appid, { ...detailsFields(data), name: data.meta?.name || name });
       addRecentGame(appid, data.meta?.name || name, data.meta?.capsule || tinyImage);
     } catch (err) {
-      if (token === lookupToken) setLookupError(`Lookup failed: ${(err as Error).message}`);
+      if (token === lookupToken) setStatusText(`Lookup failed: ${(err as Error).message}`);
+    }
+  }
+
+  // The panel's ↻: forces fresh details onto the open game.
+  async function refreshGame(game: Game): Promise<void> {
+    try {
+      const data = await fetchJson<GameDetailsReply>(
+        `/api/game-details/${game.appid}?refresh=1`,
+        undefined,
+        'Refresh failed',
+      );
+      setGames(game.appid, detailsFields(data));
+    } catch (err) {
+      setStatusText(`Refresh failed: ${(err as Error).message}`);
     }
   }
 
@@ -226,6 +240,7 @@ export default function SearchRoute() {
       stepGame,
       pickRandom: pickRandomGame,
       gamePosition,
+      refreshGame,
     });
     onCleanup(() => {
       unregister();
@@ -270,9 +285,9 @@ export default function SearchRoute() {
         <SearchClearButton />
       </div>
 
-      <Show when={lookupError()}>
+      <Show when={statusText()}>
         <p class="search-page-status" role="status">
-          {lookupError()}
+          {statusText()}
         </p>
       </Show>
       <Show when={query()} fallback={<p class="search-page-status">Type a game name to search.</p>}>

@@ -33,8 +33,6 @@ interface Host {
   hasList: boolean;
   // Opening leaves focus on the opener (Search: arrows keep walking the results, the panel following).
   keepsFocus?: boolean;
-  // Checks this page still fails, each lifted by the commit fixing its backlog item.
-  knownFailures?: string[];
 }
 
 const listHost = (name: string, path: string, game: string, appid: number, extra = {}): Host => ({
@@ -85,7 +83,6 @@ const HOSTS: Host[] = [
     closedUrl: /\/search\?q=dead$/,
     hasList: true,
     keepsFocus: true,
-    knownFailures: ['refresh'],
   },
   {
     name: 'Rank',
@@ -101,7 +98,6 @@ const HOSTS: Host[] = [
     openUrl: null,
     closedUrl: /\/lists\/[^/]+\/rank$/,
     hasList: false,
-    knownFailures: ['refresh'],
   },
 ];
 
@@ -133,11 +129,6 @@ test.afterEach(() => {
 
 for (const host of HOSTS) {
   test.describe(`panel on ${host.name}`, () => {
-    test.beforeEach(({}, testInfo) => {
-      const check = /^F1 edge: (\w+) — /.exec(testInfo.title)?.[1] ?? '';
-      test.fail(!!host.knownFailures?.includes(check), `still failing on ${host.name}`);
-    });
-
     test('F1 edge: open — focus moves into the panel (or stays on the opener); Esc closes it, focus back on the opener', async ({
       page,
     }) => {

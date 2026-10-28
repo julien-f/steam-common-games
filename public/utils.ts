@@ -1,3 +1,5 @@
+import type { Game, GameDetailsReply } from './types.ts';
+
 // The custom-URL name in a Steam profile URL ('https://steamcommunity.com/id/gaben/' → 'gaben'),
 // or null for anything else — a `/profiles/<steam64>` URL is Steam's own fallback form, which
 // means the account never set one.
@@ -433,4 +435,17 @@ export function focusGameRow(root: ParentNode | null | undefined, appid: number)
   row.focus({ preventScroll: true });
   row.scrollIntoView({ block: 'nearest' });
   return true;
+}
+
+// What a /api/game-details reply sets on a game outside a list's table (ListRoute's rows: applyDetailsEvent).
+export function detailsFields(
+  data: GameDetailsReply,
+): Pick<Game, 'details' | 'loading' | 'detailsFetchedAt' | 'detailsFetchedAts' | 'failedSources'> {
+  return {
+    details: data,
+    loading: false,
+    detailsFetchedAt: data.fetchedAt ?? null,
+    detailsFetchedAts: data.fetchedAts ?? null,
+    failedSources: data.failed ?? [],
+  };
 }

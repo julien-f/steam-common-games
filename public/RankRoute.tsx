@@ -26,10 +26,10 @@ import { setBaseTitle } from './pageTitle.ts';
 import { panelOpen, panelClose, isPanelOpen, getPanelGame } from './panel.tsx';
 import { isLightboxOpen } from './lightbox.tsx';
 import { withAccountParam } from './urlState.ts';
-import { computeSteamdbRating, fetchJson, isTextEntry, scoreColor } from './utils.ts';
+import { computeSteamdbRating, detailsFields, fetchJson, isTextEntry, scoreColor } from './utils.ts';
 import { registerRouteHandlers } from './AppShell.tsx';
 import Kbd from './Kbd.tsx';
-import type { Game, GameDetails } from './types.ts';
+import type { Game, GameDetails, GameDetailsReply } from './types.ts';
 
 const MAX_UNDO = 100;
 
@@ -119,15 +119,15 @@ export default function RankRoute() {
     }
   }
 
-  function getDetails(appid: number, refresh = false): Promise<GameDetails> {
-    return fetchJson<GameDetails>(
+  function getDetails(appid: number, refresh = false): Promise<GameDetailsReply> {
+    return fetchJson<GameDetailsReply>(
       `/api/game-details/${appid}${refresh ? '?refresh=1' : ''}`,
       undefined,
       refresh ? 'Refresh failed' : 'Details failed',
     );
   }
-  function setDetails(appid: number, details: GameDetails): void {
-    setGames(appid, { name: details.meta?.name || `App ${appid}`, loading: false, details });
+  function setDetails(appid: number, data: GameDetailsReply): void {
+    setGames(appid, { ...detailsFields(data), name: data.meta?.name || `App ${appid}` });
   }
 
   // Cached per appid for this mount; the server's own cache makes a repeat cheap anyway.
