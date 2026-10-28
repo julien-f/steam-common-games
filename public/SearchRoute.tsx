@@ -177,6 +177,7 @@ export default function SearchRoute() {
 
   // The panel's ↻: forces fresh details onto the open game.
   async function refreshGame(game: Game): Promise<void> {
+    const unresolved = !game.details?.meta;
     try {
       const data = await fetchJson<GameDetailsReply>(
         `/api/game-details/${game.appid}?refresh=1`,
@@ -187,7 +188,7 @@ export default function SearchRoute() {
       setGames(game.appid, { ...detailsFields(data), name });
       setStatusText('');
       // A lookup that failed lands only now.
-      addRecentGame(game.appid, name, data.meta?.capsule || null);
+      if (unresolved && data.meta) addRecentGame(game.appid, name, data.meta.capsule || null);
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
     }

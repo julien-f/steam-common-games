@@ -2443,7 +2443,7 @@ function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
         aria-label="Refresh details"
         onClick={handlePanelRefresh}
       >
-        <Show when={age()}>
+        <Show when={age() || panelRefreshing()}>
           <span class="panel-refresh-age">{panelRefreshing() ? 'Refreshing…' : age()}</span>
         </Show>
         {/* Only the icon spins — the animation used to be on the button itself, which now has

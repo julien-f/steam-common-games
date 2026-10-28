@@ -34,7 +34,7 @@ import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 import { StorageFullBanner } from './StorageFullBanner.tsx';
 import { prefsWriteFailed } from './prefs.ts';
-import { smoothScroll } from './utils.ts';
+import { detailsPending, smoothScroll } from './utils.ts';
 import ArrowUp from 'lucide-solid/icons/arrow-up';
 import Settings from 'lucide-solid/icons/settings';
 import X from 'lucide-solid/icons/x';
@@ -185,7 +185,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           clearTimeout(timeout);
           dispose();
           // Its details never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
-          if (!game || (!game.details && on.item.shotId !== 'banner')) return resolve(false);
+          if (!game || (detailsPending(game) && on.item.shotId !== 'banner')) return resolve(false);
           setPrivateMode(false);
           const items = buildMediaItems(game.appid, game.details?.meta);
           const i = items.findIndex((s) => s.shotId === on.item.shotId);

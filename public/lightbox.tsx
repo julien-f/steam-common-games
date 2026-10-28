@@ -16,7 +16,7 @@ import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
-import { fmtTime } from './utils.ts';
+import { detailsPending, fmtTime } from './utils.ts';
 import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
@@ -2061,7 +2061,7 @@ createRoot(() => {
     lbTvLinked = now;
     const game = lbGame();
     const shot = shots()[idx()];
-    if (!now || !game || !shot || (awaitingMedia() && !game.details)) return cancelLbTv();
+    if (!now || !game || !shot || (awaitingMedia() && detailsPending(game))) return cancelLbTv();
     const on = presented();
     if (on?.appid === game.appid && on.item.shotId === shot.shotId) return cancelLbTv();
     clearTimeout(lbTvTimer);

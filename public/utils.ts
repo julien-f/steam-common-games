@@ -459,3 +459,8 @@ export const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, de
 export function failedLookupFields(): ReturnType<typeof detailsFields> {
   return detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] });
 }
+
+// No media to show yet, and some may come: details not in, or the store's metadata failed (↻ retries it).
+export function detailsPending(game: Pick<Game, 'details' | 'failedSources'>): boolean {
+  return !game.details || !!game.failedSources?.includes('meta');
+}

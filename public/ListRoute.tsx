@@ -106,6 +106,7 @@ import {
   computeSteamdbRating,
   computeProductionTier,
   detailsFields,
+  detailsPending,
   failedLookupFields,
   NO_DETAILS,
   DETAIL_SOURCES,
@@ -1651,12 +1652,13 @@ export default function ListRoute() {
   // live URL (setPanelParam) and because a row's screenshots only exist after its details have
   // streamed in — so the value is read up front and replayed afterwards, the same shape the
   // deleted pages' own restorePanelFromUrl used.
-  let pendingShot: string | null = null;
+  let pendingShot: { appid: number; shot: string } | null = null;
   function restorePendingShot(): void {
     if (!pendingShot) return;
     const game = getPanelGame();
-    if (!game?.details?.meta) return; // no media yet — a later call (a ↻ too) replays it
-    const shot = pendingShot;
+    // Only on the link's own game, once its media can show — a later call (a ↻ too) replays it.
+    if (!game || game.appid !== pendingShot.appid || detailsPending(game)) return;
+    const { shot } = pendingShot;
     pendingShot = null;
     openLightbox(game, shot);
   }
@@ -1920,6 +1922,7 @@ export default function ListRoute() {
   // lookup isn't), so `mutateRow` returning undefined means it's a standalone one instead, which
   // has its own store (see standaloneRows).
   async function refreshGame(game: Game): Promise<void> {
+    const unresolved = !game.details?.meta;
     try {
       const data = await fetchJson<DetailsEvent>(
         `/api/game-details/${game.appid}?refresh=1`,
@@ -1933,7 +1936,7 @@ export default function ListRoute() {
           produce((draft) => applyDetailsEvent(draft, data)),
         );
         // A lookup that failed lands only now.
-        addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
+        if (unresolved && data.meta) addRecentGame(game.appid, data.meta.name || '', data.meta.capsule || null);
       }
       restorePendingShot();
     } catch (err) {
@@ -2847,8 +2850,9 @@ export default function ListRoute() {
     // URL (setPanelParam), and this route re-runs load() for reasons of its own (an appid-only
     // navigation, an account change) — a later pass reading the by-then-stripped URL would
     // otherwise wipe a value the first pass hasn't replayed yet. Cleared only by the replay.
-    const shotParam = new URLSearchParams(routerLocation.search).get('shot');
-    if (shotParam) pendingShot = shotParam;
+    const search = new URLSearchParams(routerLocation.search);
+    const shotParam = search.get('shot');
+    if (shotParam) pendingShot = { appid: Number(search.get('game') ?? params.appid), shot: shotParam };
     if (kind === 'recent') {
       if (params.appid) openOrAddRecentGame(Number(params.appid));
     } else {

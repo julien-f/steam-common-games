@@ -4294,6 +4294,31 @@ test('D2 edge: a refused details stream marks every game failed, not loading for
   await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toBeVisible();
 });
 
+test("D2 edge: a link's screenshot of a game with no store page isn't opened on the next game", async ({ page }) => {
+  await page.route('**/api/game-details/stream', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    // Hades' store page answers with nothing: no metadata, and no failure to retry.
+    const body = full.body
+      .split('\n\n')
+      .map((e) => (e.includes('"appid":1145360') ? e.replace(/"meta":\{.*?\},"(?=[a-z]+":)/, '"meta":null,"') : e))
+      .join('\n\n');
+    return route.fulfill({ ...full, body });
+  });
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(rows(page)).toHaveCount(6);
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).not.toHaveAttribute('open');
+  // A phone's panel covers the table.
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await row(page, 'Portal 2').getByText('Portal 2').click();
+  await expect(page.locator('#panel-title')).toHaveText('Portal 2');
+  await page.waitForTimeout(300);
+  await expect(lightbox).not.toHaveAttribute('open');
+});
+
 test("D2 edge: a game the details stream refused shows no age, and its link's screenshot waits for ↻", async ({
   page,
 }) => {
@@ -4308,7 +4333,16 @@ test("D2 edge: a game the details stream refused shows no age, and its link's sc
   await expect(page.locator('.panel-refresh-age')).toHaveCount(0);
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox).not.toHaveAttribute('open');
+  // With no age to show, ↻ still says it's working.
+  let land = () => {};
+  const landed = new Promise<void>((resolve) => (land = resolve));
+  await page.route(/\/api\/game-details\/1145360\?refresh=1$/, async (route) => {
+    await landed;
+    await route.fallback();
+  });
   await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(page.locator('.panel-refresh-age')).toHaveText('Refreshing…');
+  land();
   await expect(lightbox).toHaveAttribute('open');
   await expect(page).toHaveURL(/[?&]shot=s1\b/);
 });
@@ -6775,9 +6809,27 @@ test("F1 edge: a lookup that fails says the sources didn't answer, and ↻ retri
   await expect(page.locator('.panel-glance')).toContainText("didn't answer");
   await page.getByRole('button', { name: 'Refresh details' }).click();
   await expect(page.locator('.panel-glance')).not.toContainText("didn't answer");
-  const name = (await page.locator('#panel-title').textContent())!;
   await page.goto('/game');
-  await expect(row(page, name)).toBeVisible();
+  await expect(row(page, 'It Takes Two')).toBeVisible();
+});
+
+test("F1 edge: a lookup retried by ↻ that still doesn't answer isn't added to Recently Looked Up", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.route(/\/api\/game-details\/1426210(\?refresh=1)?$/, (route) =>
+    route.request().url().includes('refresh=1')
+      ? route.fulfill({
+          json: { rating: null, hltb: null, meta: null, tags: null, protondb: null, demo: null, failed: ['meta'] },
+        })
+      : route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }),
+  );
+  await page.goto('/lists/owned?game=1426210');
+  await expect(page.locator('.panel-glance')).toContainText("didn't answer");
+  const refresh = page.getByRole('button', { name: 'Refresh details' });
+  await refresh.click();
+  // Disabled from the click until every refetch has settled.
+  await expect(refresh).toBeEnabled();
+  const recents = await page.evaluate(() => localStorage.getItem('steam.isonoe.net:prefs'));
+  expect(JSON.parse(recents!).recentGames?.value ?? []).toEqual([]);
 });
 
 test('I2 edge: a game outside the list shows the age of its details', async ({ page }) => {
