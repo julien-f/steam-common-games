@@ -701,6 +701,31 @@ test('A5 edge: a profile too thin for an archetype or tiles shows neither, and n
   await expect(profile).not.toHaveClass(/profile--tiles/);
 });
 
+test('A5 edge: the profile stays on screen through a refresh that keeps every game', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  // 10 h on each game: enough for Plays mostly.
+  await page.route('**/api/common-games', (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    for (const perPlayer of Object.values(body.playtime) as Record<string, number>[])
+      for (const id of Object.keys(perPlayer)) perPlayer[id] = 600;
+    return route.fulfill({ json: body });
+  });
+  await page.goto('/lists/owned');
+  await expect(page.locator('.profile').getByRole('heading')).toHaveText('Plays mostly');
+  await page.evaluate(() => {
+    const w = window as unknown as { profileGone: boolean };
+    w.profileGone = false;
+    new MutationObserver(() => {
+      if (!document.querySelector('.profile')) w.profileGone = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.getByRole('button', { name: /^Updated\b/ }).click();
+  await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
+  await expect(page.locator('.profile').getByRole('heading')).toHaveText('Plays mostly');
+  expect(await page.evaluate(() => (window as unknown as { profileGone: boolean }).profileGone)).toBe(false);
+});
+
 test('A5.1-3: Plays mostly says what it is built from, leaving software out, and how the account plays', async ({
   page,
 }) => {
@@ -844,6 +869,25 @@ test('B2 edge: Taste fit says an opened Owned has too few games played, and stay
   await page.goto('/lists/wishlist?u=bob');
   await expect(rows(page)).toHaveCount(BOB.wishlist!.length);
   await expect(note).toHaveText('Taste fit: Bob has too few games played');
+});
+
+test("B2 edge: a panel Refresh on Owned doesn't relearn its taste", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  const stored = () =>
+    page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) => k.startsWith('steam.isonoe.net:taste:'));
+      return key ? localStorage.getItem(key) : null;
+    });
+  await expect.poll(stored).not.toBeNull();
+  const learned = await stored();
+
+  await row(page, 'Hades').getByText('Hades').click();
+  const refetch = page.waitForResponse((res) => /\/api\/game-details\/\d+\?refresh=1$/.test(res.url()));
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await refetch;
+  await expect(page.getByRole('button', { name: 'Refresh details' })).toBeEnabled();
+  expect(await stored()).toBe(learned);
 });
 
 test("B2 edge: a link to my own ★ account still says to open its Owned, whoever's current", async ({ page }) => {

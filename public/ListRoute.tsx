@@ -58,7 +58,7 @@ import {
   Show,
   type JSX,
 } from 'solid-js';
-import { createStore, produce } from 'solid-js/store';
+import { createStore, produce, unwrap } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
@@ -890,6 +890,9 @@ export default function ListRoute() {
   const [bundleFailedCount, setBundleFailedCount] = createSignal(0);
 
   const [rowsStore, setRowsStore] = createStore<Game[]>([]);
+  // The rows once every one's details are in, unwrapped (updateStatus): what's computed from them reads
+  // ~10× faster than through store proxies, and later row writes (prices, a panel ↻) don't redo it.
+  const [loadedRows, setLoadedRows] = createSignal<Game[] | null>(null);
   // "HowLongToBeat didn't answer for 6 games", per source: a hidden column's failure still shows.
   const failedSummary = createMemo(() => {
     // Refused for this client, not unanswered: one message, not a count per source.
@@ -937,7 +940,7 @@ export default function ListRoute() {
   const similarityScores = createMemo(() => {
     const appid = similarTo();
     if (appid == null) return null;
-    const rows = tableData();
+    const rows = loadedRows() ?? tableData();
     const target = rows.find((r) => r.appid === appid);
     if (!target) return null;
     const scores = new Map(similarGames(target, rows, Infinity).map((s) => [s.game.appid, s.score]));
@@ -1451,6 +1454,10 @@ export default function ListRoute() {
   let slowLoad = false;
   // 0–1 while a list's game details stream in, null otherwise — the status line's progress bar.
   const [loadFraction, setLoadFraction] = createSignal<number | null>(null);
+  // Set by a load or a stream; cleared once loadedRows is scheduled, so a later empty flush retakes nothing.
+  let loadedRowsDue = false;
+  let loadedRowsTimer: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(loadedRowsTimer));
   // kind === 'recent' only: the one row addRecentGame should persist once its data streams in —
   // set by openOrAddRecentGame right before kicking off that row's own stream call, cleared once
   // the matching event lands (see the detailBatcher below). Every *other* 'recent' row (already
@@ -1555,10 +1562,19 @@ export default function ListRoute() {
       const why = slowLoad ? ' — details for games not seen before are fetched a few at a time' : '';
       setStatusText(`${loaded} / ${total} games loaded${eta != null ? ` · ${formatEta(eta)}` : '…'}${why}`);
       setLoadFraction(loaded / total);
+      loadedRowsDue = true;
+      setLoadedRows(null);
       return;
     }
     setStatusText('');
     setLoadFraction(null);
+    if (!loadedRowsDue) return;
+    loadedRowsDue = false;
+    clearTimeout(loadedRowsTimer);
+    // A task of its own, so the stream's last flush paints first; a load started since retakes it.
+    loadedRowsTimer = setTimeout(() => {
+      if (!loadedRowsDue) setLoadedRows(unwrap(rowsStore).filter((r) => !r.loading));
+    });
   }
 
   function renderPanelNav(game: Game): void {
@@ -2193,10 +2209,15 @@ export default function ListRoute() {
     // list is in, then only streams the games new to it.
     const kept = refresh ? new Map(rowsStore.map((r) => [r.appid, r])) : null;
     const keptSelection = refresh ? new Set(selectedRows().map((r) => r.appid)) : null;
-    if (!kept) clearTable();
+    if (!kept) {
+      clearTable();
+      // A refresh keeps the previous load's until its own, so the profile doesn't blink.
+      setLoadedRows(null);
+    }
     setEmptyText('');
     total = 0;
     loaded = 0;
+    loadedRowsDue = true;
     loadSamples = [];
     slowLoad = false;
     setDetailsLimited('');
@@ -3375,34 +3396,32 @@ export default function ListRoute() {
     return minutes ? minutes / 60 : 0;
   };
   // Once every row's details are in, like Plays mostly.
-  const groupFits = createMemo(() =>
-    kind === 'compare' && loadFraction() == null ? playerFits(tableData(), comparePlayers.map(playerHours)) : null,
-  );
+  const groupFits = createMemo(() => {
+    const rows = kind === 'compare' && loadedRows();
+    return rows ? playerFits(rows, comparePlayers.map(playerHours)) : null;
+  });
   // Profiles need every player's whole library among the rows: Intersect and Subtract drop some.
   const profilesShown = () => compareOp() === 'group-by-membership' || compareOp() === 'union';
-  // Untracked rows: price loading and ownership stamping after the details mustn't recompute it.
   const playerProfiles = createMemo(() => {
-    if (kind !== 'compare' || loadFraction() != null || !profilesShown()) return null;
-    return untrack(() => {
-      const rows = tableData();
-      const players = comparePlayers.map((player) => {
-        const hours = playerHours(player);
-        const ofRow = (g: { appid: number }) => hours(g.appid);
-        const style = playStyle(rows, ofRow);
-        return {
-          label: player.label,
-          avatarUrl: player.avatarUrl,
-          tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
-          style,
-          archetype: archetypeOf(style, storyGames(rows, ofRow), { family: player.family }),
-        };
-      });
-      const compared = comparePlayers.map((player): ComparedPlayer => ({
-        owns: (appid) => player.owners.has(appid),
-        hours: playerHours(player),
-      }));
-      return { players, ground: commonGround(rows, compared), compared };
+    const rows = kind === 'compare' && profilesShown() && loadedRows();
+    if (!rows) return null;
+    const players = comparePlayers.map((player) => {
+      const hours = playerHours(player);
+      const ofRow = (g: { appid: number }) => hours(g.appid);
+      const style = playStyle(rows, ofRow);
+      return {
+        label: player.label,
+        avatarUrl: player.avatarUrl,
+        tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
+        style,
+        archetype: archetypeOf(style, storyGames(rows, ofRow), { family: player.family }),
+      };
     });
+    const compared = comparePlayers.map((player): ComparedPlayer => ({
+      owns: (appid) => player.owners.has(appid),
+      hours: playerHours(player),
+    }));
+    return { players, ground: commonGround(rows, compared), compared, rows };
   });
   // Defaults to the first player with a profile who isn't me (my ★ or current account): suggesting
   // to myself is what Taste fit does.
@@ -3418,7 +3437,7 @@ export default function ListRoute() {
   const suggestions = createMemo(() => {
     const profiles = playerProfiles();
     const target = suggestTo();
-    return profiles && untrack(() => suggestionsFor(tableData(), profiles.compared, target));
+    return profiles && suggestionsFor(profiles.rows, profiles.compared, target);
   });
   // At least two players with a profile: each line then says what sets that player apart.
   const compared = (profiles: NonNullable<ReturnType<typeof playerProfiles>>) =>
@@ -3627,52 +3646,49 @@ export default function ListRoute() {
     const tasteNote = source && visible?.has(TASTE_FIT_KEY) && tasteFitNote(source);
     if (tasteNote) notes.push(tasteNote);
     // An open Players says who has no profile; folded (a phone's default), nothing would.
-    if (
-      kind === 'compare' &&
-      visible?.has(GROUP_FIT_KEY) &&
-      loadFraction() == null &&
-      !(playerProfiles() && playersOpen())
-    ) {
+    if (kind === 'compare' && visible?.has(GROUP_FIT_KEY) && loadedRows() && !(playerProfiles() && playersOpen())) {
       const fits = groupFits();
       const left = comparePlayers.filter((_, i) => !fits?.profiled[i]).map((p) => p.label);
       if (left.length) notes.push(`Group fit leaves out ${left.join(', ')}: too few games played here`);
     }
     return notes;
   });
-  // Owned learns its account's taste for Taste fit elsewhere, once every row's details are in.
+  // Owned's profile alone (no other list renders it), once every row's details are in, so it doesn't reshuffle as they stream.
+  const profileRows = () => (kind === 'owned' ? loadedRows() : null);
+  // Owned learns its account's taste for Taste fit elsewhere.
   createEffect(() => {
-    if (kind !== 'owned' || loadFraction() != null) return;
+    const rows = profileRows();
+    if (!rows) return;
     // Untracked: on an account switch the rows are still the previous account's until the reload.
     const account = untrack(getEffectiveCurrentAccount);
-    const taste = account && tasteOf(tableData(), Date.now());
+    const taste = account && tasteOf(rows, Date.now());
     const keep = untrack(() => [getMyAccount()?.id, getCurrentAccount()?.id]).filter((id) => id != null);
     if (!taste) return;
     saveTaste(account.id, taste, keep);
     // So Owned's own Taste fit scores on a first visit, and not from a taste stored before a change.
     setTasteFitSource((source) => source && { ...source, taste });
   });
-  // Once every row's details are in, so it doesn't reshuffle as they stream.
-  // Owned's profile alone: no other list renders it.
-  const profileReady = () => kind === 'owned' && loadFraction() == null;
-  const playsMostlyProfile = createMemo(() =>
-    profileReady() ? topPlayedTags(tableData(), PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 },
-  );
+  const playsMostlyProfile = createMemo(() => {
+    const rows = profileRows();
+    return rows ? topPlayedTags(rows, PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 };
+  });
   const playsMostly = () => playsMostlyProfile().tags;
   // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
-  const playtimeHidden = createMemo(
-    () => profileReady() && tableData().length > 0 && !tableData().some((g) => g.playtime),
-  );
+  const playtimeHidden = createMemo(() => {
+    const rows = profileRows();
+    return !!rows?.length && !rows.some((g) => g.playtime);
+  });
   const profileFacts = createMemo(() => {
-    if (!profileReady()) return { style: null, story: null };
+    const rows = profileRows();
+    if (!rows) return { style: null, story: null };
     const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
-    return { style: playStyle(tableData(), hours), story: storyGames(tableData(), hours) };
+    return { style: playStyle(rows, hours), story: storyGames(rows, hours) };
   });
   // The games Play next lists (listViews.ts), counted the same way so the two agree.
-  const unplayed = createMemo(() =>
-    profileReady() && !playtimeHidden()
-      ? tableData().filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS).length
-      : 0,
-  );
+  const unplayed = createMemo(() => {
+    const rows = profileRows();
+    return rows && !playtimeHidden() ? rows.filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS).length : 0;
+  });
   const backlogShown = () => activeView()?.template === PLAY_NEXT;
   // Opens the Play next view (created the first time), or back to All games when it's open.
   function showBacklog(): void {
