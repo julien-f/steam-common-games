@@ -102,8 +102,8 @@ type LoadOptions = { force?: boolean; settled?: () => boolean };
 // The cached value when there is one and `force` is unset, else a load that caches its result. A
 // failed load keeps whatever was last loaded rather than wiping it on a failed forced refresh;
 // `null` ("couldn't load") only the first time, when there's no fallback. `refusals` keeps the
-// server's message for the key's last load when it was a 429 (refusalMessage). With `settled`,
-// a load the panel moved on from is never sent; its caller discards the uncached null.
+// server's message for the key's last load when it was a 429 (refusalMessage), left uncached. With
+// `settled`, a load the panel moved on from is never sent; its caller discards the uncached null.
 function sessionCached<K, V>(
   cache: Map<K, V | null>,
   key: K,
@@ -128,7 +128,8 @@ function sessionCached<K, V>(
       if (refusal) refusals?.set(key, refusal);
       else refusals?.delete(key);
       const value = cache.get(key) ?? null;
-      cache.set(key, value);
+      // A refusal passes with its window: the next open asks again.
+      if (!refusal || cache.has(key)) cache.set(key, value);
       return value;
     },
   );
@@ -230,7 +231,7 @@ export function createPanelDataCache() {
         data.steamUrl = achievementsSteamUrl(appid, memberIds);
         return data;
       },
-      { force, settled },
+      { force, settled: achievementCount === 0 ? undefined : settled },
       achievementsRefused,
     );
   }
@@ -255,7 +256,7 @@ export function createPanelDataCache() {
         applyPriceInfo(fields, prices[appid]);
         return fields;
       },
-      { force, settled },
+      { force, settled: itadOff ? undefined : settled },
       priceRefused,
     );
   }
@@ -280,7 +281,7 @@ export function createPanelDataCache() {
         );
         return data.bundles;
       },
-      { force, settled },
+      { force, settled: itadOff ? undefined : settled },
       bundlesRefused,
     );
   }

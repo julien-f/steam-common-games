@@ -167,8 +167,21 @@ test('a refused bundles lookup keeps the server message', async (t) => {
   assert.equal(await cache.fetchBundles(620, 'FR'), null);
   assert.equal(cache.bundlesRefusal(620, 'FR'), LIMITED);
   state.limited = false;
-  await cache.fetchBundles(620, 'FR', { force: true });
+  await cache.fetchBundles(620, 'FR'); // a refusal isn't cached: the next open asks again
   assert.equal(cache.bundlesRefusal(620, 'FR'), undefined);
+  assert.deepEqual(cache.fetchBundles(620, 'FR'), DATA.bundles);
+});
+
+test('settled: an answer known without a request skips the pause', async (t) => {
+  const state = mockPanelRoutes(t, DATA, { itadConfigured: false });
+  const cache = createPanelDataCache();
+  await cache.isItadConfigured();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const settled = () => true;
+  assert.equal(await cache.fetchBundles(620, 'FR', { settled }), null);
+  assert.equal(await cache.fetchPrice(620, 'FR', { settled }), null);
+  assert.equal((await cache.fetchAchievements(620, [], { settled, achievementCount: 0 })).total, 0);
+  assert.deepEqual(state.urls, ['/api/health']);
 });
 
 // Holding ↓ in the table or lightbox passes a game every few dozen ms (panel.tsx passes `settled`).
