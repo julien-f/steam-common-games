@@ -146,9 +146,11 @@ export default function SearchRoute() {
 
   // Store-backed, so the panel updates in place when details land rather than reopening (which drops its DLC trail).
   const [games, setGames] = createStore<Record<number, Game>>({});
+  const [lookupError, setLookupError] = createSignal('');
   let lookupToken = 0;
   async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
     const token = ++lookupToken;
+    setLookupError('');
     setGames(appid, { appid, name, loading: true, details: null });
     const game = games[appid];
     panelOpen(game);
@@ -166,9 +168,8 @@ export default function SearchRoute() {
       if (token !== lookupToken) return; // a newer pick has since taken over
       setGames(appid, { details: data, loading: false, name: data.meta?.name || name });
       addRecentGame(appid, data.meta?.name || name, data.meta?.capsule || tinyImage);
-    } catch {
-      // Left showing the loading placeholder — same as ListRoute's openStandaloneInPlace, no
-      // separate status line here since this route has no status bar of its own.
+    } catch (err) {
+      if (token === lookupToken) setLookupError(`Lookup failed: ${(err as Error).message}`);
     }
   }
 
@@ -269,6 +270,11 @@ export default function SearchRoute() {
         <SearchClearButton />
       </div>
 
+      <Show when={lookupError()}>
+        <p class="search-page-status" role="status">
+          {lookupError()}
+        </p>
+      </Show>
       <Show when={query()} fallback={<p class="search-page-status">Type a game name to search.</p>}>
         <Show when={query().length >= GAME_SEARCH_MIN_CHARS} fallback={<p class="search-page-status">Keep typing…</p>}>
           <Show when={!searching()} fallback={<p class="search-page-status">Searching…</p>}>

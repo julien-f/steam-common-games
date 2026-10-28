@@ -5894,6 +5894,14 @@ test("F2 edge: on /search, a DLC's panel keeps its way back once its details lan
   await expect(back).toBeVisible();
 });
 
+test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {
+  await page.route(/\/api\/game-details\/1145360$/, (route) =>
+    route.fulfill({ status: 502, json: { error: 'Steam store error 500' } }),
+  );
+  await page.goto('/search?q=hades');
+  await expect(page.getByRole('status').filter({ hasText: 'Lookup failed' })).toContainText('Steam store error 500');
+});
+
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
   await page.route('**/api/search-games?q=portal*', (route) =>
     route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
