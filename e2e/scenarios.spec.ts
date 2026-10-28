@@ -5924,6 +5924,14 @@ test('F2 edge: on /search, a game outside the results gets no list nav, as on a 
   await card.locator('.panel-dlc-item').first().click();
   await expect(page.getByRole('button', { name: 'Back to Hades', exact: true })).toBeVisible();
   await expect(page.locator('#panel-nav button')).toHaveCount(0);
+  const dlc = await page.locator('#panel-title').textContent();
+  await page.keyboard.press('r');
+  await expect(page.locator('#panel-title')).toHaveText(dlc!);
+
+  // A result restored from the address, before the results land, keeps its nav.
+  await page.goto('/search?q=dead&game=550');
+  await expect(page.locator('#panel-title')).toHaveText('Left 4 Dead 2');
+  await expect(page.locator('#panel-reroll')).toBeVisible();
 });
 
 test('F2 edge: on /search, a lookup that fails says so', async ({ page }) => {

@@ -148,11 +148,9 @@ export default function SearchRoute() {
   const [games, setGames] = createStore<Record<number, Game>>({});
   const [statusText, setStatusText] = createSignal('');
   let lookupToken = 0;
-  async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
+  async function openResult(appid: number, name: string, tinyImage: string | null, standalone = false): Promise<void> {
     const token = ++lookupToken;
     setStatusText('');
-    // A game reached from the panel (a DLC, a similar game) isn't one of the results: no list nav, as on a list page.
-    const standalone = !results().some((r) => r.appid === appid);
     setGames(appid, { appid, name, loading: true, details: null, standalone });
     const game = games[appid];
     panelOpen(game);
@@ -197,6 +195,7 @@ export default function SearchRoute() {
   }
 
   function pickRandomGame(): boolean {
+    if (getPanelGame()?.standalone) return false;
     const list = getGameList();
     if (!list.length) return false;
     const pick = pickRandomFrom(list, RANDOM_QUEUE_KEY, getPanelGame()?.appid ?? 0) as Game | null;
@@ -235,8 +234,9 @@ export default function SearchRoute() {
 
   onMount(() => {
     const unregister = registerRouteHandlers({
+      // A game from the panel (a DLC, a similar game) or the nav box, outside the results: no list nav, as on a list page.
       openGame: (appid) => {
-        openResult(appid, '', null);
+        openResult(appid, '', null, !results().some((r) => r.appid === appid));
         return true;
       },
       stepGame,
