@@ -260,6 +260,28 @@ test('recordCacheEvent: lastHour drops events older than an hour but sinceRestar
   assert.deepEqual(lastHour.cacheHits.library, { hits: 0, misses: 1, forced: 0 });
 });
 
+test('getMetrics: lastHour keeps exactly the last hour as the window rolls over', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, status: 200 }));
+  // One event of each kind per minute (fetches every 15) for 90 minutes: the window wraps once and reuses its oldest minutes.
+  for (let minute = 0; minute < 90; minute++) {
+    if (minute % 15 === 0) await createTrackedFetch('hltb')('search', 'u'); // stays under OUTBOUND_HOURLY_MAX
+    recordLimiterTrip('details');
+    recordDedupHit('steam');
+    recordCacheEvent('library', minute % 2 ? 'hits' : 'misses');
+    t.mock.timers.tick(60 * 1000);
+  }
+  t.mock.timers.setTime(89.5 * 60 * 1000); // halfway through the last recorded minute
+
+  const { sinceRestart, lastHour } = getMetrics();
+  assert.equal(sinceRestart.groups.hltb.search.requests, 6);
+  assert.equal(lastHour.groups.hltb.search.requests, 4);
+  assert.deepEqual(lastHour.groups.hltb.search.statusCounts, { 200: 4 });
+  assert.equal(lastHour.rateLimiters.details, 60);
+  assert.equal(lastHour.dedupHits.steam, 60);
+  assert.deepEqual(lastHour.cacheHits.library, { hits: 30, misses: 30, forced: 0 });
+});
+
 test('getMetrics: includes a stable "since" timestamp', () => {
   const { since } = getMetrics();
   assert.equal(typeof since, 'number');
