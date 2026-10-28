@@ -5,6 +5,7 @@
 // this page its keyboard row navigation for free; opening a result uses the same shared side
 // panel every other route uses, and participates in its usual step/random/lightbox nav.
 import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } from 'solid-js';
+import { createStore } from 'solid-js/store';
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
 import type { ColumnDef } from '@vates/data-table-solid';
@@ -143,15 +144,18 @@ export default function SearchRoute() {
     if (row) table.focus.moveTo(row, { focus: true });
   }
 
+  // Store-backed, so the panel updates in place when details land rather than reopening (which drops its DLC trail).
+  const [games, setGames] = createStore<Record<number, Game>>({});
   let lookupToken = 0;
   async function openResult(appid: number, name: string, tinyImage: string | null): Promise<void> {
     const token = ++lookupToken;
-    const placeholder: Game = { appid, name, loading: true, details: null } as Game;
-    panelOpen(placeholder);
+    setGames(appid, { appid, name, loading: true, details: null });
+    const game = games[appid];
+    panelOpen(game);
     setPanelParam(appid);
     renderPanelNav({
       hasList: true,
-      game: placeholder,
+      game,
       getGameList,
       onStep: stepGame,
       onReroll: pickRandomGame,
@@ -160,12 +164,7 @@ export default function SearchRoute() {
     try {
       const data = await fetchJson<GameDetails>(`/api/game-details/${appid}`, undefined, 'Lookup failed');
       if (token !== lookupToken) return; // a newer pick has since taken over
-      const resolved: Game = { ...placeholder, details: data, loading: false, name: data.meta?.name || name };
-      panelOpen(resolved);
-      // panelOpen moves focus into the panel itself (its hero image) each time it's called —
-      // this second call, once the game's details actually land, would otherwise silently
-      // re-steal focus back out of the row focusRow just placed it on above.
-      focusRow(appid);
+      setGames(appid, { details: data, loading: false, name: data.meta?.name || name });
       addRecentGame(appid, data.meta?.name || name, data.meta?.capsule || tinyImage);
     } catch {
       // Left showing the loading placeholder — same as ListRoute's openStandaloneInPlace, no

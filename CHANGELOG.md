@@ -76,6 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Looking up games in quick succession while signed in no longer exhausts the account's sync allowance, which made the next settings change or sign-in fail.
 - Skimming games with the arrow keys no longer looks up every game passed, which could exhaust the bundle lookups for the session; a refused bundle lookup now says why, and is tried again the next time the game opens.
 - Leaving the search page with a game open no longer keeps its panel open on the next page
+- On the search page, a game opened from the panel keeps its way back to the game before it
 
 ### Development
 

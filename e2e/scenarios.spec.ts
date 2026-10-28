@@ -5872,6 +5872,28 @@ test('F2 edge: on /search, ↓ moves from the box into the results, and an opene
   await expect(rows(page).first()).toBeFocused();
 });
 
+test("F2 edge: on /search, a DLC's panel keeps its way back once its details land", async ({ page }) => {
+  let landDetails = () => {};
+  const landed = new Promise<void>((resolve) => (landDetails = resolve));
+  await page.route(/\/api\/game-details\/9000\d\d$/, async (route) => {
+    await landed;
+    await route.fulfill({ json: { appid: 900001, meta: null, failed: ['meta'] } });
+  });
+  await page.goto('/search?q=hades');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const card = page.locator('#panel-section-dlc');
+  await card.getByRole('button', { name: /DLC · 25 available/ }).click();
+  await card.locator('.panel-dlc-item').first().click();
+  const back = page.getByRole('button', { name: 'Back to Hades', exact: true });
+  await expect(back).toBeVisible();
+  const lookup = page.waitForResponse(/\/api\/game-details\/9000\d\d$/);
+  landDetails();
+  await lookup;
+  // The page applies them right after the body parses: two frames is past that.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await expect(back).toBeVisible();
+});
+
 test('F2 edge: /search shows an image column only when a result has an image', async ({ page }) => {
   await page.route('**/api/search-games?q=portal*', (route) =>
     route.fulfill({ json: { results: [{ appid: 620, name: 'Portal 2', tinyImage: '/favicon.svg' }] } }),
