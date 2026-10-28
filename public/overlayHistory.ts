@@ -12,9 +12,10 @@ type Overlay = 'panel' | 'lightbox';
 // `toBase`: the given address with this overlay closed.
 type ToBase = (url: Location | URL) => string;
 
-const opened: { name: Overlay; depth: number; close: () => void; toBase: ToBase }[] = [];
+// `ownPage`: opened on the entry a lookup pushed (AppShell's openGameGlobally), so closing leaves for the page below.
+const opened: { name: Overlay; depth: number; close: () => void; toBase: ToBase; ownPage: boolean }[] = [];
 // A self-close's landing entry and the address to give it, applied once Back lands there.
-let landing: { depth: number; url: string } | null = null;
+let landing: { depth: number; url: string | null } | null = null;
 // The address of the entry Back just left. The Navigation API is the only way to read it, as
 // popstate fires once the address has already changed; without it, a Back keeps the stale one.
 let leftUrl: URL | null = null;
@@ -31,9 +32,10 @@ function currentDepth(): number {
 // A deep link arrives with the overlay already in the address, hence `toBase` for the entry below.
 export function pushOverlayEntry(name: Overlay, close: () => void, toBase: ToBase): void {
   if (opened.some((o) => o.name === name)) return;
+  const ownPage = !opened.length && !!(history.state as { lookup?: boolean } | null)?.lookup;
   // Back onto an entry pushed earlier (from a page a link led to, or across a reload) reopens the
   // overlay there: reuse that entry, or the page would need a second Back to leave.
-  if ((history.state as { overlay?: Overlay } | null)?.overlay !== name) {
+  if (!ownPage && (history.state as { overlay?: Overlay } | null)?.overlay !== name) {
     const url = location.href;
     history.replaceState(history.state, '', toBase(location));
     history.pushState(history.state, '', url);
@@ -42,7 +44,11 @@ export function pushOverlayEntry(name: Overlay, close: () => void, toBase: ToBas
     const depth = Math.max(history.length - 1, currentDepth() + 1);
     history.replaceState({ ...history.state, _depth: depth, overlay: name }, '');
   }
-  opened.push({ name, depth: currentDepth(), close, toBase });
+  opened.push({ name, depth: currentDepth(), close, toBase, ownPage });
+}
+// Whether closing this overlay leaves its page (see `ownPage`): the host then leaves the address alone.
+export function overlayClosesPage(name: Overlay): boolean {
+  return opened.some((o) => o.name === name && o.ownPage);
 }
 
 // The overlay closed itself (×, Esc, the backdrop): drop its entry, and any opened above it, so
@@ -54,7 +60,7 @@ export function popOverlayEntry(name: Overlay): void {
   if (i < 0) return;
   const below = opened[i].depth - 1;
   const top = opened[opened.length - 1].depth;
-  const url = opened[i].toBase(location);
+  const url = opened[i].ownPage ? null : opened[i].toBase(location);
   opened.length = i;
   setTimeout(() => {
     if (currentDepth() !== top) return;
@@ -70,8 +76,9 @@ window.addEventListener('popstate', () => {
   landing = null;
   while (opened.length && opened[opened.length - 1].depth > depth) {
     const o = opened.pop()!;
-    url = leftUrl && o.depth - 1 === depth ? o.toBase(leftUrl) : null;
-    o.close();
+    url = leftUrl && o.depth - 1 === depth && !o.ownPage ? o.toBase(leftUrl) : null;
+    // The page below is another route: unmounting closes it, and a close now would run the host's on the new entry.
+    if (!o.ownPage) o.close();
   }
   if (url) history.replaceState(history.state, '', url);
 });

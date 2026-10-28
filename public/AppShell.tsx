@@ -23,6 +23,7 @@ import { initGameSearch } from './gameSearch.ts';
 import { addRecentGame, loadRecentGames } from './recentGames.ts';
 import type { GameOwner } from './accountData.ts';
 import { setPanelParam, setLightboxParam, withAccountParam, COMPARE_PATH } from './urlState.ts';
+import { overlayClosesPage } from './overlayHistory.ts';
 import { syncAccountOverrideFromUrl } from './accountOverride.ts';
 import type { Game } from './types.ts';
 import { ShortcutsModal } from './ShortcutsModal.tsx';
@@ -166,7 +167,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     if (routeHandlers.openGame?.(appid)) return;
     // withAccountParam: a `?u=` link being explored has to survive this navigation, or looking
     // up a game from Home would silently drop back to the stored account (see urlState.ts).
-    navigate(withAccountParam(`/game/${appid}`, location.search));
+    navigate(withAccountParam(`/game/${appid}`, location.search), { state: { lookup: true } }); // closes back here: overlayHistory.ts's `ownPage`
   }
 
   // Opens what's on the TV in the lightbox, steering it without sending it again: the panel on its game
@@ -248,7 +249,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
     onCleanup(disposeLightbox);
     initPanel({
       onClose: ({ leavingRoute = false } = {}) => {
-        if (leavingRoute) return;
+        if (leavingRoute || overlayClosesPage('panel')) return;
         routeHandlers.onGameClose?.();
         setPanelParam(null);
       },

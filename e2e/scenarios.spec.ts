@@ -3883,6 +3883,41 @@ test('B1 edge: picking a region reloads Bundles in it', async ({ page }) => {
   await asked;
 });
 
+for (const close of ['×', 'Esc', 'Back'] as const)
+  test(`F1 edge: a game looked up from a page without a list closes back to that page (${close})`, async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/about');
+    await page.goto('/');
+    await page.getByPlaceholder('Look up any game…').fill('Hades');
+    await page.locator('.game-search-result', { hasText: 'Hades' }).first().click();
+    await expect(page).toHaveURL(/\/game\/1145360$/);
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    if (close === '×') await page.getByRole('button', { name: 'Close', exact: true }).click();
+    else if (close === 'Esc') await page.keyboard.press('Escape');
+    else await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('.game-panel')).toBeHidden();
+    // One step: the next Back leaves Home.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/about$/);
+  });
+
+test("F1 edge: a looked-up game's lightbox closes back to its panel, then to the page", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/');
+  await page.getByPlaceholder('Look up any game…').fill('Hades');
+  await page.locator('.game-search-result', { hasText: 'Hades' }).first().click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.getByRole('button', { name: 'Open in lightbox' }).first().click();
+  await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
+  await page.goBack();
+  await expect(page.locator('#screenshot-lightbox')).not.toHaveAttribute('open');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(page).toHaveURL(/\/game\/1145360$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test('F1 edge: the panel prices a game, and its bundles, in a newly picked region', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.route('**/api/prices?country=US', async (route) => {

@@ -57,6 +57,8 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 
 **Looking up a game never navigates away from a route with a list context of its own** — the nav-bar search box and a panel's DLC/base-game links open in place (a real row if the appid is loaded, a standalone panel via `?game=` otherwise). `/search` counts as having one (its results). Only Home, `/bundles`, `/about`, the rank screen (`RankRoute`) and the 404 page navigate, to `/game/:appid`. See `AppShell.tsx`'s `openGameGlobally`.
 
+- That navigation carries `{ lookup: true }` in its history state, so the panel takes that entry as its own (`overlayHistory.ts`'s `ownPage`): ×, Esc and Back all return to the page the lookup came from in one step, rather than to Recently Looked Up. A shared `/game/:appid` link has no such state and closes to `/game`.
+
 ## Module map
 
 **Shell and routes**
