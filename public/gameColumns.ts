@@ -49,6 +49,7 @@ import {
   PROTON_TIER_UNKNOWN,
   fadeInOnLoad,
   fmtReleaseDate,
+  type DetailSource,
 } from './utils.ts';
 import { convert } from './currency.ts';
 
@@ -781,7 +782,7 @@ export const SOURCE_NAMES: Record<string, string> = {
   protondb: 'ProtonDB',
   meta: 'Steam store',
   tags: 'Steam tags',
-};
+} satisfies Record<DetailSource, string>;
 const COLUMN_SOURCE: Record<string, string> = {
   steamdbRating: 'rating',
   score: 'rating',

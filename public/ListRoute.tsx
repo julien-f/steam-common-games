@@ -107,6 +107,8 @@ import {
   computeProductionTier,
   detailsFields,
   failedLookupFields,
+  NO_DETAILS,
+  DETAIL_SOURCES,
   fetchJson,
   fmtAge,
   fmtLastPlayed,
@@ -645,8 +647,6 @@ interface DetailsEvent extends GameDetailsReply {
   done?: boolean;
   limited?: string; // its own event, with no appid: see detailsLimited
 }
-
-const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
 const PLAYS_MOSTLY_SHOWN = 6;
 const PLAYER_TAGS_SHOWN = 3;
@@ -1853,7 +1853,7 @@ export default function ListRoute() {
     if (loadGuard.isStale(gen)) return;
     // Rows the stream never answered (refused, dropped, cut short) would otherwise stay loading.
     for (const appid of unanswered) {
-      detailBatcher.push({ appid, ...NO_DETAILS, failed: Object.keys(SOURCE_NAMES) }, gen);
+      detailBatcher.push({ appid, ...NO_DETAILS, failed: [...DETAIL_SOURCES] }, gen);
       loaded++;
     }
     detailBatcher.flushNow();
