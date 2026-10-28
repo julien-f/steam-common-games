@@ -4294,6 +4294,25 @@ test('D2 edge: a refused details stream marks every game failed, not loading for
   await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toBeVisible();
 });
 
+test("D2 edge: a game the details stream refused shows no age, and its link's screenshot waits for ↻", async ({
+  page,
+}) => {
+  await page.route('**/api/game-details/stream', (route) =>
+    route.fulfill({ status: 429, json: { error: 'Too many requests. Please wait a minute and try again.' } }),
+  );
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s1');
+  await expect(page.locator('.list-status')).toContainText('Too many requests');
+  await expect(page.locator('.panel-glance')).toContainText("didn't answer");
+  // Nothing was fetched, so nothing is "just now".
+  await expect(page.locator('.panel-refresh-age')).toHaveCount(0);
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).not.toHaveAttribute('open');
+  await page.getByRole('button', { name: 'Refresh details' }).click();
+  await expect(lightbox).toHaveAttribute('open');
+  await expect(page).toHaveURL(/[?&]shot=s1\b/);
+});
+
 test('D2 edge: a details stream cut short marks the games it never sent failed', async ({ page }) => {
   await page.route('**/api/game-details/stream', (route) => {
     const req = route.request();

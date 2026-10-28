@@ -670,7 +670,7 @@ function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void
 }
 
 function applyDetailsEvent(row: Game, event: DetailsEvent) {
-  row.detailsFetchedAt = event.fetchedAt ?? null;
+  row.detailsFetchedAt = event.fetchedAt; // absent on a row the stream never answered: no age
   row.detailsFetchedAts = event.fetchedAts ?? null;
   row.failedSources = event.failed ?? [];
   row.capsule = event.meta?.capsule ?? null;
@@ -1655,7 +1655,7 @@ export default function ListRoute() {
   function restorePendingShot(): void {
     if (!pendingShot) return;
     const game = getPanelGame();
-    if (!game || !game.details) return; // no media yet — a later call replays it
+    if (!game?.details?.meta) return; // no media yet — a later call (a ↻ too) replays it
     const shot = pendingShot;
     pendingShot = null;
     openLightbox(game, shot);
@@ -1935,6 +1935,7 @@ export default function ListRoute() {
         // A lookup that failed lands only now.
         addRecentGame(game.appid, data.meta?.name || '', data.meta?.capsule || null);
       }
+      restorePendingShot();
     } catch (err) {
       setStatusText(`Refresh failed: ${(err as Error).message}`);
     }

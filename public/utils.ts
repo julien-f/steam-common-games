@@ -444,7 +444,7 @@ export function detailsFields(
   return {
     details: data,
     loading: false,
-    detailsFetchedAt: data.fetchedAt ?? null,
+    detailsFetchedAt: data.fetchedAt, // absent when nothing was fetched: no age
     detailsFetchedAts: data.fetchedAts ?? null,
     failedSources: data.failed ?? [],
   };
@@ -455,7 +455,7 @@ export const DETAIL_SOURCES = ['rating', 'hltb', 'meta', 'tags', 'protondb'] as 
 export type DetailSource = (typeof DETAIL_SOURCES)[number];
 export const NO_DETAILS = { rating: null, hltb: null, meta: null, tags: null, demo: null, protondb: null };
 
-// A lookup that didn't answer at all: every source failed, so the panel says so and offers ↻ (no age: nothing was fetched).
+// A lookup that didn't answer at all: every source failed, so the panel says so and offers ↻.
 export function failedLookupFields(): ReturnType<typeof detailsFields> {
-  return { ...detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] }), detailsFetchedAt: undefined };
+  return detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] });
 }
