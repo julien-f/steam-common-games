@@ -6522,6 +6522,8 @@ test('I2 edge: Esc closing the panel returns focus to the row it was showing', a
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360');
   await expect(page.locator('.game-panel')).toBeVisible();
+  // The panel can open before the rows land, leaving ↓ nothing to step to.
+  await expect(rows(page)).toHaveCount(6);
   await page.keyboard.press('ArrowDown');
   await expect(page).not.toHaveURL(/[?&]game=1145360\b/);
   const shown = new URL(page.url()).searchParams.get('game');
