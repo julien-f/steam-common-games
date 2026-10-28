@@ -4,7 +4,7 @@
 // uses (a minimal two-column config, not `gameColumns.ts`'s `CORE_COLUMNS`), which is what gets
 // this page its keyboard row navigation for free; opening a result uses the same shared side
 // panel every other route uses, and participates in its usual step/random/lightbox nav.
-import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show, untrack } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
@@ -264,7 +264,8 @@ export default function SearchRoute() {
           placeholder="Search for a game…"
           aria-label="Search for a game"
           enterkeyhint="search"
-          value={query()}
+          // Seeded once: rebinding it to the trimmed query would eat a trailing space typed during the debounce.
+          value={untrack(query)}
           onFocus={(e) => e.currentTarget.select()}
           onInput={(e) => handleInput(e.currentTarget.value)}
           // `on:keydown`, not `onKeyDown`: Solid delegates onX-style handlers for `keydown`
