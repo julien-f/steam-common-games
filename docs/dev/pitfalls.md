@@ -116,6 +116,12 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: worktrees run their own `npm ci`; the main checkout's `node_modules` stays at whatever it last installed, behind the lockfile.
 - **Fix**: `npm ci` in the main checkout, then commit the merge again (it stays staged).
 
+## Another agent's commit shows a branch as merged without its changes
+
+- **Symptom**: `git log --graph` shows someone else's commit with a branch as second parent, but its tree lacks that branch's changes, which are still staged.
+- **Cause**: a merge left pending in the main checkout (`--no-commit`, or a hook that blocked the merge commit) keeps `MERGE_HEAD`; the next `git commit` there, by any agent, becomes the merge and takes only what that agent staged.
+- **Fix**: never leave a merge pending in the main checkout: on a blocked merge commit, retry at once (another run on the e2e port: `E2E_PORT=<free port>`, above) or `git merge --abort`. Once absorbed, commit the staged changes on top, naming the absorbing commit in the message.
+
 ## A worktree agent's branch lacks the latest commits
 
 - **Symptom**: an agent started with `isolation: "worktree"` doesn't see a commit just made on `main` (e.g. backlog items it was asked to fix: "the section reads None open").
