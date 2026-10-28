@@ -5683,7 +5683,8 @@ test('F1 edge: on a zoomed screenshot the arrows pan it, and Esc zooms back out 
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
   const lb = page.locator('#screenshot-lightbox');
-  await expect(lb).not.toHaveClass(/lb--loading/);
+  // Z acts once the still is drawn below its natural size, as its button shows; "not loading" alone holds before it opens.
+  await expect(lb.getByRole('button', { name: 'Zoom' })).toBeVisible();
   await page.keyboard.press('z');
   await expect(img).toHaveAttribute('style', /scale\(2\) translate\(0px, 0px\)/);
   await page.keyboard.press('ArrowRight');
