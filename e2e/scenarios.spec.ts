@@ -5931,8 +5931,11 @@ test('F1 edge: on a phone, a sideways swipe drags the next media in beside the o
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone', 'touch only');
   await asPlayer(page, ALICE);
+  // The panel's settle-delayed loads land right after the media do: a gesture during them loses touches (C224).
+  const panelSettled = page.waitForResponse('**/api/game-news/**');
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await panelSettled;
   const peek = page.locator('.lb-peek');
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y: 420 }] });
