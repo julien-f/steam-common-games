@@ -468,6 +468,10 @@ export function mediaPending(game: MediaState): boolean {
   return !!meta && !meta.screenshots && !game.mediaFailed;
 }
 
+// What the panel and the lightbox say for a game whose media didn't load (`mediaFailed`).
+export const MEDIA_FAILED =
+  "Screenshots and trailers: the Steam store didn't answer. Reopen the game or refresh details to try again.";
+
 // No media to show yet, and some may come: details not in, the store's metadata failed (↻ retries it),
 // or its media loading.
 export function detailsPending(game: MediaState): boolean {

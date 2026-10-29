@@ -5206,23 +5206,41 @@ test("M1 edge: a link's screenshot opens once its game's media are in", async ({
   expect(hadesMedia.count).toBe(1);
 });
 
-test("M1 edge: media that don't load leave the Cover, and opening the game again retries", async ({ page }) => {
+const MEDIA_FAILED = /Screenshots and trailers: the Steam store didn't answer/;
+
+test("M1 edge: media that don't load leave the Cover, say so, and opening the game again retries", async ({ page }) => {
   await asPlayer(page, ALICE);
   let fail = true;
   await page.route('**/api/game-meta/1145360', (route) =>
     fail ? route.fulfill({ status: 502, json: { error: "Steam store didn't answer" } }) : route.fallback(),
   );
   await page.goto('/lists/owned?game=1145360&shot=s2');
-  // The link opens on what there is.
+  // The link opens on what there is, and says why.
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-status')).toContainText('Cover');
+  await expect(lightbox.locator('.lb-status')).toContainText(MEDIA_FAILED);
   await page.keyboard.press('Escape');
   await expect(lightbox).not.toHaveAttribute('open');
   await expect(page.getByRole('button', { name: 'Screenshot 1 of 3' })).toHaveCount(0);
+  const panelLine = page.locator('#panel-hero').getByText(MEDIA_FAILED);
+  await expect(panelLine).toBeVisible();
   fail = false;
   await page.getByRole('button', { name: 'Close', exact: true }).click(); // a phone's panel covers the table
   await row(page, 'Hades').getByText('Hades').click();
   await expect(page.getByRole('button', { name: 'Screenshot 1 of 3' })).toBeVisible();
+  await expect(panelLine).toHaveCount(0);
+});
+
+test("M1 edge: a game whose media load doesn't say they didn't", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360&shot=s2');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await expect(lightbox.locator('.lb-status')).not.toContainText(MEDIA_FAILED);
+  await page.keyboard.press('Home');
+  await expect(lightbox.locator('.lb-status')).toContainText('Cover');
+  await expect(lightbox.locator('.lb-status')).not.toContainText(MEDIA_FAILED);
+  await expect(page.locator('#panel-hero').getByText(MEDIA_FAILED)).toHaveCount(0);
 });
 
 test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {

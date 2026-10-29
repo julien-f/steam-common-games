@@ -16,7 +16,7 @@ import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
-import { detailsPending, fmtTime } from './utils.ts';
+import { detailsPending, fmtTime, MEDIA_FAILED } from './utils.ts';
 import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
@@ -1976,6 +1976,7 @@ function renderLightbox() {
   const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
   counter.querySelector('.lb-counter-n')!.textContent = `${i + 1} / ${list.length}`;
   counter.style.display = list.length > 1 ? '' : 'none';
+  if (list.length === 1 && untrack(() => lbGame()?.mediaFailed)) lbStatusNote = MEDIA_FAILED;
   announceLb(
     lb,
     gameChanged && name ? `${name}, ${pos ? `game ${pos.index + 1} of ${pos.total}, ` : ''}` : '',
@@ -2051,6 +2052,7 @@ createRoot(() => {
     // A trailer is drawn differently on the TV (its poster) than here: a link change redraws it.
     if (list[idx()]?.type === 'video') linked();
     gameName();
+    lbGame()?.mediaFailed; // a failed load on the lone Cover shown: say so
     if (list.length) renderLightbox();
   });
   // Steers the TV: a step is presented at once, then a burst's later steps only where it stops (after the
