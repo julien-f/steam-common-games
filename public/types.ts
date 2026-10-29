@@ -37,9 +37,10 @@ export interface GameMeta {
   capsule: string;
   thumb: string | null; // the game tables' larger capsule; `capsule` is its fallback
   banner: string;
+  // Both absent until loaded: the details stream leaves them out (an opened game fills them, ListRoute.tsx).
   // `name`: absent from details cached before it was kept.
-  movies: { id: number; name?: string | null; thumbnail: string; hls: string | null }[];
-  screenshots: { id: number; thumbnail: string; full: string }[];
+  movies?: { id: number; name?: string | null; thumbnail: string; hls: string | null }[];
+  screenshots?: { id: number; thumbnail: string; full: string }[];
   dlc: number[];
   fullgame: { appid: number; name: string | null } | null;
   website: string | null;
@@ -163,6 +164,8 @@ export interface Game extends PriceFields {
   detailsFetchedAts?: DetailsAges | null;
   // Detail sources that errored on the last fetch (server.js's `failed`), as opposed to having no data.
   failedSources?: string[];
+  // Its screenshots and trailers didn't load (GET /api/game-meta failed): opening the game again retries.
+  mediaFailed?: boolean;
 }
 
 // Keyed by source, epoch ms, null when that source was fetched fresh for the request that

@@ -199,7 +199,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         const timeout = setTimeout(() => done(ours()), 5000);
         createEffect(() => {
           const game = ours();
-          if (game && (game.details || on.item.shotId === 'banner')) done(game);
+          if (game && (!detailsPending(game) || on.item.shotId === 'banner')) done(game);
         });
       }),
     );

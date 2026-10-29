@@ -23,6 +23,7 @@
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
+import { streamEvent } from '../lib/streamEvent.mjs';
 
 const NOW = Date.now();
 // server.js's message for a client past its share of the outbound budgets (lib/metrics.js).
@@ -361,7 +362,9 @@ export function respond(
   if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
 
   if (path === '/api/game-details/stream') {
-    const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(detailsFor(g.appid))}\n\n`);
+    const lines = (body.games ?? []).map(
+      (g: { appid: number }) => `data: ${JSON.stringify(streamEvent(detailsFor(g.appid)))}\n\n`,
+    );
     if (limited) lines.unshift(`data: ${JSON.stringify({ limited: LIMITED })}\n\n`);
     return {
       status: 200,

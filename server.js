@@ -53,6 +53,7 @@ const {
   extractGameBundles,
 } = require('./lib/itad');
 const { withPickAndMix } = require('./lib/fanatical');
+const { streamEvent } = require('./lib/streamEvent.mjs');
 const { catalogCacheKey, getGamePass } = require('./lib/gamepass');
 const {
   SESSION_COOKIE,
@@ -1220,7 +1221,7 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
           limitedSent = true;
           send({ limited });
         }
-        send({ appid, ...result });
+        send(streamEvent({ appid, ...result }));
       } catch (err) {
         // fetchGameDetails resolves every sub-fetch via Promise.allSettled internally and should
         // never itself reject — this is a defensive backstop, not an expected path, so unlike

@@ -2,5 +2,7 @@
 // bundle. playwright.config.ts stays out — it reads `process.env`, and @types/node isn't a dependency.
 {
   "extends": "./tsconfig.json",
+  // lib/streamEvent.mjs, shared with server.js: its types come from its JSDoc.
+  "compilerOptions": { "allowJs": true },
   "include": ["e2e/**/*.ts"]
 }

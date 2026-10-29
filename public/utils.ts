@@ -460,7 +460,9 @@ export function failedLookupFields(): ReturnType<typeof detailsFields> {
   return detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] });
 }
 
-// No media to show yet, and some may come: details not in, or the store's metadata failed (↻ retries it).
-export function detailsPending(game: Pick<Game, 'details' | 'failedSources'>): boolean {
-  return !game.details || !!game.failedSources?.includes('meta');
+// No media to show yet, and some may come: details not in, the store's metadata failed (↻ retries it),
+// or its media not loaded yet (a failed load gives up until the game is opened again).
+export function detailsPending(game: Pick<Game, 'details' | 'failedSources' | 'mediaFailed'>): boolean {
+  const meta = game.details?.meta;
+  return !game.details || !!game.failedSources?.includes('meta') || (!!meta && !meta.screenshots && !game.mediaFailed);
 }

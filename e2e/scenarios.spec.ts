@@ -3,7 +3,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { HEARTBEAT_MS, PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
 import { hookPresentation, type PresTest } from './presentationHooks.ts';
-import { asPlayer, shot } from './state.ts';
+import { asPlayer, gate, shot } from './state.ts';
 import { row, rows } from './rows.ts';
 import {
   ALICE,
@@ -1726,7 +1726,8 @@ test('C8 edge: game steps in the linked lightbox put each game on the TV once it
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, {});
-  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 105600] });
+  const terrariaMedia = await gate(page, '**/api/game-meta/105600');
   await page.goto('/game/1145360?shot=s1');
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
@@ -1740,15 +1741,20 @@ test('C8 edge: game steps in the linked lightbox put each game on the TV once it
     w.said = [];
     new MutationObserver(() => w.said.push(el.textContent ?? '')).observe(el, { childList: true, characterData: true });
   });
+  await terrariaMedia.requested; // Hades' neighbour's, held
   await page.keyboard.press('ArrowDown');
-  await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Terraria');
+  const terraria = async () => (await sentOnAir(shown)).filter((m) => m.appid === 105600);
+  await page.waitForTimeout(600); // past the settle
+  expect(await terraria()).toEqual([]);
+  terrariaMedia.release();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { said: string[] }).said.join('\n')))
-    .toContain('On TV: Valheim, game 3 of 3');
-  await page.waitForTimeout(600);
-  // Its media streamed in after the step: one send, of what the lightbox landed on, not the Cover first.
-  const valheim = (await sentOnAir(shown)).filter((m) => m.appid === 892970);
-  expect(valheim.map((m) => m.item.shotId)).toEqual([await lightboxShotId(page)]);
+    .toContain('On TV: Terraria, game 3 of 3');
+  await page.waitForTimeout(600); // and nothing after
+  // One send, of what the lightbox landed on once the media came, not the Cover first.
+  expect((await terraria()).map((m) => m.item.shotId)).toEqual([await lightboxShotId(page)]);
+  expect(terrariaMedia.count).toBe(1);
   await page.keyboard.press('ArrowUp');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
 });
@@ -1990,6 +1996,51 @@ test("C8 edge: the chip opens what's on the TV in the lightbox, steering it from
   expect(await sentShots(shown)).toEqual(['s1']);
   await page.keyboard.press('ArrowDown');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
+});
+
+test("C8 edge: after a reload, the chip opens what's on the TV once its game's media are in", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await page.goto('/game/1145360?shot=s2');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
+  const shown = await startPresenting(page);
+  await expect.poll(() => sentShots(shown)).toEqual(['s2']);
+  await page.keyboard.press('Escape');
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
+  await expect(page).toHaveURL(/\/$/);
+  const hadesMedia = await gate(page, '**/api/game-meta/1145360');
+  await page.reload();
+  await expect(page.getByRole('banner').locator('.present-chip')).toContainText('Hades');
+  await page.getByRole('button', { name: "Open what's on the TV" }).click();
+  await hadesMedia.requested;
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await expect(lightbox).not.toHaveAttribute('open');
+  hadesMedia.release();
+  await expect(lightbox.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
+  await page.waitForTimeout(500);
+  expect(await sentShots(shown)).toEqual(['s2']);
+});
+
+test("C8 edge: a game step onto media that don't load puts its Cover on the TV", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
+  await hookPresentation(page, {});
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 105600] });
+  await page.route('**/api/game-meta/105600', (route) =>
+    route.fulfill({ status: 502, json: { error: "Steam store didn't answer" } }),
+  );
+  await page.goto('/game/1145360?shot=s1');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
+  const shown = await startPresenting(page);
+  await expect.poll(() => sentShots(shown)).toEqual(['s1']);
+  await page.keyboard.press('ArrowDown');
+  await expect(lightbox.locator('.lb-caption-text')).toHaveText('Terraria');
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Terraria');
+  expect(await sentShots(shown)).toEqual(['s1', 'banner']);
 });
 
 test("C8 edge: keys pressed on the TV step it through the main window's lightbox, opening it if need be; private, they don't", async ({
@@ -4299,9 +4350,20 @@ test("D2.3: once the upstream is back, the panel's Refresh details fills in what
   await expect(row(page, 'Hades').getByTitle(/HowLongToBeat didn't answer/)).toHaveCount(0);
 });
 
+// The /api/game-meta paths the page asks for from now on.
+function gameMetaRequests(page: Page): string[] {
+  const paths: string[] = [];
+  page.on('request', (req) => {
+    const { pathname } = new URL(req.url());
+    if (pathname.startsWith('/api/game-meta/')) paths.push(pathname);
+  });
+  return paths;
+}
+
 test('D2 edge: a failed Steam store page is marked, not shown as missing data', async ({ page }, testInfo) => {
   await mockApi(page, { states: ['store-down'] });
   await asPlayer(page, ALICE);
+  const metaAsked = gameMetaRequests(page);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('.list-status')).toContainText("Steam store didn't answer for 6 games");
@@ -4312,6 +4374,11 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
         .getByTitle(/Steam store didn't answer/)
         .first(),
     ).toBeVisible();
+  // Opened, it asks for no media: they come with the store page ↻ retries.
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  await page.waitForTimeout(300);
+  expect(metaAsked).toEqual([]);
 });
 
 test('D2 edge: a refused details stream marks every game failed, not loading forever', async ({ page }) => {
@@ -4343,6 +4410,7 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
     return route.fulfill({ ...full, body });
   });
   await asPlayer(page, ALICE);
+  const metaAsked = gameMetaRequests(page);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('#panel-title')).toHaveText('Hades');
@@ -4357,6 +4425,7 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
   await page.waitForTimeout(300);
   await expect(lightbox).not.toHaveAttribute('open');
+  expect(metaAsked).not.toContain('/api/game-meta/1145360'); // no store page, no media to ask for
 });
 
 test("D2 edge: a game the details stream refused shows no age, and its link's screenshot waits for ↻", async ({
@@ -4366,6 +4435,7 @@ test("D2 edge: a game the details stream refused shows no age, and its link's sc
     route.fulfill({ status: 429, json: { error: 'Too many requests. Please wait a minute and try again.' } }),
   );
   await asPlayer(page, ALICE);
+  const metaAsked = gameMetaRequests(page);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(page.locator('.list-status')).toContainText('Too many requests');
   await expect(page.locator('.panel-glance')).toContainText("didn't answer");
@@ -4385,6 +4455,7 @@ test("D2 edge: a game the details stream refused shows no age, and its link's sc
   land();
   await expect(lightbox).toHaveAttribute('open');
   await expect(page).toHaveURL(/[?&]shot=s1\b/);
+  expect(metaAsked).not.toContain('/api/game-meta/1145360'); // ↻'s details carry the media
 });
 
 test('D2 edge: a details stream cut short marks the games it never sent failed', async ({ page }) => {
@@ -5016,39 +5087,16 @@ test('M2 edge: stepping back to a game just left in the lightbox lands where it 
   await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
 });
 
-// Terraria (Hades' ↓ neighbour on /lists/owned) loads without its store metadata, so only its
-// banner; Refresh details refetches it, with its media whenever `withMedia()` says so.
-async function terrariaMediaOnRefresh(page: Page, withMedia: () => boolean) {
-  await page.route('**/api/game-details/stream', (route) => {
-    const req = route.request();
-    const full = respond(req.method(), new URL(req.url()), req.postData());
-    const body = full.body
-      .split('\n\n')
-      .map((line: string) => {
-        if (!line.startsWith('data: ')) return line;
-        const event = JSON.parse(line.slice(6));
-        return event.appid === 105600 ? `data: ${JSON.stringify({ ...event, meta: null })}` : line;
-      })
-      .join('\n\n');
-    return route.fulfill({ ...full, body });
-  });
-  await page.route('**/api/game-details/105600?refresh=1', (route) => {
-    const req = route.request();
-    const full = respond(req.method(), new URL(req.url()), req.postData());
-    return route.fulfill(
-      withMedia() ? full : { ...full, body: JSON.stringify({ ...JSON.parse(full.body), meta: null }) },
-    );
-  });
-}
+// Terraria (Hades' ↓ neighbour on /lists/owned) shows only its banner until its held media are released.
+const holdTerrariaMedia = (page: Page) => gate(page, '**/api/game-meta/105600');
 
 // The panel's Refresh details sits behind the lightbox; clicked there, it refreshes the game the lightbox shows.
 const refreshBehindLightbox = (page: Page) =>
   page.locator('.panel-refresh-btn').evaluate((b: HTMLElement) => b.click());
 
 test("F1 edge: a banner shown while a game's media streams isn't where paging back to it lands", async ({ page }) => {
-  let media = false;
   await asPlayer(page, ALICE);
-  await terrariaMediaOnRefresh(page, () => media);
+  const terrariaMedia = await holdTerrariaMedia(page);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
@@ -5063,25 +5111,28 @@ test("F1 edge: a banner shown while a game's media streams isn't where paging ba
   await expect(name).not.toHaveText('Terraria');
   await page.keyboard.press('ArrowUp');
   await expect(name).toHaveText('Terraria');
-  media = true;
-  await refreshBehindLightbox(page);
+  terrariaMedia.release();
   await expect(counter).toContainText('Screenshot 1 of 2');
 });
 
 test('F1 edge: paging back to a game whose media is still loading lands where it was left once it loads', async ({
   page,
 }) => {
-  let media = false;
+  let media = true;
   await asPlayer(page, ALICE);
-  await terrariaMediaOnRefresh(page, () => media);
+  const terrariaMedia = await holdTerrariaMedia(page);
+  await page.route('**/api/game-details/105600?refresh=1', (route) => {
+    const req = route.request();
+    const full = respond(req.method(), new URL(req.url()), req.postData());
+    return route.fulfill(media ? full : { ...full, body: JSON.stringify({ ...JSON.parse(full.body), meta: null }) });
+  });
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const counter = page.locator('.lb-status');
   const name = page.locator('.lb-caption-text');
   await expect(counter).toContainText('Screenshot 1 of 3');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
-  media = true;
-  await refreshBehindLightbox(page);
+  terrariaMedia.release();
   await expect(counter).toContainText('Screenshot 1 of 2');
   await page.keyboard.press('ArrowRight');
   await expect(counter).toContainText('Screenshot 2 of 2');
@@ -5105,9 +5156,8 @@ test('F1 edge: paging back to a game whose media is still loading lands where it
 test('F1 edge: ←/→ on a Cover standing in while the media streams still lets the media replace it', async ({
   page,
 }) => {
-  let media = false;
   await asPlayer(page, ALICE);
-  await terrariaMediaOnRefresh(page, () => media);
+  const terrariaMedia = await holdTerrariaMedia(page);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const counter = page.locator('.lb-status');
   await expect(counter).toContainText('Screenshot 1 of 3');
@@ -5115,8 +5165,7 @@ test('F1 edge: ←/→ on a Cover standing in while the media streams still lets
   await expect(page.locator('.lb-caption-text')).toHaveText('Terraria');
   await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowRight'); // nothing to step to: no pick made
-  media = true;
-  await refreshBehindLightbox(page);
+  terrariaMedia.release();
   await expect(counter).toContainText('Screenshot 1 of 2');
 });
 
@@ -5143,6 +5192,39 @@ test('M1 edge: a refresh that shrinks the media on screen still remembers where 
   await expect(counter).toContainText('Screenshot 2 of 2');
 });
 
+test("M1 edge: a link's screenshot opens once its game's media are in", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  const hadesMedia = await gate(page, '**/api/game-meta/1145360');
+  await page.goto('/lists/owned?game=1145360&shot=s2');
+  await hadesMedia.requested;
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox).not.toHaveAttribute('open');
+  hadesMedia.release();
+  await expect(lightbox.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await expect(page).toHaveURL(/[?&]shot=s2\b/);
+  expect(hadesMedia.count).toBe(1);
+});
+
+test("M1 edge: media that don't load leave the Cover, and opening the game again retries", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  let fail = true;
+  await page.route('**/api/game-meta/1145360', (route) =>
+    fail ? route.fulfill({ status: 502, json: { error: "Steam store didn't answer" } }) : route.fallback(),
+  );
+  await page.goto('/lists/owned?game=1145360&shot=s2');
+  // The link opens on what there is.
+  const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-status')).toContainText('Cover');
+  await page.keyboard.press('Escape');
+  await expect(lightbox).not.toHaveAttribute('open');
+  await expect(page.getByRole('button', { name: 'Screenshot 1 of 3' })).toHaveCount(0);
+  fail = false;
+  await page.getByRole('button', { name: 'Close', exact: true }).click(); // a phone's panel covers the table
+  await row(page, 'Hades').getByText('Hades').click();
+  await expect(page.getByRole('button', { name: 'Screenshot 1 of 3' })).toBeVisible();
+});
+
 test('F1 edge: paging back to a game only passed through lands on the kind being left', async ({ page }) => {
   // Hollow Knight (screenshots), Hades, Terraria (a trailer).
   await asPlayer(page, ALICE, { recentGames: [367520, 1145360, 105600] });
@@ -5164,7 +5246,6 @@ test('F1 edge: paging back to a game only passed through lands on the kind being
 });
 
 test('F1 edge: paging games from the Cover keeps showing covers', async ({ page }) => {
-  let media = false;
   await asPlayer(page, ALICE, { recentGames: [1145360, 105600, 367520] });
   await page.goto('/game/1145360?shot=banner');
   const counter = page.locator('.lb-status');
@@ -5177,13 +5258,12 @@ test('F1 edge: paging games from the Cover keeps showing covers', async ({ page 
     await expect(counter).toContainText('Cover');
   }
   // Onto a game whose media is still loading: its media arriving doesn't move off the Cover.
-  await terrariaMediaOnRefresh(page, () => media);
+  const terrariaMedia = await holdTerrariaMedia(page);
   await page.goto('/lists/owned?game=1145360&shot=banner');
   await expect(counter).toContainText('Cover');
   await page.keyboard.press('ArrowDown');
   await expect(name).toHaveText('Terraria');
-  media = true;
-  await refreshBehindLightbox(page);
+  terrariaMedia.release();
   await expect(page.locator('#screenshot-lightbox .lb-next')).toBeEnabled();
   await expect(counter).toContainText('Cover');
 });
@@ -6136,6 +6216,18 @@ test('F1.1-4: look up one game from the nav search, in place', async ({ page }) 
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+});
+
+test('F1 edge: a game looked up outside the list comes with its media', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  const metaAsked = gameMetaRequests(page);
+  await page.goto('/lists/wishlist');
+  await expect(rows(page)).toHaveCount(4);
+  await page.keyboard.press('/');
+  await page.keyboard.type('hollow');
+  await page.getByRole('option', { name: /Hollow Knight/ }).click();
+  await expect(page.getByRole('button', { name: 'Screenshot 2 of 2' })).toBeVisible();
+  expect(metaAsked).not.toContain('/api/game-meta/367520');
 });
 
 test("F1 edge: the open nav search's ✓ marks follow a link's account resolving", async ({ page }) => {

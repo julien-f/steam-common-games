@@ -2061,7 +2061,9 @@ createRoot(() => {
     lbTvLinked = now;
     const game = lbGame();
     const shot = shots()[idx()];
-    if (!now || !game || !shot || (awaitingMedia() && detailsPending(game))) return cancelLbTv();
+    if (!now || !game || !shot) return cancelLbTv();
+    // Media just in with the latch still set: the latch's effect may run after this one, so wait for its pick.
+    if (awaitingMedia() && (detailsPending(game) || shots().length > 1)) return cancelLbTv();
     const on = presented();
     if (on?.appid === game.appid && on.item.shotId === shot.shotId) return cancelLbTv();
     clearTimeout(lbTvTimer);

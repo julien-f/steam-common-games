@@ -21,3 +21,18 @@ test('mockApi: game details for an appid outside the fixtures answer empty, as t
 test('mockApi: game meta for an appid outside the fixtures is null', async () => {
   assert.deepEqual(await ask('/api/game-meta/999999'), { status: 200, body: { meta: null } });
 });
+
+// As server.js's stream (lib/streamEvent.mjs): media come from /api/game-meta, the banner stays.
+test('mockApi: the details stream leaves out media and keeps the banner, as the real API does', async () => {
+  const { respond } = await import('../e2e/mockApi.ts');
+  const res = respond('POST', new URL('/api/game-details/stream', 'http://localhost'), '{"games":[{"appid":1145360}]}');
+  const [event] = res.body
+    .split('\n\n')
+    .filter((c) => c.startsWith('data: '))
+    .map((c) => JSON.parse(c.slice(6)));
+  assert.equal(event.appid, 1145360);
+  assert.ok('banner' in event.meta);
+  assert.equal('screenshots' in event.meta, false);
+  assert.equal('movies' in event.meta, false);
+  assert.equal((await ask('/api/game-meta/1145360')).body.meta.screenshots.length, 3);
+});
