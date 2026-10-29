@@ -13,6 +13,9 @@
 //   resolve-failed the Co-op Pack's Portal 2 fails to resolve to Steam (its package lookup errored)
 //   slow-media     every banner, screenshot and trailer poster takes 1.5 s to load (Hades, Terraria and Hollow Knight have media)
 //   broken-trailer trailers point at a manifest that answers 501, so playback fails
+//   playable-trailers Hades' and Terraria's trailers have a stream (a stubbed browser plays anything)
+//   many-shots     Hades has 24 screenshots, a counter as long as a real game's
+//   slow-meta      a game's store metadata (GET /api/game-meta) takes 1.5 s to answer
 //   signed-in      signed in with Steam as Alice, whose account already has prefs (fixtures.ts's signedInPrefs)
 //   creator-capped a developer's/publisher's list is Steam's first page of 523 games
 //   tagless        no game has Steam tags
@@ -20,6 +23,7 @@
 import type { Page } from '@playwright/test';
 import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, type Player } from './fixtures.ts';
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
+import { streamEvent } from '../lib/streamEvent.mjs';
 
 const NOW = Date.now();
 // server.js's message for a client past its share of the outbound budgets (lib/metrics.js).
@@ -82,17 +86,23 @@ const mediaUrl = (label: string, slow: boolean, variant = '') =>
     : `data:image/svg+xml,${encodeURIComponent(svg(label))}`;
 // `hls: null`, as Steam sends for a trailer with no H.264 stream: the player and its controls
 // show, nothing plays (Playwright's Chromium has no H.264 decoder anyway).
-const media = (appid: number, slow: boolean, brokenTrailer: boolean) => {
+const media = (appid: number, states: ReadonlySet<string>) => {
   const m = MEDIA[appid];
   if (!m) return { movies: [], screenshots: [] };
+  const slow = states.has('slow-media');
   const range = (length: number) => Array.from({ length }, (_, i) => i + 1);
+  const shots = appid === MEDIA_APPID && states.has('many-shots') ? 24 : m.screenshots;
   return {
     movies: range(m.movies).map((id) => ({
       id,
       thumbnail: mediaUrl(`${m.label}Trailer`, slow),
-      hls: brokenTrailer ? '/api/mock-media/missing.m3u8' : null,
+      hls: states.has('broken-trailer')
+        ? '/api/mock-media/missing.m3u8'
+        : states.has('playable-trailers')
+          ? `/trailer-${appid}.m3u8`
+          : null,
     })),
-    screenshots: range(m.screenshots).map((id) => ({
+    screenshots: range(shots).map((id) => ({
       id,
       thumbnail: mediaUrl(`${m.label}Screenshot ${id}`, slow, 'thumb'),
       full: mediaUrl(`${m.label}Screenshot ${id}`, slow, 'full'),
@@ -114,7 +124,7 @@ const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Stud
 // Out of rating order, so sorting by Tag match visibly reorders a co-op filter.
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
-function details(appid: number, slowMedia = false, brokenTrailer = false) {
+function details(appid: number, states: ReadonlySet<string>) {
   const fetched = {
     appid,
     fetchedAt: NOW,
@@ -150,8 +160,8 @@ function details(appid: number, slowMedia = false, brokenTrailer = false) {
       // Public store art; a test's browser blocks it (off localhost), dev:mock shows it.
       capsule: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_184x69.jpg`,
       thumb: `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`,
-      banner: slowMedia ? mediaUrl(`Banner ${appid}`, true) : null,
-      ...media(appid, slowMedia, brokenTrailer),
+      banner: states.has('slow-media') ? mediaUrl(`Banner ${appid}`, true) : null,
+      ...media(appid, states),
       dlc: appid === MEDIA_APPID ? DLC_APPIDS : [],
       fullgame: null,
       // So the panel's More links menu has an entry.
@@ -285,24 +295,22 @@ export function respond(
   const limited = states.has('client-limited');
   if (limited && (path === '/api/prices' || path.startsWith('/api/achievements/')))
     return json({ error: LIMITED }, 429);
-  const slowMedia = states.has('slow-media');
-  const brokenTrailer = states.has('broken-trailer');
   const detailsFor = (appid: number) =>
     limited
-      ? { ...details(appid, slowMedia, brokenTrailer), rating: null, hltb: null, failed: ['rating', 'hltb'] }
+      ? { ...details(appid, states), rating: null, hltb: null, failed: ['rating', 'hltb'] }
       : states.has('upstream-down')
         ? {
-            ...details(appid, slowMedia, brokenTrailer),
+            ...details(appid, states),
             rating: null,
             hltb: null,
             protondb: null,
             failed: ['rating', 'hltb', 'protondb'],
           }
         : states.has('store-down')
-          ? { ...details(appid, slowMedia, brokenTrailer), meta: null, failed: ['meta'] }
+          ? { ...details(appid, states), meta: null, failed: ['meta'] }
           : states.has('tagless')
-            ? { ...details(appid, slowMedia, brokenTrailer), tags: [], tagWeights: {} }
-            : details(appid, slowMedia, brokenTrailer);
+            ? { ...details(appid, states), tags: [], tagWeights: {} }
+            : details(appid, states);
   const mediaPath = path.match(/^\/api\/mock-media\/(.+)\.svg$/);
   if (mediaPath)
     return {
@@ -354,7 +362,9 @@ export function respond(
   if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
 
   if (path === '/api/game-details/stream') {
-    const lines = (body.games ?? []).map((g: { appid: number }) => `data: ${JSON.stringify(detailsFor(g.appid))}\n\n`);
+    const lines = (body.games ?? []).map(
+      (g: { appid: number }) => `data: ${JSON.stringify(streamEvent(detailsFor(g.appid)))}\n\n`,
+    );
     if (limited) lines.unshift(`data: ${JSON.stringify({ limited: LIMITED })}\n\n`);
     return {
       status: 200,
@@ -367,7 +377,8 @@ export function respond(
   const metaOnly = path.match(/^\/api\/game-meta\/(\d+)$/);
   if (metaOnly) {
     const appid = Number(metaOnly[1]);
-    return json({ meta: DLC_APPIDS.includes(appid) ? dlcMeta(appid) : detailsFor(appid).meta });
+    const answer = json({ meta: DLC_APPIDS.includes(appid) ? dlcMeta(appid) : detailsFor(appid).meta });
+    return states.has('slow-meta') ? { ...answer, delayMs: SLOW_MEDIA_MS } : answer;
   }
   if (path.startsWith('/api/achievements/'))
     return json(achievements(url.searchParams.get('steamids'), states.has('upstream-down')));

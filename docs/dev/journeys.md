@@ -388,7 +388,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. ↑ back to one I liked
   5. close, and the panel is on that game
 - **Done when**: every step lands on real media, never on a trailer from a screenshot; the game's name and its place in the list flash briefly, then go; a game paged back to opens on the item last looked at.
-- **Edges**: wrapping past either end; no list behind the game (no game stepping, and nothing suggests it); a game whose details are still loading.
+- **Edges**: wrapping past either end; no list behind the game (no game stepping, and nothing suggests it); a game whose media are still loading.
 
 ### M3 Watch a trailer, on a phone or the couch
 

@@ -460,7 +460,20 @@ export function failedLookupFields(): ReturnType<typeof detailsFields> {
   return detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] });
 }
 
-// No media to show yet, and some may come: details not in, or the store's metadata failed (↻ retries it).
-export function detailsPending(game: Pick<Game, 'details' | 'failedSources'>): boolean {
-  return !game.details || !!game.failedSources?.includes('meta');
+type MediaState = Pick<Game, 'details' | 'failedSources' | 'mediaFailed'>;
+
+// Its media are loading (the details stream leaves them out); a failed load gives up until the game is opened again.
+export function mediaPending(game: MediaState): boolean {
+  const meta = game.details?.meta;
+  return !!meta && !meta.screenshots && !game.mediaFailed;
+}
+
+// What the panel and the lightbox say for a game whose media didn't load (`mediaFailed`).
+export const MEDIA_FAILED =
+  "Screenshots and trailers: the Steam store didn't answer. Reopen the game or refresh details to try again.";
+
+// No media to show yet, and some may come: details not in, the store's metadata failed (↻ retries it),
+// or its media loading.
+export function detailsPending(game: MediaState): boolean {
+  return !game.details || !!game.failedSources?.includes('meta') || mediaPending(game);
 }

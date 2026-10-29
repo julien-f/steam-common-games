@@ -56,7 +56,8 @@ const TAG_NAME_MAP = { 1001: 'Action', 1002: 'Co-op' };
 // tagids above — see the `tagsOk` flag below, which gates both.
 const DEMO_APPID = 999900;
 
-function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true, type } = {}) {
+// `media`: the store page lists a screenshot and a trailer.
+function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true, type, media = false } = {}) {
   return async (url) => {
     if (url.includes('GetAppReviews')) {
       if (!ratingOk) return { ok: false, status: 503 };
@@ -100,6 +101,10 @@ function makeDetailsFetch({ ratingOk = true, metaOk = true, tagsOk = true, type 
               categories: [{ id: '9', description: 'Co-op' }],
               developers: ['Valve'],
               publishers: ['Valve'],
+              ...(media && {
+                screenshots: [{ id: 0, path_thumbnail: 'thumb.jpg', path_full: 'full.jpg' }],
+                movies: [{ id: 1, name: 'Trailer', thumbnail: 'poster.jpg', hls_h264: 'trailer.m3u8' }],
+              }),
             },
           },
         }),
@@ -1285,7 +1290,7 @@ function ssePost(port, path, body) {
   });
 }
 
-// The stream is the one large response (~5 KB per game, mostly media URLs), so it is gzipped for
+// The stream is the one large response (a whole library's details), so it is gzipped for
 // clients that accept it, flushed per event so rows still arrive as each game resolves.
 for (const encoding of ['gzip', 'identity']) {
   test(`POST /api/game-details/stream: ${encoding === 'gzip' ? 'gzipped' : 'plain'} for Accept-Encoding: ${encoding}`, async (t) => {
@@ -1402,6 +1407,71 @@ test('POST /api/game-details/stream: fetches fresh details and streams them', as
   assert.equal(typeof gameEvent.rating?.score, 'number');
   assert.equal(gameEvent.hltb?.main, 10);
   assert.deepEqual(gameEvent.meta?.genres, ['Action']);
+});
+
+test('POST /api/game-details/stream: leaves out screenshots and trailers, keeps the banner', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(globalThis, 'fetch', makeDetailsFetch({ media: true }));
+  const server = app.listen(0);
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
+
+  const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 400 }] });
+  const { meta } = parseSseEvents(res.body).find((e) => e.appid === 400);
+  assert.equal(meta.name, 'Portal');
+  assert.match(meta.banner, /header\.jpg/);
+  assert.equal('screenshots' in meta, false);
+  assert.equal('movies' in meta, false);
+});
+
+// fetchGameDetails' result is shared with GET /api/game-details through dedupDetails: the stream strips a copy.
+test('POST /api/game-details/stream: a GET /api/game-details sharing its fetch keeps the media', async (t) => {
+  _reset();
+  _resetAuth();
+  const { promise: released, resolve: release } = Promise.withResolvers();
+  const detailsFetch = makeDetailsFetch({ media: true });
+  let storeCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('appdetails')) storeCalls++;
+    await released;
+    return detailsFetch(url);
+  });
+  const server = app.listen(0);
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
+
+  const single = api.get('/api/game-details/400').then((r) => r);
+  await new Promise((r) => setTimeout(r, 20)); // the GET's fetch is under way first
+  const stream = ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 400 }] });
+  await new Promise((r) => setTimeout(r, 20));
+  release();
+  const [one, streamed] = await Promise.all([single, stream]);
+  assert.equal(storeCalls, 1); // one fetch, shared
+  assert.equal(one.body.meta.screenshots.length, 1);
+  assert.equal(one.body.meta.movies.length, 1);
+  assert.equal('screenshots' in parseSseEvents(streamed.body).find((e) => e.appid === 400).meta, false);
+});
+
+test('POST /api/game-details/stream: then GET /api/game-meta answers the media from cache', async (t) => {
+  _reset();
+  _resetAuth();
+  const urls = [];
+  const detailsFetch = makeDetailsFetch({ media: true });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(url);
+    return detailsFetch(url);
+  });
+  const server = app.listen(0);
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
+
+  await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 400 }] });
+  urls.length = 0;
+  const res = await api.get('/api/game-meta/400').expect(200);
+  assert.deepEqual(urls, []);
+  assert.equal(res.body.meta.screenshots.length, 1);
+  assert.equal(res.body.meta.movies.length, 1);
 });
 
 // The client never sends a name (see fetchGameDetails in server.js — the server always

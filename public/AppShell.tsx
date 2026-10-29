@@ -34,7 +34,7 @@ import { bindNavPopover } from './navPopover.ts';
 import { SearchClearButton } from './SearchClearButton.tsx';
 import { StorageFullBanner } from './StorageFullBanner.tsx';
 import { prefsWriteFailed } from './prefs.ts';
-import { detailsPending, smoothScroll } from './utils.ts';
+import { detailsPending, mediaPending, smoothScroll } from './utils.ts';
 import ArrowUp from 'lucide-solid/icons/arrow-up';
 import Settings from 'lucide-solid/icons/settings';
 import X from 'lucide-solid/icons/x';
@@ -184,7 +184,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           settled = true;
           clearTimeout(timeout);
           dispose();
-          // Its details never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
+          // Its media never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
           if (!game || (detailsPending(game) && on.item.shotId !== 'banner')) return resolve(false);
           setPrivateMode(false);
           const items = buildMediaItems(game.appid, game.details?.meta);
@@ -199,7 +199,8 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
         const timeout = setTimeout(() => done(ours()), 5000);
         createEffect(() => {
           const game = ours();
-          if (game && (game.details || on.item.shotId === 'banner')) done(game);
+          // Details in, media too unless failed: a failed store page waits for nothing (↻ retries it).
+          if (game && ((game.details && !mediaPending(game)) || on.item.shotId === 'banner')) done(game);
         });
       }),
     );

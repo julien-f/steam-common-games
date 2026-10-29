@@ -16,7 +16,7 @@ import { urlWithoutShot } from './urlState.ts';
 import { buildMediaItems, resolveShotIndex, preferredShotIndex, mediaLabel } from './mediaItems.ts';
 import type { MediaItem, ShotKind } from './mediaItems.ts';
 import type { Game, ReadonlyGame } from './types.ts';
-import { detailsPending, fmtTime } from './utils.ts';
+import { detailsPending, fmtTime, MEDIA_FAILED } from './utils.ts';
 import { loadedWhen, morph } from './viewTransition.ts';
 import { decideSwipeAxis, resolveSwipe, LB_SWIPE_RESISTANCE } from './lightboxSwipe.ts';
 import type { SwipeAxis } from './lightboxSwipe.ts';
@@ -54,8 +54,8 @@ import ZoomIn from 'lucide-solid/icons/zoom-in';
 const [lbGame, setLbGame] = createSignal<ReadonlyGame | null>(null);
 const [lbIdx, setIdx] = createSignal(0);
 // Derived from the open game on each read, not snapshotted at open time — the same shape, for
-// the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its details
-// have streamed in has nothing but a banner to offer, and gains its screenshots and videos
+// the same reason, as `PanelHero`'s own `items()` (panel.tsx): a row opened before its media
+// have loaded has nothing but a banner to offer, and gains its screenshots and videos
 // asynchronously *without the row object ever being replaced*, so only a read through the store
 // proxy sees them arrive. Snapshotting meant such a game showed that lone banner for as long as
 // it stayed open. Plain accessors rather than `createMemo`s: a memo at module level would need
@@ -1664,7 +1664,7 @@ function landingIndex(appid: number, list: MediaItem[], leaving: ShotKind) {
 export function repointLightboxGame(game: ReadonlyGame) {
   const left = shots()[idx()];
   const leavingGame = lbGame();
-  // A lone banner is no pick: it stands in while the game's media streams.
+  // A lone banner is no pick: it stands in while the game's media load.
   if (left && leavingGame && lbShotChosen && shots().length > 1) lbLastShot.set(leavingGame.appid, left.shotId);
   lbShotChosen = false;
   // A pending latch's kind carries on through a game still loading: its lone banner is no Cover.
@@ -1672,7 +1672,7 @@ export function repointLightboxGame(game: ReadonlyGame) {
     untrack(awaitingMedia) ?? (left?.shotId === 'banner' && shots().length > 1 ? 'cover' : (left?.type ?? 'image'));
   const next = buildMediaItems(game.appid, game.details?.meta);
   const target = landingIndex(game.appid, next, leaving);
-  // A lone banner means this row's details are still streaming — there is nothing else to show
+  // A lone banner means this row's media are still loading — there is nothing else to show
   // *yet*. Latch the intent so the first real media to arrive is taken (see the effect at the
   // foot of this file); without it the banner would simply stay up, which is the whole reason
   // paging through a list used to be unrewarding.
@@ -1752,7 +1752,7 @@ function closeLightboxNow() {
 }
 
 function stepLightbox(dir: number, swipe = false) {
-  // A lone Cover (media still streaming): no step, so no pick that would cancel the latch.
+  // A lone Cover (media still loading): no step, so no pick that would cancel the latch.
   if (shots().length <= 1) return;
   // The viewer has taken over: whatever is on screen from here on is their choice, so the latch
   // must never move it under them.
@@ -1976,6 +1976,7 @@ function renderLightbox() {
   const counter = lb.querySelector<HTMLElement>('.lb-counter')!;
   counter.querySelector('.lb-counter-n')!.textContent = `${i + 1} / ${list.length}`;
   counter.style.display = list.length > 1 ? '' : 'none';
+  if (list.length === 1 && untrack(() => lbGame()?.mediaFailed)) lbStatusNote = MEDIA_FAILED;
   announceLb(
     lb,
     gameChanged && name ? `${name}, ${pos ? `game ${pos.index + 1} of ${pos.total}, ` : ''}` : '',
@@ -2029,7 +2030,7 @@ function renderLightbox() {
 // will never be disposed" (same fix panel.tsx's own top-level effects needed).
 createRoot(() => {
   // Consumes the `awaitingMedia` latch (see `repointLightboxGame`): a game paged onto before
-  // its details had streamed in has only its banner to offer, so the moment the real media
+  // its media had loaded has only its banner to offer, so the moment the real media
   // lands, take it. Created *before* the render effect below so it runs first within the same
   // flush — the render then happens once, on the shot actually wanted, rather than painting the
   // banner and immediately replacing it. Deliberately one-shot and cancelled by any viewer
@@ -2051,17 +2052,20 @@ createRoot(() => {
     // A trailer is drawn differently on the TV (its poster) than here: a link change redraws it.
     if (list[idx()]?.type === 'video') linked();
     gameName();
+    lbGame()?.mediaFailed; // a failed load on the lone Cover shown: say so
     if (list.length) renderLightbox();
   });
   // Steers the TV: a step is presented at once, then a burst's later steps only where it stops (after the
-  // settle); not while a game's media is still streaming in (the latch above picks what it lands on).
+  // settle); not while a game's media are still loading (the latch above picks what it lands on).
   createEffect(() => {
     const now = linked();
     const fresh = now && !lbTvLinked;
     lbTvLinked = now;
     const game = lbGame();
     const shot = shots()[idx()];
-    if (!now || !game || !shot || (awaitingMedia() && detailsPending(game))) return cancelLbTv();
+    if (!now || !game || !shot) return cancelLbTv();
+    // Media just in with the latch still set: the latch's effect may run after this one, so wait for its pick.
+    if (awaitingMedia() && (detailsPending(game) || shots().length > 1)) return cancelLbTv();
     const on = presented();
     if (on?.appid === game.appid && on.item.shotId === shot.shotId) return cancelLbTv();
     clearTimeout(lbTvTimer);

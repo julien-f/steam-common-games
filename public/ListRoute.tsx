@@ -245,7 +245,7 @@ import {
 import { encodeListFormula, decodeListFormula, shareListUrl, inMemoryDynamicList } from './listShare.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import { setBaseTitle } from './pageTitle.ts';
-import type { AccountSlot, GameDetailsReply, Game, GameList, CombineOp, ListRef } from './types.ts';
+import type { AccountSlot, GameDetailsReply, Game, GameList, GameMeta, CombineOp, ListRef } from './types.ts';
 import {
   getList,
   getLists,
@@ -1649,8 +1649,8 @@ export default function ListRoute() {
   // `game.standalone` (panelNav.ts), so there's no extra plumbing needed here beyond that.
   // A `&shot=<id>` deep link, captured at load time and applied once the open game actually has
   // media to index into. Two steps, because opening the panel is what *clears* `shot` from the
-  // live URL (setPanelParam) and because a row's screenshots only exist after its details have
-  // streamed in — so the value is read up front and replayed afterwards, the same shape the
+  // live URL (setPanelParam) and because a row's screenshots only exist once its media have
+  // loaded — so the value is read up front and replayed afterwards, the same shape the
   // deleted pages' own restorePanelFromUrl used.
   let pendingShot: { appid: number; shot: string } | null = null;
   function restorePendingShot(): void {
@@ -1662,6 +1662,54 @@ export default function ListRoute() {
     pendingShot = null;
     openLightbox(game, shot);
   }
+
+  // The details stream leaves out each game's screenshots and trailers: a row loads them from the cached
+  // GET /api/game-meta once opened. A failure only marks it; opening it again (`retry`) tries again.
+  const mediaLoading = new Set<number>();
+  function loadMedia(appid: number, retry: boolean): void {
+    const row = rowStore.getRow(appid);
+    const meta = row?.details?.meta;
+    if (!meta || meta.screenshots || mediaLoading.has(appid)) return; // no meta: none, or failed (↻ retries)
+    if (row.mediaFailed && !retry) return;
+    mediaLoading.add(appid);
+    if (row.mediaFailed) rowStore.mutateRow(appid, (draft) => void (draft.mediaFailed = false));
+    // Only onto this row: a reload of the list may have replaced it by the time the answer lands.
+    const ours = (write: (draft: Game) => void) => rowStore.getRow(appid) === row && rowStore.mutateRow(appid, write);
+    fetchJson<{ meta: GameMeta | null }>(`/api/game-meta/${appid}`, undefined, "Steam store didn't answer")
+      .then(({ meta: loaded }) => {
+        ours((draft) => {
+          const details = draft.details;
+          if (!details?.meta || details.meta.screenshots) return; // a ↻ landed first
+          const media = { screenshots: loaded?.screenshots ?? [], movies: loaded?.movies ?? [] };
+          draft.details = { ...details, meta: { ...details.meta, ...media } };
+        });
+      })
+      .catch((err) => {
+        console.warn('[media]', appid, err);
+        ours((draft) => void (draft.mediaFailed = true));
+      })
+      .finally(() => {
+        mediaLoading.delete(appid);
+        restorePendingShot(); // on the media, or the Cover if they failed
+      });
+  }
+  // The open game's, then its neighbours' in list order, so ↑/↓ land on their media at once.
+  function loadOpenGameMedia(opened = false): void {
+    const game = getPanelGame();
+    if (!game) return;
+    loadMedia(game.appid, opened);
+    for (const dir of [-1, 1] as const) {
+      const near = stepGameList(getGameList(), game, dir);
+      if (near) loadMedia(near.appid, false);
+    }
+  }
+  // Keyed on the open game alone (`on` runs the load untracked), so a failed load can't loop.
+  createEffect(
+    on(
+      () => getPanelGame()?.appid,
+      () => loadOpenGameMedia(true),
+    ),
+  );
 
   // Says so in the status line when it isn't.
   function isValidAppid(appid: number): boolean {
@@ -1801,7 +1849,10 @@ export default function ListRoute() {
       }
     },
     isStale: (gen) => loadGuard.isStale(gen),
-    onFlush: updateStatus,
+    onFlush: () => {
+      updateStatus();
+      loadOpenGameMedia(); // the open game or a neighbour may have landed
+    },
   });
 
   async function streamGameDetails(games: { appid: number }[], gen: number): Promise<void> {
@@ -2893,7 +2944,7 @@ export default function ListRoute() {
     const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
-    restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
+    restorePendingShot(); // now that the open game's details have arrived (its media, if any, replay it too)
   }
 
   // ── The hero card's content (see ListHero.tsx) ────────────────────────────────────────────

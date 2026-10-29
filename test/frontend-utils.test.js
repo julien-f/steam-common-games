@@ -21,6 +21,8 @@ const {
   fmtAge,
   oldestFetchedAt,
   isTextEntry,
+  detailsPending,
+  mediaPending,
 } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
@@ -452,4 +454,26 @@ test('fmtTime: truncates fractional seconds', () => {
 test('fmtTime: pads seconds with leading zero', () => {
   assert.equal(fmtTime(61), '1:01');
   assert.equal(fmtTime(600), '10:00');
+});
+
+test('detailsPending: media may still come until they load, fail, or there is no store page', () => {
+  const details = (meta) => ({ rating: null, hltb: null, meta, tags: null, demo: null, protondb: null });
+  const streamed = { name: 'Hades' }; // the details stream leaves media out
+  const filled = { name: 'Hades', screenshots: [], movies: [] };
+  assert.equal(detailsPending({ details: null }), true);
+  assert.equal(detailsPending({ details: details(streamed) }), true);
+  assert.equal(detailsPending({ details: details(streamed), mediaFailed: true }), false);
+  assert.equal(detailsPending({ details: details(filled) }), false);
+  assert.equal(detailsPending({ details: details(null) }), false);
+  assert.equal(detailsPending({ details: details(null), failedSources: ['meta'] }), true);
+});
+
+// What a wait on media can end on: a failed store page brings none until ↻, so it isn't waited for.
+test('mediaPending: only a game whose media are loading', () => {
+  const details = (meta) => ({ rating: null, hltb: null, meta, tags: null, demo: null, protondb: null });
+  assert.equal(mediaPending({ details: null }), false);
+  assert.equal(mediaPending({ details: details({ name: 'Hades' }) }), true);
+  assert.equal(mediaPending({ details: details({ name: 'Hades' }), mediaFailed: true }), false);
+  assert.equal(mediaPending({ details: details({ name: 'Hades', screenshots: [] }) }), false);
+  assert.equal(mediaPending({ details: details(null), failedSources: ['meta'] }), false);
 });

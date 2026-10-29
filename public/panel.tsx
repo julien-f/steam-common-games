@@ -15,6 +15,7 @@ import {
   fadeInOnLoad,
   safeHref,
   fmtReleaseDate,
+  MEDIA_FAILED,
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
@@ -2063,6 +2064,9 @@ function PanelHero(): JSX.Element {
             }}
           </For>
         </ul>
+      </Show>
+      <Show when={panelGame()?.mediaFailed}>
+        <div class="panel-no-data">{MEDIA_FAILED}</div>
       </Show>
     </div>
   );
