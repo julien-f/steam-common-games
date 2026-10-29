@@ -46,6 +46,23 @@ export async function asPlayer(
   }, JSON.stringify(prefs));
 }
 
+// Holds every request to `url` until `release()`, then lets the mock answer it: register before the
+// page asks. `requested` settles on the first; `count` says how many came. The page closing releases it.
+export async function gate(page: Page, url: string) {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let hit!: () => void;
+  const held = { requested: new Promise<void>((resolve) => (hit = resolve)), count: 0, release };
+  await page.route(url, async (route) => {
+    held.count++;
+    hit();
+    await released;
+    await route.fallback().catch(() => {}); // the page may be gone by then
+  });
+  page.once('close', release);
+  return held;
+}
+
 // A named mid-test screenshot, kept only on an `E2E_SHOTS=1` run (see playwright.config.ts).
 export async function shot(page: Page, name: string): Promise<void> {
   if (test.info().project.use.screenshot !== 'on') return;

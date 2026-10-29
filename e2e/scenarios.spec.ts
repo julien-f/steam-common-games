@@ -1293,7 +1293,7 @@ test('C8.5: the nav chip plays, pauses, mutes and replays the TV, and shows how 
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true, neverActivated: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1336,7 +1336,7 @@ test('C8.5: the nav chip plays, pauses, mutes and replays the TV, and shows how 
 test("C8 edge: the host's mute holds from one media to the next on the TV", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1364,7 +1364,7 @@ test('C8 edge: Space and M on the focused chip pause and mute the TV, without sc
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1454,7 +1454,7 @@ test("C8 edge: the keyboard's play/pause key pauses the TV's trailer from anywhe
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true, mediaKeys: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1516,7 +1516,7 @@ test('C8 edge: on the TV, Space and M play and mute a trailer; a stall spins, an
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1607,7 +1607,7 @@ test("C8 edge: the TV's Place button is reached by Tab, which doesn't go fullscr
     fakePlayback: true,
     neverActivated: true,
   });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -1815,7 +1815,7 @@ test('C8 edge: a trailer in the linked lightbox plays on the TV only; private, i
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360?shot=s1');
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
@@ -1847,7 +1847,7 @@ test("C8 edge: a linked trailer's controls drive the TV, showing one state at a 
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true, neverActivated: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360?shot=v1');
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
@@ -1939,7 +1939,7 @@ test('C8 edge: a linked trailer goes back to the lightbox paused where the TV wa
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360?shot=v1');
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
@@ -2047,7 +2047,7 @@ test('C8 edge: private, a trailer played here stops when a step lands on another
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await asPlayer(page, ALICE, { recentGames: [1145360, 105600] });
   await page.goto('/game/1145360?shot=v1');
   const lightbox = page.locator('#screenshot-lightbox');
@@ -2074,7 +2074,7 @@ test("C8 edge: a linked trailer's scrubber seeks the TV once when let go; a canc
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360?shot=v1');
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
@@ -2144,7 +2144,7 @@ test("C8 edge: a trailer the browser won't play with sound there says a click gi
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true, refusedSound: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
@@ -2198,7 +2198,7 @@ test('C8 edge: before its first click, the TV says what a click does; then never
 test('C8 edge: a trailer the browser lets play with sound starts with it, no pill', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -2236,7 +2236,7 @@ test('C8 edge: a click on the TV enters fullscreen, and no later click leaves it
 test("C8 edge: P on what's already up doesn't restart it; on an ended trailer, it does", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -2270,7 +2270,7 @@ test('C8 edge: P on a lightbox trailer carries on where it was on the TV', async
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await fakePlayback(page);
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360?shot=v1');
   await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
   // Played to 0:42 (the fake stream errors in the lightbox, whose card would cover its play button).
@@ -2287,7 +2287,7 @@ test('C8 edge: P on a lightbox trailer carries on where it was on the TV', async
 test('C8 edge: the TV seeks where it is told and reports seeks and stalls at once', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -2311,7 +2311,7 @@ test('C8 edge: the TV seeks where it is told and reports seeks and stalls at onc
 test('C8 edge: a handover on the trailer already on the TV moves it there', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, { fakePlayback: true });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
@@ -4334,7 +4334,11 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
     // Hades' store page answers with nothing: no metadata, and no failure to retry.
     const body = full.body
       .split('\n\n')
-      .map((e) => (e.includes('"appid":1145360') ? e.replace(/"meta":\{.*?\},"(?=[a-z]+":)/, '"meta":null,"') : e))
+      .map((line: string) => {
+        if (!line.startsWith('data: ')) return line;
+        const event = JSON.parse(line.slice(6));
+        return event.appid === 1145360 ? `data: ${JSON.stringify({ ...event, meta: null })}` : line;
+      })
       .join('\n\n');
     return route.fulfill({ ...full, body });
   });
@@ -4342,7 +4346,10 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('#panel-title')).toHaveText('Hades');
+  // No more media will come: the link opens on what there is.
   const lightbox = page.locator('#screenshot-lightbox');
+  await expect(lightbox.locator('.lb-status')).toContainText('Cover');
+  await page.keyboard.press('Escape');
   await expect(lightbox).not.toHaveAttribute('open');
   // A phone's panel covers the table.
   await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -4758,25 +4765,6 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await doubleTap();
   await expect(img).not.toHaveAttribute('style', /scale/);
 });
-
-// The fixture trailer has no stream to start: give Hades' one (a stubbed browser plays anything).
-async function withTrailerStream(page: Page) {
-  await page.route('**/api/game-details/stream', (route) => {
-    const req = route.request();
-    const full = respond(req.method(), new URL(req.url()), req.postData());
-    const body = full.body
-      .split('\n\n')
-      .map((line: string) => {
-        if (!line.startsWith('data: ')) return line;
-        const event = JSON.parse(line.slice(6));
-        if (event.appid !== 1145360 && event.appid !== 105600) return line; // Hades, Terraria
-        const movies = event.meta.movies.map((m: object) => ({ ...m, hls: `/trailer-${event.appid}.m3u8` }));
-        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, movies } })}`;
-      })
-      .join('\n\n');
-    return route.fulfill({ ...full, body });
-  });
-}
 
 // A key hides the lightbox's controls; moving the mouse, as one reaching for them does (a tap on a phone), brings them back.
 async function reachForControls(page: Page) {
@@ -5535,23 +5523,7 @@ test("F1 edge: the viewer's game stepper shows with its other controls, not only
 
 test("F1 edge: the viewer's ↑/↓ game buttons stay put from game to game", async ({ page }) => {
   await asPlayer(page, ALICE);
-  // Hades with 24 screenshots, for a counter as long as a real game's.
-  await page.route('**/api/game-details/stream', (route) => {
-    const req = route.request();
-    const full = respond(req.method(), new URL(req.url()), req.postData());
-    const body = full.body
-      .split('\n\n')
-      .map((line: string) => {
-        if (!line.startsWith('data: ')) return line;
-        const event = JSON.parse(line.slice(6));
-        if (event.appid !== 1145360) return line;
-        const [shot] = event.meta.screenshots;
-        const screenshots = Array.from({ length: 24 }, (_, i) => ({ ...shot, id: i + 1 }));
-        return `data: ${JSON.stringify({ ...event, meta: { ...event.meta, screenshots } })}`;
-      })
-      .join('\n\n');
-    return route.fulfill({ ...full, body });
-  });
+  await mockApi(page, { states: ['many-shots'] });
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const boxes = () =>
     page.evaluate(() =>
@@ -5619,7 +5591,7 @@ test("M3 edge: a trailer the browser won't play with sound plays muted and says 
       return this.muted ? play.call(this) : Promise.reject(new DOMException('No sound yet', 'NotAllowedError'));
     };
   });
-  await withTrailerStream(page);
+  await mockApi(page, { states: ['playable-trailers'] });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
   const unmute = page.locator('.lb-unmute');
