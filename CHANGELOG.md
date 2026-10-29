@@ -111,6 +111,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - node scripts/session-end.js lists what's left before closing a session
 - The checks stop with a clear message when node_modules is behind package-lock.json
 - Fix-batch lanes install their own dependencies before their first commit
+- Dependencies updated, including a fix for a denial-of-service flaw in the request body parser
 
 ## [0.11.0] - 2026-10-14
 
