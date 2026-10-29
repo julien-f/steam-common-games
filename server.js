@@ -351,8 +351,8 @@ const detailsLimit = namedRateLimit('details', {
   },
 });
 
-// Store metadata alone (GET /api/game-meta/:appid), for lists of entries that only show a name
-// and capsule (the panel's DLC card): one store call instead of fetchGameDetails' five sources.
+// Store metadata alone (GET /api/game-meta/:appid): the panel's DLC card, and an opened list row's media,
+// which the details stream leaves out. One store call instead of fetchGameDetails' five sources.
 const metaLimit = namedRateLimit('meta', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
@@ -1175,9 +1175,9 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Vary', 'Accept-Encoding');
-  // ~5 KB per game, mostly media URLs: gzipped it's a fifth of that (no reverse proxy is assumed
-  // to compress text/event-stream; nginx doesn't by default). Flushed per event, so each row
-  // still arrives as soon as it resolves.
+  // Gzipped (its size: docs/dev/architecture.md), as no reverse proxy is assumed to compress
+  // text/event-stream (nginx doesn't by default). Flushed per event, so each row still arrives as
+  // soon as it resolves.
   const gzip = /\bgzip\b/.test(req.get('accept-encoding') ?? '');
   let out = res;
   if (gzip) {

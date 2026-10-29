@@ -184,7 +184,7 @@ export function AppShell(props: RouteSectionProps): JSX.Element {
           settled = true;
           clearTimeout(timeout);
           dispose();
-          // Its details never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
+          // Its media never came (5 s): nothing to open on but the Cover, which the TV doesn't show.
           if (!game || (detailsPending(game) && on.item.shotId !== 'banner')) return resolve(false);
           setPrivateMode(false);
           const items = buildMediaItems(game.appid, game.details?.meta);

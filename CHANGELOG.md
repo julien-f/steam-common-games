@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Home loads about 10 KB less code before showing
 - Sorting a large list or the bundles by a date column is faster
 - Owned's profile and taste, and a comparison's player profiles, no longer hold up the page as the last game details land, and a game's Refresh details no longer recomputes them
+- Game lists load less data: a game's screenshots and trailers load when it's opened
 
 ### Fixed
 

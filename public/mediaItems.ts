@@ -52,7 +52,7 @@ export type ShotKind = MediaItem['type'] | 'cover';
 // anything else, unless the Cover is what's being left: it's Steam's 460×215 header strip — the
 // least rewarding thing to open fullscreen, and the one item with no separate thumbnail to stand in
 // while it loads. A return of 0 therefore means "this game has nothing but its banner" (which is
-// also how a caller tells that the details simply haven't streamed in yet) or "leaving the Cover".
+// also how a caller tells that the media simply haven't loaded yet) or "leaving the Cover".
 //
 // Kind-preserving, so paging on from a trailer keeps landing on trailers, and from the Cover on
 // covers — but never from an image to a trailer: the lightbox autoplays video, so promoting an

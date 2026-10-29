@@ -1649,8 +1649,8 @@ export default function ListRoute() {
   // `game.standalone` (panelNav.ts), so there's no extra plumbing needed here beyond that.
   // A `&shot=<id>` deep link, captured at load time and applied once the open game actually has
   // media to index into. Two steps, because opening the panel is what *clears* `shot` from the
-  // live URL (setPanelParam) and because a row's screenshots only exist after its details have
-  // streamed in — so the value is read up front and replayed afterwards, the same shape the
+  // live URL (setPanelParam) and because a row's screenshots only exist once its media have
+  // loaded — so the value is read up front and replayed afterwards, the same shape the
   // deleted pages' own restorePanelFromUrl used.
   let pendingShot: { appid: number; shot: string } | null = null;
   function restorePendingShot(): void {
@@ -2942,7 +2942,7 @@ export default function ListRoute() {
     const toStream = kept ? initialRows.filter((row) => !kept.has(row.appid)) : initialRows;
     if (toStream.length) await streamGameDetails(toStream, gen);
     if (loadGuard.isStale(gen)) return;
-    restorePendingShot(); // now that the open game's screenshots/videos have actually arrived
+    restorePendingShot(); // now that the open game's details have arrived (its media, if any, replay it too)
   }
 
   // ── The hero card's content (see ListHero.tsx) ────────────────────────────────────────────
