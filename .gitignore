@@ -9,5 +9,6 @@ db.sqlite-wal
 db.sqlite-shm
 .playwright-mcp/
 .claude/batch/
+.claude/worktrees/
 test-results/
 playwright-report/
