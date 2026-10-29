@@ -460,9 +460,16 @@ export function failedLookupFields(): ReturnType<typeof detailsFields> {
   return detailsFields({ ...NO_DETAILS, failed: [...DETAIL_SOURCES] });
 }
 
-// No media to show yet, and some may come: details not in, the store's metadata failed (↻ retries it),
-// or its media not loaded yet (a failed load gives up until the game is opened again).
-export function detailsPending(game: Pick<Game, 'details' | 'failedSources' | 'mediaFailed'>): boolean {
+type MediaState = Pick<Game, 'details' | 'failedSources' | 'mediaFailed'>;
+
+// Its media are loading (the details stream leaves them out); a failed load gives up until the game is opened again.
+export function mediaPending(game: MediaState): boolean {
   const meta = game.details?.meta;
-  return !game.details || !!game.failedSources?.includes('meta') || (!!meta && !meta.screenshots && !game.mediaFailed);
+  return !!meta && !meta.screenshots && !game.mediaFailed;
+}
+
+// No media to show yet, and some may come: details not in, the store's metadata failed (↻ retries it),
+// or its media loading.
+export function detailsPending(game: MediaState): boolean {
+  return !game.details || !!game.failedSources?.includes('meta') || mediaPending(game);
 }

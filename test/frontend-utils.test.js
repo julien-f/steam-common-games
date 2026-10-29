@@ -22,6 +22,7 @@ const {
   oldestFetchedAt,
   isTextEntry,
   detailsPending,
+  mediaPending,
 } = require('../public/utils.ts');
 
 // ── normalizeInput ────────────────────────────────────────────────────────────
@@ -465,4 +466,14 @@ test('detailsPending: media may still come until they load, fail, or there is no
   assert.equal(detailsPending({ details: details(filled) }), false);
   assert.equal(detailsPending({ details: details(null) }), false);
   assert.equal(detailsPending({ details: details(null), failedSources: ['meta'] }), true);
+});
+
+// What a wait on media can end on: a failed store page brings none until ↻, so it isn't waited for.
+test('mediaPending: only a game whose media are loading', () => {
+  const details = (meta) => ({ rating: null, hltb: null, meta, tags: null, demo: null, protondb: null });
+  assert.equal(mediaPending({ details: null }), false);
+  assert.equal(mediaPending({ details: details({ name: 'Hades' }) }), true);
+  assert.equal(mediaPending({ details: details({ name: 'Hades' }), mediaFailed: true }), false);
+  assert.equal(mediaPending({ details: details({ name: 'Hades', screenshots: [] }) }), false);
+  assert.equal(mediaPending({ details: details(null), failedSources: ['meta'] }), false);
 });

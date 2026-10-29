@@ -1673,9 +1673,11 @@ export default function ListRoute() {
     if (row.mediaFailed && !retry) return;
     mediaLoading.add(appid);
     if (row.mediaFailed) rowStore.mutateRow(appid, (draft) => void (draft.mediaFailed = false));
+    // Only onto this row: a reload of the list may have replaced it by the time the answer lands.
+    const ours = (write: (draft: Game) => void) => rowStore.getRow(appid) === row && rowStore.mutateRow(appid, write);
     fetchJson<{ meta: GameMeta | null }>(`/api/game-meta/${appid}`, undefined, "Steam store didn't answer")
       .then(({ meta: loaded }) => {
-        rowStore.mutateRow(appid, (draft) => {
+        ours((draft) => {
           const details = draft.details;
           if (!details?.meta || details.meta.screenshots) return; // a ↻ landed first
           const media = { screenshots: loaded?.screenshots ?? [], movies: loaded?.movies ?? [] };
@@ -1684,7 +1686,7 @@ export default function ListRoute() {
       })
       .catch((err) => {
         console.warn('[media]', appid, err);
-        rowStore.mutateRow(appid, (draft) => void (draft.mediaFailed = true));
+        ours((draft) => void (draft.mediaFailed = true));
       })
       .finally(() => {
         mediaLoading.delete(appid);
