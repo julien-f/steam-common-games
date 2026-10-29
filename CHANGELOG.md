@@ -110,6 +110,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Setup review's skill-run times no longer show NaN or count a run twice
 - node scripts/session-end.js lists what's left before closing a session
 - The checks stop with a clear message when node_modules is behind package-lock.json
+- Fix-batch lanes install their own dependencies before their first commit
 
 ## [0.11.0] - 2026-10-14
 
