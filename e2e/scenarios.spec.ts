@@ -5135,6 +5135,28 @@ test('F1 edge: the panel behind the lightbox follows its steps unrendered, and i
   await expect.poll(filmScrolls).toBeGreaterThan(0);
 });
 
+test("F1 edge: the lightbox preloads a screenshot's neighbours only once it is in, or has failed", async ({ page }) => {
+  await mockApi(page, { states: ['slow-media'] }); // its images by URL, so one can be held
+  const shown = await gate(page, '**/Screenshot%201.svg?full**');
+  await page.goto('/game/1145360?shot=s1');
+  await shown.requested;
+  const preloads = page.locator('#screenshot-lightbox .lb-preload');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
+  expect(await preloads.count()).toBe(0); // not competing with the one awaited
+  shown.release();
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toHaveAttribute('src', /Screenshot%201\.svg\?full/);
+  await expect(preloads).toHaveCount(2);
+
+  // A failed one doesn't hold its neighbours back.
+  await page.route('**/Screenshot%203.svg?full**', (route) => route.fulfill({ status: 404 }));
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 3 of 3');
+  await expect(page.locator('.lb-error')).toBeVisible();
+  await expect(preloads).toHaveCount(2);
+  await expect(page.locator('#screenshot-lightbox .lb-preload[data-src*="Screenshot%202"]')).toHaveCount(1);
+});
+
 test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the game stepped to', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');

@@ -566,6 +566,7 @@ function loadLbImage(src: string, placeholder?: string) {
     img.style.opacity = '1';
     setLbLoading(lb, false);
     syncLbZoomBtn(lb);
+    preloadLbNeighbours(true);
   };
   if (full.complete && full.naturalWidth) return show();
   img.style.opacity = placeholder ? '1' : '0';
@@ -577,6 +578,7 @@ function loadLbImage(src: string, placeholder?: string) {
     img.style.opacity = '0';
     setLbLoading(lb, false);
     showLbError("Couldn't load this image.");
+    preloadLbNeighbours(true);
   });
 }
 
@@ -2007,7 +2009,7 @@ function renderLightbox() {
       lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek on the TV');
       schedHideLbChrome();
     } else {
-      // Until the full image loads, its thumbnail (cached from the hero carousel) rather than the previous shot;
+      // Until the full image loads, its thumbnail (often cached by the panel's filmstrip) rather than the previous shot;
       // the banner has no separate one (thumb === main): blank there.
       loadLbImage(shot.main!, shot.thumb !== shot.main ? shot.thumb : undefined);
       schedHideLbChrome();
@@ -2026,15 +2028,23 @@ function renderLightbox() {
   );
   lb.querySelector<HTMLButtonElement>('.lb-prev')!.disabled = list.length <= 1;
   lb.querySelector<HTMLButtonElement>('.lb-next')!.disabled = list.length <= 1;
-  // Preload prev and next images so navigation feels instant; for a video,
-  // warm its poster the same way and prime its HLS manifest in the HTTP
-  // cache so stepping onto it doesn't pay the full fetch latency cold.
+  preloadLbNeighbours(shot.type === 'video');
+}
+
+// The shown item's neighbours (images, posters, a trailer's manifest and hls.js), so stepping feels instant: made
+// (`create`) once the shown image is in or failed, not competing with it, at once for a trailer; stale ones go.
+function preloadLbNeighbours(create: boolean) {
+  const lb = document.getElementById('screenshot-lightbox')!;
+  const list = untrack(shots);
+  const i = untrack(idx);
+  const shot = list[i];
   const keep = new Set<string>();
   for (const offset of [-1, 1]) {
     const adjacent = list[(i + offset + list.length) % list.length];
     if (!adjacent) continue;
     const preloadSrc = adjacent.type === 'video' ? adjacent.thumb : adjacent.main;
     if (preloadSrc) keep.add(preloadSrc);
+    if (!create) continue;
     if (preloadSrc && preloadSrc !== shot.main) {
       let pre = lb.querySelector<HTMLImageElement>(`.lb-preload[data-src="${CSS.escape(preloadSrc)}"]`);
       if (!pre) {
@@ -2052,7 +2062,6 @@ function renderLightbox() {
       loadHlsModule().catch(() => {}); // warm it ahead of time — see its own comment above
     }
   }
-  // Drop stale preloads (keep only prev/next)
   lb.querySelectorAll<HTMLImageElement>('.lb-preload').forEach((el) => {
     if (!keep.has(el.dataset.src ?? '')) el.remove();
   });
