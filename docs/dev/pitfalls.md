@@ -191,5 +191,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## Phone e2e fails intermittently under heavy load
 
 - **Symptom**: `npm run test:e2e -- --project=phone` failed 2 runs in 5 (2026-10-30, load average ≈27), a different test each time, and passed on rerun. One was `F1 edge: on a phone, a pinch zooms around the point between the fingers`: `Expected: < 0.01, Received: 0.0493`; the other, a `toContainText`, went unidentified.
+- `F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to the current one` fails 3–5 runs in 10 alone (`--repeat-each=10`, load ≈20), already before 0.12.0's last commits: `Expected: 1, Received: 2` (the tabs wrap) or the scroll check `false`. It blocked 0.12.0's pre-push, pushed with `--no-verify` on approval.
 - **Cause**: unconfirmed; the pinch test may read the image's box before its zoom transition settles.
 - **Fix**: none yet; check whether the failures follow load before rerunning.
