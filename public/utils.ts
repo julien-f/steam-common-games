@@ -1,3 +1,4 @@
+import { prefersReducedMotion } from './motion.ts';
 import type { Game, GameDetailsReply } from './types.ts';
 
 // The custom-URL name in a Steam profile URL ('https://steamcommunity.com/id/gaben/' → 'gaben'),
@@ -131,7 +132,7 @@ export function compareByOrder(
 
 // Smooth scrolling, unless the user asked the system for reduced motion.
 export function smoothScroll(): ScrollBehavior {
-  return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  return prefersReducedMotion() ? 'auto' : 'smooth';
 }
 
 // Fades an image in once loaded or failed (`.img-fade`); a cached one shows at once. Call it in the
