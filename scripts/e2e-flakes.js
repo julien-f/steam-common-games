@@ -3,7 +3,7 @@
 // Measures the e2e suite's flakiness: runs it N times (scripts/e2e.js, `--repeat-each`), optionally beside
 // busy-looping threads, then prints each test's failure rate and the slowest tests, and logs the run.
 // The added load comes on top of other sessions', so the load sampled during the run is logged too.
-//   node scripts/e2e-flakes.js [--repeat=N] [--load=THREADS] [playwright args…]
+//   node scripts/e2e-flakes.js [--repeat=N] [--load=THREADS] [playwright args…, e.g. --workers=12 -g <title>]
 
 const fs = require('node:fs');
 const os = require('node:os');
