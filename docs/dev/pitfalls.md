@@ -193,3 +193,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: `F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to the current one` failed 3–5 runs in 10 alone (`--repeat-each=10`, load ≈20, 2026-10-30): `Expected: 1, Received: 2` (the tabs wrap) or the scroll check `false`. It blocked 0.12.0's pre-push, pushed with `--no-verify` on approval.
 - **Cause**: unconfirmed; it passed 34 runs in 34 the same day under `node scripts/e2e-flakes.js` at load 22–66. It measures the tabs right after the last one is attached.
 - **Fix**: none yet; on a new failure, keep its trace (`test-results/`) and look for what reflows after the tabs attach.
+
+## Staging one hunk from a patch lands it in the wrong place
+
+- **Symptom**: `pre-commit` fails `format` on lines that look right in the working tree; the staged file (`git show :<file>`) has them inside another function.
+- **Cause**: a patch made with `git diff -U0` and staged with `git apply --cached --unidiff-zero` carries no context, so its line numbers count the hunks left out: it applies at the shifted line.
+- **Fix**: build the staged content from `HEAD` (`git show HEAD:<file>`, edit, then `git update-index --cacheinfo 100644,$(git hash-object -w <copy>),<file>`), or commit the hunks in the order they sit in the file.
