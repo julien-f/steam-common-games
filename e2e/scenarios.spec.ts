@@ -5943,6 +5943,8 @@ test('M3 edge: on a phone, a double-tap seek leaves the trailer playing', async 
   await page.getByRole('button', { name: 'Play trailer' }).tap();
   await page.clock.runFor(3500); // controls idled out: the first tap only brings them back
   await expect(page.locator('#screenshot-lightbox')).toHaveClass(/lb-idle/);
+  // Paused, so a slow tap under load still lands within the double-tap's 300 ms.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   const box = (await page.locator('.lb-video').boundingBox())!;
   const point = { x: box.x + box.width * 0.85, y: box.y + box.height / 2 };
   const cdp = await page.context().newCDPSession(page);
