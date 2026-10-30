@@ -20,6 +20,20 @@
 - `node scripts/e2e-flakes.js [--repeat=N] [--load=THREADS] [playwright args…]` runs the suite N times (default 5), beside THREADS busy-looping threads, and prints each test's failure rate and the slowest tests. The added load stacks on other sessions', so it logs the load sampled during the run (`.git/dev-metrics/flakes.jsonl`; `setup-facts.js --cost` shows the last one). 5 repeats find candidates; confirming a flake or a fix takes 20. A full passing run records the e2e pass like any other.
 - `E2E_SHOTS=1 npm run test:e2e` keeps each test's final screen, plus any `shot(page, name)` (`e2e/state.ts`), under `test-results/`, one folder per test and width — a way to look at a UI change without touching real prefs.
 
+## Writing reliable tests
+
+Each rule comes from a flake it fixed; add one when a fix teaches something new.
+
+- No real-time wait: drive time with the fake clock (`page.clock`, `node:test`'s `mock.timers`). A real wait is a window that load closes or stretches.
+  - `page.clock` is the whole context's: install it after `startPresenting`, not before (the popup's first document misses it about one run in four). Timers armed before the install keep real time.
+  - A window between two inputs (double-tap, a wheel gesture's end, a burst's settle): `pauseAt`, then `runFor` past it.
+  - Paused, `requestAnimationFrame` and debounced writes (the lightbox's status line) wait too: assert on what changes at once (its counter).
+- Wait for the state the next step needs, not a proxy: `not lb--loading` holds before the lightbox opens and before its media arrive (`stillShown`); `waitForResponse` resolves before the app's handlers run.
+- A "nothing after" check advances the fake clock past the window, then asserts; break the app once to see it fail.
+- Mocked "fetched" stamps take the answer's time: a module-level `Date.now()` ages with the worker.
+- `Event.timeStamp` is real time: app code a test drives by the clock reads `performance.now()` or `Date.now()`.
+- A flake: reproduce it with `node scripts/e2e-flakes.js --repeat=24 --load=24 --project=… -g …` and Playwright's `--workers=12` (the full suite's contention: alone it rarely fails), fix the cause, then show 0 failures over at least twice the runs it took to fail, under the same load.
+
 ## Looking at the UI
 
 - **Mocked** (the default): `npm run dev:mock` (`:58993`; a worktree its own, `node scripts/ports.js mock`) serves the app against the e2e fixtures — no backend or upstream traffic, and its own localStorage, so no demo-prefs seed/restore. The `mock` cookie switches on error and slow states (`e2e/mockApi.ts`).
