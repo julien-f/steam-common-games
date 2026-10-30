@@ -4868,6 +4868,60 @@ test('M3 edge: fullscreen media turns a phone to landscape, and keeps it there',
   await expect.poll(locks).toEqual(['landscape', 'landscape', 'unlock']);
 });
 
+test('M2 edge: a burst of steps over a trailer starts it only once they stop on it', async ({ page }) => {
+  // Native HLS, so a start sets the trailer's `src` at once: each set is a stream loading.
+  await page.addInitScript(() => {
+    const w = window as Window & { starts?: number };
+    w.starts = 0;
+    HTMLMediaElement.prototype.canPlayType = () => 'maybe';
+    const src = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src')!;
+    Object.defineProperty(HTMLMediaElement.prototype, 'src', {
+      get: src.get,
+      set(v: string) {
+        if (v.includes('.m3u8')) w.starts!++;
+        src.set!.call(this, v);
+      },
+    });
+  });
+  await fakePlayback(page);
+  await page.clock.install();
+  await mockApi(page, { states: ['playable-trailers'] });
+  await page.goto('/game/1145360?shot=s2');
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toBeVisible();
+  await page.clock.pauseAt(Date.now() + 60_000); // the steps below are all at one instant
+  const starts = () => page.evaluate(() => (window as Window & { starts?: number }).starts);
+  const at = (shot: string) => expect(page).toHaveURL(new RegExp(`shot=${shot}`));
+
+  // Held ←: Screenshot 1 on its own, then the trailer and the Cover within the settle.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await at('v1');
+  await page.keyboard.press('ArrowLeft');
+  await at('banner');
+  await page.clock.runFor(1000);
+  expect(await starts()).toBe(0); // passed over: never loaded
+
+  // A lone step onto it starts it at once, as before; a burst stopping on it, once it has settled.
+  await page.keyboard.press('ArrowRight');
+  await at('v1');
+  expect(await starts()).toBe(1);
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await at('v1');
+  expect(await starts()).toBe(1);
+  await page.clock.runFor(250);
+  expect(await starts()).toBe(2);
+
+  // Closed while it waits: nothing starts behind the closed lightbox.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await at('v1');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+  await page.clock.runFor(1000);
+  expect(await starts()).toBe(2);
+});
+
 test('M3 edge: on Firefox for Android, a trailer enters fullscreen unloaded, then plays on as it was', async ({
   page,
 }) => {

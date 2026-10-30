@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - About's GitHub link points to the repository's new name, playshelf
 - Swiping between media in the lightbox slides the previous one out beside the next, instead of fading it where you let go
 - A list mixing games already looked up with new ones fills in the known ones at once, instead of after the new ones ahead of them
+- Holding an arrow key through the lightbox no longer loads each trailer it passes; the one you stop on starts once you stop
 
 ### Fixed
 

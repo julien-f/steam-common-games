@@ -100,6 +100,9 @@ let lbTvBurstUntil = 0;
 // Stop presenting came from the lightbox's own pill: said as a stop, not as a lost window.
 let lbStopped = false;
 const LB_SETTLE_MEDIA_MS = 200;
+// Until when steps are a burst (a held key, quick taps): a trailer one lands on waits to start where it stops.
+let lbStepBurstUntil = 0;
+let lbSettleTimer: ReturnType<typeof setTimeout> | undefined;
 const LB_SETTLE_GAME_MS = 400; // the TV's cross-fade: a held ↓ shouldn't flash half-loaded games at the room
 let lbZoom = 1,
   lbPanX = 0,
@@ -1738,6 +1741,7 @@ export function closeLightbox() {
 function closeLightboxNow() {
   if (!isLightboxOpen()) return;
   flushLbTv(); // a step closed within its settle still reaches the TV
+  clearTimeout(lbSettleTimer);
   setLbGame(null);
   setAwaitingMedia(null);
   clearTimeout(lbVcTimer);
@@ -1926,8 +1930,12 @@ function renderLightbox() {
   const onTv = untrack(linked);
   if (dir !== 0) fadeOutLbItem(lb);
   flashLbCounter(lb, gameChanged);
+  clearTimeout(lbSettleTimer);
+  const settling = dir !== 0 && Date.now() < lbStepBurstUntil;
+  if (dir !== 0) lbStepBurstUntil = Date.now() + LB_SETTLE_MEDIA_MS;
   // Private, or unlinked on what the TV played: no sound starting here by itself.
-  lbHeld = shot.type === 'video' && !onTv && (untrack(privateMode) || (sameItem && lbRenderedOnTv));
+  const held = untrack(privateMode) || (sameItem && lbRenderedOnTv);
+  lbHeld = shot.type === 'video' && !onTv && (held || settling);
   lbHeldAt = lbHeld && sameItem && lbRenderedOnTv ? lbTvTime() : 0;
   lbRenderedAppid = appid;
   lbRenderedShotId = shot.shotId;
@@ -1970,6 +1978,7 @@ function renderLightbox() {
       lbVideoEl.currentTime = lbHeldAt; // shown there until played (set again once loaded)
       syncLbMuteBtn(lb);
       lb.classList.remove('lb--automuted', 'lb--ended');
+      if (!held) lbSettleTimer = setTimeout(() => lbHeld && toggleLbPlay(), LB_SETTLE_MEDIA_MS);
     } else playLbTrailer(lb, shot);
     syncLbPaused();
     schedHideLbChrome();
