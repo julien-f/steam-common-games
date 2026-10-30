@@ -4772,6 +4772,46 @@ test('M3 edge: fullscreen media turns a phone to landscape, and keeps it there',
   await expect.poll(locks).toEqual(['landscape', 'landscape', 'unlock']);
 });
 
+test('M3 edge: on Firefox for Android, a trailer enters fullscreen unloaded, then plays on as it was', async ({
+  page,
+}) => {
+  // Its media session, loaded before fullscreen, would put the system orientation back over the lock.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Android 12; Mobile) Firefox/159.0' });
+    const w = window as Window & { steps?: string[] };
+    w.steps = [];
+    HTMLMediaElement.prototype.load = function () {
+      w.steps!.push('unload');
+      this.removeAttribute('src');
+    };
+    document.addEventListener(
+      'play',
+      () => w.steps!.push(document.fullscreenElement ? 'play fullscreen' : 'play'),
+      true,
+    );
+  });
+  await fakePlayback(page);
+  await mockApi(page, { states: ['playable-trailers'] });
+  await page.goto('/game/1145360?shot=v1');
+  const steps = () => page.evaluate(() => (window as Window & { steps?: string[] }).steps);
+  const video = page.locator('#screenshot-lightbox .lb-video');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !!v.currentSrc && !v.paused)).toBe(true);
+  await page.evaluate(() => ((window as Window & { steps?: string[] }).steps = []));
+  await page.getByRole('button', { name: 'Enter fullscreen' }).click();
+  await expect.poll(steps).toEqual(['unload', 'play fullscreen']);
+
+  // Paused, it stays paused, and plays from there.
+  await page.evaluate(() => document.exitFullscreen());
+  await video.evaluate((v: HTMLVideoElement) => v.pause());
+  await page.evaluate(() => ((window as Window & { steps?: string[] }).steps = []));
+  await page.getByRole('button', { name: 'Enter fullscreen' }).click();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  expect(await steps()).toEqual(['unload']);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect.poll(steps).toEqual(['unload', 'play fullscreen']);
+});
+
 test('M3 edge: without element fullscreen (an iPhone), only a trailer offers it, in the native player', async ({
   page,
 }) => {

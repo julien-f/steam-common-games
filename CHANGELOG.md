@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - About's GitHub link points to the repository's new name, playshelf
 
+### Fixed
+
+- On Firefox for Android, a fullscreen trailer no longer turns the phone back to portrait when it ends or you step to another media
+
 ## [0.12.0] - 2026-10-30
 
 ### Added

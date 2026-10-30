@@ -465,12 +465,32 @@ function toggleLbFullscreen(lb: HTMLElement) {
   if (isFullscreen()) {
     exitFullscreen();
   } else {
+    const wasPlaying = holdLbTrailerForFullscreen();
     const surface = lbSurface(lb);
     (
       surface.requestFullscreen?.() ??
       (surface as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen?.()
-    )?.catch?.(() => {});
+    )?.then?.(
+      () => wasPlaying && toggleLbPlay(),
+      () => {},
+    );
   }
+}
+
+// Firefox for Android puts the system orientation back over our landscape lock when a trailer loaded
+// before fullscreen ends or is stepped off: enter with none, held where it was. Remove once fixed upstream.
+const FIREFOX_ANDROID = /Android.*Firefox\//.test(navigator.userAgent);
+function holdLbTrailerForFullscreen() {
+  if (!FIREFOX_ANDROID || !lbShowingVideo() || lbHeld || lbTvTrailer() || !lbVideoEl.currentSrc) return false;
+  const wasPlaying = !lbVideoEl.paused;
+  const at = lbVideoEl.ended ? 0 : lbVideoEl.currentTime;
+  stopHls(lbVideoEl);
+  lbVideoEl.load(); // removing `src` alone keeps the media loaded, and its session with it
+  lbHeld = true;
+  lbHeldAt = at;
+  lbVideoEl.currentTime = at;
+  syncLbPaused();
+  return wasPlaying;
 }
 
 // Fullscreen media is landscape, so a phone turns to show it, pictures included. Re-asserted on
