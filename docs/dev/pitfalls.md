@@ -187,3 +187,9 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: the handler (holding or failing a response) is skipped and the real mock answers, sometimes making a test flaky rather than failing.
 - **Cause**: a glob matches the whole URL, query included, so `**/api/prices` misses `/api/prices?country=…`.
 - **Fix**: end the glob with `**` (`**/api/prices**`), or spell out the query.
+
+## Phone e2e fails intermittently under heavy load
+
+- **Symptom**: `npm run test:e2e -- --project=phone` failed 2 runs in 5 (2026-10-30, load average ≈27), a different test each time, and passed on rerun. One was `F1 edge: on a phone, a pinch zooms around the point between the fingers`: `Expected: < 0.01, Received: 0.0493`; the other, a `toContainText`, went unidentified.
+- **Cause**: unconfirmed; the pinch test may read the image's box before its zoom transition settles.
+- **Fix**: none yet; check whether the failures follow load before rerunning.
