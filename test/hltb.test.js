@@ -491,3 +491,42 @@ test('getHLTB: concurrent searches refused by one 429 burst back off once, not o
   assert.equal(searches.length, 4);
   await next;
 });
+
+test("getHLTB: a success sent before a 429 burst doesn't undo its back-off, which grows with the next burst", async (t) => {
+  // In flight together: 429, 200, 429 (one burst, 2 s); then the next search's 429 is a new one: 4 s.
+  const searches = pausedHLTB(t, (n) => (n === 2 || n >= 5 ? makeSearchResponse([]) : too()));
+  await Promise.allSettled([1, 2, 3].map((id) => getHLTB(id, `Game ${id}`)));
+  const fourth = getHLTB(4, 'Portal').catch(() => {});
+  t.mock.timers.tick(2000);
+  await flush();
+  assert.equal(searches.length, 4);
+  await fourth;
+  const fifth = getHLTB(5, 'Half-Life');
+  t.mock.timers.tick(3999);
+  await flush();
+  assert.equal(searches.length, 4, 'the second burst backs off 4 s');
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(searches.length, 5);
+  await fifth;
+});
+
+test('getHLTB: a search already waiting out a pause waits for a longer one that comes in meanwhile', async (t) => {
+  let answerSecond;
+  const second = new Promise((r) => (answerSecond = r));
+  const searches = pausedHLTB(t, (n) => (n === 1 ? too() : n === 2 ? second : makeSearchResponse([])));
+  const first = assert.rejects(() => getHLTB(1, 'Portal'));
+  const slow = assert.rejects(() => getHLTB(2, 'Half-Life'));
+  await first; // 2 s pause
+  const waiting = getHLTB(3, 'Portal 2'); // starts waiting it out
+  await flush();
+  answerSecond(too('10')); // meanwhile, HLTB asks for 10 s
+  await slow;
+  t.mock.timers.tick(2000);
+  await flush();
+  assert.equal(searches.length, 2, 'still waiting: Retry-After was 10 s');
+  t.mock.timers.tick(8000);
+  await flush();
+  assert.equal(searches.length, 3);
+  await waiting;
+});
