@@ -7023,6 +7023,24 @@ test.describe('with motion on', () => {
     await expect(page.locator('.panel-hero-open')).toBeFocused();
   });
 
+  test('F1 edge: stepping off a trailer fades it out too, not through black', async ({ page }) => {
+    await fakePlayback(page);
+    await mockApi(page, { states: ['playable-trailers'] });
+    await page.goto('/game/1145360?shot=v1');
+    await expect(page.locator('#screenshot-lightbox .lb-video')).toBeVisible();
+    // Not loaded yet (the fixture stream never is): its poster fades out.
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('img.lb-ghost')).toHaveAttribute('src', /Trailer/);
+    await expect(page.locator('.lb-ghost')).toHaveCount(0);
+    // Loaded: its current frame does.
+    await page.keyboard.press('ArrowLeft');
+    await page.locator('#screenshot-lightbox .lb-video').evaluate((v: HTMLVideoElement) => {
+      Object.defineProperty(v, 'readyState', { configurable: true, get: () => 2 });
+    });
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('canvas.lb-ghost')).toHaveCount(1);
+  });
+
   test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {
     await asPlayer(page, ALICE);
     await page.goto('/lists/owned');

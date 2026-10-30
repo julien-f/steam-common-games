@@ -3017,6 +3017,7 @@
   .lb-ghost {
     position: absolute;
     height: auto;
+    object-fit: contain;
     pointer-events: none;
     animation: lb-fade-out var(--dur-3) var(--ease-out) forwards;
   }

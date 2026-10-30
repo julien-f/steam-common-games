@@ -1867,12 +1867,29 @@ function renderLbCaption() {
 // The item stepped from fades out where it was (where a swipe left it) while the new one enters.
 function fadeOutLbItem(lb: HTMLElement) {
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
-  const rect = lbSwipeLeft ?? img.getBoundingClientRect();
+  const video = lbShowingVideo() ? lbVideoEl : null;
+  const rect = lbSwipeLeft ?? (video ?? img).getBoundingClientRect();
   lbSwipeLeft = null;
-  if (!lbShowingImage() || img.style.opacity === '0' || !img.src || !rect.width) return;
-  const ghost = img.cloneNode() as HTMLImageElement;
+  if (!rect.width) return;
+  let ghost: HTMLImageElement | HTMLCanvasElement;
+  if (video) {
+    // Its frame, else its poster: the video is detached at once, which would leave a black frame.
+    if (video.readyState >= 2) {
+      ghost = document.createElement('canvas');
+      ghost.width = video.videoWidth;
+      ghost.height = video.videoHeight;
+      ghost.getContext('2d')?.drawImage(video, 0, 0);
+    } else if (video.poster) {
+      ghost = document.createElement('img');
+      ghost.src = video.poster;
+    } else return;
+    ghost.style.height = `${rect.height}px`; // letterboxed as the video is
+  } else {
+    if (!lbShowingImage() || img.style.opacity === '0' || !img.src) return;
+    ghost = img.cloneNode() as HTMLImageElement;
+    ghost.removeAttribute('style');
+  }
   ghost.className = 'lb-ghost';
-  ghost.removeAttribute('style');
   Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
   ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
   lbSurface(lb).append(ghost);
