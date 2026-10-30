@@ -421,3 +421,73 @@ test('getHLTB: picks the best match by similarity, not first result', async (t) 
   const result = await getHLTB(1, 'Portal');
   assert.deepEqual(result, { id: 2, main: 2, extra: 4, completionist: null, all: null }); // Portal's times, not Portal Stories
 });
+
+// ── 429 pause ──────────────────────────────────────────────────────────────
+
+function pausedHLTB(t, searchAnswer) {
+  _reset();
+  _resetAuth();
+  _resetCircuitBreakers();
+  t.after(_resetAuth);
+  t.after(_resetCircuitBreakers);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  const searches = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    searches.push(Date.now());
+    return searchAnswer(searches.length);
+  });
+  return searches;
+}
+const flush = async () => {
+  for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+};
+const too = (retryAfter) => ({
+  ok: false,
+  status: 429,
+  headers: new Headers(retryAfter === undefined ? {} : { 'retry-after': retryAfter }),
+});
+
+test('getHLTB: a 429 holds every queued search until Retry-After has passed, and is not retried', async (t) => {
+  const searches = pausedHLTB(t, (n) => (n === 1 ? too('2') : makeSearchResponse([])));
+  await assert.rejects(() => getHLTB(1, 'Portal'), /429/);
+  const next = getHLTB(2, 'Half-Life');
+  await flush();
+  t.mock.timers.tick(1999);
+  await flush();
+  assert.equal(searches.length, 1, 'nothing goes out before Retry-After');
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(searches.length, 2, 'the next search, not a retry of the refused one');
+  await next;
+});
+
+test('getHLTB: an HTTP-date Retry-After holds searches until that date', async (t) => {
+  const searches = pausedHLTB(t, (n) =>
+    n === 1 ? too(new Date(Date.now() + 5000).toUTCString()) : makeSearchResponse([]),
+  );
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  const next = getHLTB(2, 'Half-Life');
+  t.mock.timers.tick(3000);
+  await flush();
+  assert.equal(searches.length, 1);
+  t.mock.timers.tick(2000);
+  await flush();
+  assert.equal(searches.length, 2);
+  await next;
+});
+
+test('getHLTB: concurrent searches refused by one 429 burst back off once, not once each', async (t) => {
+  const searches = pausedHLTB(t, (n) => (n <= 3 ? too() : makeSearchResponse([])));
+  // Three slots, all in flight when HLTB starts refusing: the burst is one 2 s back-off, not 2+4+8.
+  await Promise.all([1, 2, 3].map((id) => assert.rejects(() => getHLTB(id, `Game ${id}`))));
+  const next = getHLTB(4, 'Portal');
+  t.mock.timers.tick(1999);
+  await flush();
+  assert.equal(searches.length, 3);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(searches.length, 4);
+  await next;
+});

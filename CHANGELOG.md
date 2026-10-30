@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Stepping to a screenshot already loaded in the lightbox shows it sharp at once, without its blurry thumbnail first
 - Stepping off a trailer in the lightbox fades it out like a picture instead of flashing black
 - The game panel's section tabs stay in place as its sections finish loading, instead of being rebuilt each time one arrives
+- When HLTB asks to slow down, the app pauses its HLTB lookups instead of retrying the next game at once
 
 ### Development
 

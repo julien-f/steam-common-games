@@ -70,9 +70,7 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 ## Compliance
 
 - **C221 · minor · S** — `getProtonDbStatus` is called for every appid (`server.js:737`), DLC, soundtracks and hardware included; the cache holds `null` for all 49 such rows, so ~2% of calls to an undocumented upstream are certain misses. Chain it off the meta lookup like HLTB and skip non-played types — once confirmed ProtonDB never has reports for them (inferred from the cache), recorded in integrations.md.
-- **C170 · minor · S** — `lib/steam.js:72` reads `Retry-After` with `Number(...)`, so its HTTP-date form becomes NaN and the store falls back to 2/4/8 s instead of the wait Steam asked for (integrations.md says it's honoured). Parse a date as the seconds until it.
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
-- **C233 · major · S** — an HLTB 429 gets no pause (`lib/hltb.js:198` throws `HLTB API error 429`), unlike the store and reviews ([integrations.md](integrations.md)'s pacing): one Owned load got 54 429s in 156 searches, until a 403 tripped the auth fast-fail and gave up on ~120 more games. Pause the HLTB semaphore on a 429, as the store does.
 
 ## Tests
 
