@@ -12,6 +12,7 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { until } = require('./until');
 const http = require('node:http');
 const zlib = require('node:zlib');
 const fs = require('node:fs');
@@ -1194,12 +1195,9 @@ test('GET /api/game-details/:appid: a request aborted mid-flight still caches, s
   // fetches (~100ms each) but no response has been sent yet.
   await abortedGet(port, '/api/game-details/600', 20);
 
-  // Give the stranded handler time to finish its upstream work and setCache. HLTB now
-  // waits on meta before searching (see fetchGameDetails — it always resolves the search
-  // name from store metadata rather than trusting a client-supplied one), so that chain is
-  // meta → search/site/init → search/site, three sequential ~100ms hops instead of running in parallel
-  // with meta — comfortably under this budget but no longer as slack as it used to be.
-  await new Promise((r) => setTimeout(r, 500));
+  // The stranded handler's upstream work done (meta → HLTB's search is its longest chain), then its setCache.
+  await until(() => counts.rating && counts.hltb && counts.meta && counts.tags === 2, 'the stranded fetches');
+  await new Promise((r) => setImmediate(r));
 
   // The refresh: same appid requested again.
   const res = await api.get('/api/game-details/600');
@@ -1442,9 +1440,9 @@ test('POST /api/game-details/stream: a GET /api/game-details sharing its fetch k
   await new Promise((r) => server.once('listening', r));
 
   const single = api.get('/api/game-details/400').then((r) => r);
-  await new Promise((r) => setTimeout(r, 20)); // the GET's fetch is under way first
+  await until(() => storeCalls === 1, "the GET's store fetch"); // under way first
   const stream = ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 400 }] });
-  await new Promise((r) => setTimeout(r, 20));
+  await new Promise((r) => setTimeout(r, 20)); // the stream's lookup under way too: no signal to wait on; late, it reads the cache and passes anyway
   release();
   const [one, streamed] = await Promise.all([single, stream]);
   assert.equal(storeCalls, 1); // one fetch, shared
@@ -2653,6 +2651,8 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   });
 
   const server = http.createServer(app).listen(0);
+  let sockets = 0;
+  server.on('connection', (socket) => (sockets++, socket.once('close', () => sockets--)));
   await new Promise((r) => server.once('listening', r));
   const port = server.address().port;
   const payload = JSON.stringify({ games: Array.from({ length: 200 }, (_, i) => ({ appid: i + 1 })) });
@@ -2672,10 +2672,10 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   assert.ok(maxInFlight <= Number(process.env.STREAM_CONCURRENCY || 16), `maxInFlight=${maxInFlight}`);
 
   req.destroy();
-  await new Promise((r) => setTimeout(r, 50));
+  await until(() => sockets === 0, 'the server seeing the disconnect');
   const startedAtDisconnect = started;
   release();
-  await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 100)); // room for a pool that kept going to show it: can only miss, not flake
   // A disconnect stops the pool within roughly one appid per worker, rather than working
   // through the remaining 190-odd games for a client that has gone.
   assert.ok(

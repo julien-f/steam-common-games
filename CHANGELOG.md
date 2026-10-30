@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Development
 
 - Faster, steadier tests: the e2e suite runs on a fake clock instead of real waits, the unit suite takes half the time, and `node scripts/e2e-flakes.js` measures each test's flake rate under load
+- Unit tests wait on the state they expect instead of sleeping
 
 ## [0.12.0] - 2026-10-30
 
