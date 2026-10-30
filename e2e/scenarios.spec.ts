@@ -4740,6 +4740,19 @@ test('F1 edge: the panel section nav highlights the section it jumped to', async
   await expect(nav.getByRole('button', { name: 'Overview' })).not.toHaveClass(/active/);
 });
 
+test("F1 edge: a section arriving adds its tab to the panel's tabs without rebuilding the others", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  const achievements = await gate(page, '**/api/achievements/**');
+  await page.goto('/lists/owned?game=1145360');
+  const list = page.locator('.panel-subnav-list');
+  await expect(list.getByRole('button', { name: 'DLC' })).toBeAttached();
+  const owners = await list.getByRole('button', { name: 'Owned by' }).elementHandle();
+  achievements.release();
+  await expect(list.getByRole('button', { name: 'Achievements' })).toBeAttached();
+  // Rebuilt, a tab a test or a finger is on would leave the page under it.
+  expect(await owners!.evaluate((el) => el.isConnected)).toBe(true);
+});
+
 test("F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to the current one", async ({
   page,
 }, testInfo) => {

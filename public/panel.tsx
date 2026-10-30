@@ -2520,6 +2520,16 @@ function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
 // (preserved in git history) for the full reasoning. Listed in the same order the sections
 // actually appear below (Owners right after the tag cloud, ahead of the collapsibles) so
 // scroll-spy highlighting (see updateSubnavScrollSpy) always lights up left-to-right.
+// One object per tab: `<For>` keeps a tab's button while the same object stays in the list, so a section arriving adds its own.
+type SubnavItem = { label: string; target: string };
+const SUBNAV = {
+  owners: { label: 'Owned by', target: 'panel-section-owners' },
+  hltb: { label: 'HLTB', target: 'panel-section-hltb' },
+  news: { label: 'News', target: 'panel-section-news' },
+  achievements: { label: 'Achievements', target: 'panel-section-achievements' },
+  dlc: { label: 'DLC', target: 'panel-section-dlc' },
+} satisfies Record<string, SubnavItem>;
+
 function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
   // Each condition counts a section only once it has *confirmed* content (or a confirmed
   // failure, which renders its own "couldn't load" card) — deliberately NOT while its fetch is
@@ -2537,12 +2547,12 @@ function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
   const items = createMemo(() => {
     const g = props.game;
     return [
-      !!panelData.owners()?.length && { label: 'Owned by', target: 'panel-section-owners' },
-      hltbShown(g) && { label: 'HLTB', target: 'panel-section-hltb' },
-      newsShown() && { label: 'News', target: 'panel-section-news' },
-      achievementsShown() && { label: 'Achievements', target: 'panel-section-achievements' },
-      !!g.details?.meta?.dlc?.length && { label: 'DLC', target: 'panel-section-dlc' },
-    ].filter((it): it is { label: string; target: string } => !!it);
+      !!panelData.owners()?.length && SUBNAV.owners,
+      hltbShown(g) && SUBNAV.hltb,
+      newsShown() && SUBNAV.news,
+      achievementsShown() && SUBNAV.achievements,
+      !!g.details?.meta?.dlc?.length && SUBNAV.dlc,
+    ].filter((it): it is SubnavItem => !!it);
   });
 
   // Re-run the scroll-spy whenever the set of buttons changes, since a newly rendered button

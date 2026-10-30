@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On Firefox for Android, a fullscreen trailer no longer turns the phone back to portrait when it ends or you step to another media
 - Stepping to a screenshot already loaded in the lightbox shows it sharp at once, without its blurry thumbnail first
 - Stepping off a trailer in the lightbox fades it out like a picture instead of flashing black
+- The game panel's section tabs stay in place as its sections finish loading, instead of being rebuilt each time one arrives
 
 ### Development
 
