@@ -1712,13 +1712,17 @@ test('C8 edge: a burst of steps sends the TV its first at once and then only whe
   await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
   const shown = await startPresenting(page);
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
+  // Frozen, so a slow poll can't miss the burst's first before the settle sends its last.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 60_000);
   await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft', 'ArrowLeft']);
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']); // the first, at once
+  await page.clock.runFor(250); // past the settle
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']);
-  await page.waitForTimeout(300); // and nothing after
+  await page.clock.runFor(1000); // and nothing after
   expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
   await stepsAtOnce(page, ['ArrowRight', 'ArrowRight']);
-  await page.keyboard.press('Escape'); // well within the settle
+  await page.keyboard.press('Escape'); // within the settle: the clock stands still
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1', 's1', 's2']);
 });
 
