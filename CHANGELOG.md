@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - On Firefox for Android, a fullscreen trailer no longer turns the phone back to portrait when it ends or you step to another media
 
+### Development
+
+- Faster, steadier tests: the e2e suite runs on a fake clock instead of real waits, the unit suite takes half the time, and `node scripts/e2e-flakes.js` measures each test's flake rate under load
+
 ## [0.12.0] - 2026-10-30
 
 ### Added

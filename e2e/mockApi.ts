@@ -25,6 +25,7 @@ import { PLAYERS, CATALOG, BUNDLE, PICK_BUNDLE, SIGNED_IN, signedInPrefs, game, 
 import { flattenBundleGames, type Bundle } from '../public/bundleData.ts';
 import { streamEvent } from '../lib/streamEvent.mjs';
 
+// Fixed per worker, for dates that need no freshness; a "fetched" stamp takes the answer's own time: a worker outlives a minute.
 const NOW = Date.now();
 // server.js's message for a client past its share of the outbound budgets (lib/metrics.js).
 export const LIMITED =
@@ -125,10 +126,11 @@ const creators = (appid: number) => CREATORS[appid] ?? { developers: ['Test Stud
 const COOP_WEIGHT: Record<number, number> = { 620: 0.3, 105600: 0.9, 413150: 0.6, 892970: 1 };
 
 function details(appid: number, states: ReadonlySet<string>) {
+  const now = Date.now();
   const fetched = {
     appid,
-    fetchedAt: NOW,
-    fetchedAts: { rating: NOW, hltb: NOW, meta: NOW, tags: NOW, protondb: NOW },
+    fetchedAt: now,
+    fetchedAts: { rating: now, hltb: now, meta: now, tags: now, protondb: now },
   };
   // As server.js answers an appid with no store page: 200, every source empty rather than failed.
   if (!CATALOG.some((g) => g.appid === appid))
@@ -332,7 +334,8 @@ export function respond(
   if (states.has('signed-in') && method === 'PUT' && path.startsWith('/api/me/prefs/')) return json({ ok: true });
 
   // A refresh is fetched now; otherwise as of server start, or 12 days before it under `stale`.
-  const accountFetchedAt = () => (body.refresh ? Date.now() : states.has('stale') ? NOW - 12 * 86400_000 : NOW);
+  const accountFetchedAt = () =>
+    body.refresh ? Date.now() : states.has('stale') ? Date.now() - 12 * 86400_000 : Date.now();
 
   if (path === '/api/common-games') {
     const identifiers: string[] = body.members ?? [];
@@ -359,7 +362,7 @@ export function respond(
     );
     return json({ items, players: members.map(playerJson), fetchedAt: accountFetchedAt() });
   }
-  if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: NOW });
+  if (path === '/api/friends') return json({ friends: [], unavailable: body.members ?? [], fetchedAt: Date.now() });
 
   if (path === '/api/game-details/stream') {
     const lines = (body.games ?? []).map(
@@ -400,7 +403,7 @@ export function respond(
     const name = url.searchParams.get('name');
     const appids = CATALOG.filter((g) => creators(g.appid)[`${role}s`].includes(name!)).map((g) => g.appid);
     const capped = states.has('creator-capped');
-    return json({ appids, total: capped ? 523 : appids.length, capped, fetchedAt: NOW });
+    return json({ appids, total: capped ? 523 : appids.length, capped, fetchedAt: Date.now() });
   }
 
   // Two of Alice's wishlist games among them; one game off Steam that Microsoft's catalog didn't name.
@@ -412,7 +415,7 @@ export function respond(
         { id: '9NUNNAMED002', title: null },
       ],
       failed: 0,
-      fetchedAt: NOW,
+      fetchedAt: Date.now(),
     });
   }
 
@@ -427,7 +430,7 @@ export function respond(
     };
   };
   if (path === '/api/bundles') {
-    return json({ bundles: [coopBundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: NOW });
+    return json({ bundles: [coopBundleJson(), pickBundleJson()], offset: 0, limit: 50, fetchedAt: Date.now() });
   }
   if (path === '/api/bundles/resolve') {
     const failed = states.has('resolve-failed') ? [BUNDLE.games[0].gid] : [];
@@ -440,7 +443,7 @@ export function respond(
   const bundle = path.match(/^\/api\/bundles\/(\d+)$/);
   if (bundle) {
     const found = { [BUNDLE.id]: coopBundleJson, [PICK_BUNDLE.id]: pickBundleJson }[Number(bundle[1])];
-    return found ? json({ bundle: found(), fetchedAt: NOW }) : json({ error: 'Bundle not found' }, 404);
+    return found ? json({ bundle: found(), fetchedAt: Date.now() }) : json({ error: 'Bundle not found' }, 404);
   }
   const inBundles = path.match(/^\/api\/game-bundles\/(\d+)$/);
   if (inBundles) {
@@ -474,7 +477,7 @@ export function respond(
     const appidOf = (key: string | number) =>
       typeof key === 'number' ? key : [bundleGames.find((g) => g.gid === key)?.appid].flat()[0];
     const prices = Object.fromEntries(keys.flatMap((key) => (appidOf(key) ? [[key, priceInfo(appidOf(key)!)]] : [])));
-    return json({ prices, fetchedAt: NOW });
+    return json({ prices, fetchedAt: Date.now() });
   }
 
   return json({ error: `e2e mock: no fixture for ${method} ${path}` }, 501);

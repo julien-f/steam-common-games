@@ -1184,6 +1184,13 @@ async function sentOnAir(shown: Page) {
       .map((m) => m.onAir as { appid: number; item: { shotId: string } }),
   );
 }
+// The lightbox's still drawn among all its game's media: not loading alone holds before they arrive.
+async function stillShown(page: Page, status: string) {
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb.locator('.lb-status')).toContainText(status);
+  await expect(lb).not.toHaveClass(/lb--loading/);
+}
+
 async function sentShots(shown: Page) {
   return (await sentOnAir(shown)).map((m) => m.item.shotId);
 }
@@ -1268,6 +1275,8 @@ test('C8 edge: the TV survives a reload of the main window, and an occluded TV i
   const shown = await startPresenting(page);
   const chip = page.getByRole('banner').locator('.present-chip');
   await expect(chip).toContainText('Hades');
+  // The TV up first: one reloaded before it has what to show has nothing to tell the reloaded main window.
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   // A reload says bye then main again: the TV stays.
   await page.reload();
   await expect(chip).toContainText('Hades');
@@ -1493,6 +1502,7 @@ test("C8 edge: the TV's lower third says the game and media a while, not on a mo
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   const caption = shown.locator('.pres-caption');
   await expect(caption).toHaveClass(/pres-caption--on/);
   await expect(caption).toContainText('Cover');
@@ -1502,7 +1512,7 @@ test("C8 edge: the TV's lower third says the game and media a while, not on a mo
   await shown.mouse.move(200, 200);
   await shown.mouse.move(220, 220);
   await expect(shown.locator('.pres')).toHaveClass(/pres--awake/); // the cursor, only
-  await shown.waitForTimeout(600);
+  await page.clock.runFor(600);
   await expect(caption).not.toHaveClass(/pres-caption--on/);
   // Another media of the same game: 2 s.
   await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
@@ -1679,6 +1689,7 @@ test('C8.6: while presenting, a media opened from the panel opens the lightbox o
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
   const picture = () => shown.locator('img.pres-media').getAttribute('src');
@@ -1698,7 +1709,7 @@ test('C8.6: while presenting, a media opened from the panel opens the lightbox o
   await expect(page.locator('[role="status"]', { hasText: 'Presenting Hades, Screenshot 2' })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(lightbox).not.toHaveAttribute('open');
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await picture()).toContain('Screenshot%202'); // the TV keeps it
   await expect(page.locator('.panel-hero-present')).toHaveText('On TV');
 });
@@ -1712,13 +1723,17 @@ test('C8 edge: a burst of steps sends the TV its first at once and then only whe
   await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
   const shown = await startPresenting(page);
   await expect.poll(() => shown.locator('img.pres-media').getAttribute('src')).toContain('Screenshot%203');
+  // Frozen, so a slow poll can't miss the burst's first before the settle sends its last.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 60_000);
   await stepsAtOnce(page, ['ArrowLeft', 'ArrowLeft', 'ArrowLeft']);
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2']); // the first, at once
+  await page.clock.runFor(250); // past the settle
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']);
-  await page.waitForTimeout(300); // and nothing after
+  await page.clock.runFor(1000); // and nothing after
   expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
   await stepsAtOnce(page, ['ArrowRight', 'ArrowRight']);
-  await page.keyboard.press('Escape'); // well within the settle
+  await page.keyboard.press('Escape'); // within the settle: the clock stands still
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1', 's1', 's2']);
 });
 
@@ -1734,6 +1749,7 @@ test('C8 edge: game steps in the linked lightbox put each game on the TV once it
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
   // P in a lightbox not presenting yet: presents, and the lightbox stays, now on the TV.
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect(lightbox).toHaveAttribute('open');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   // Every line said, as the TV may say something after (its fixture media doesn't load).
@@ -1746,13 +1762,13 @@ test('C8 edge: game steps in the linked lightbox put each game on the TV once it
   await page.keyboard.press('ArrowDown');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Terraria');
   const terraria = async () => (await sentOnAir(shown)).filter((m) => m.appid === 105600);
-  await page.waitForTimeout(600); // past the settle
+  await page.clock.runFor(600); // past the settle
   expect(await terraria()).toEqual([]);
   terrariaMedia.release();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { said: string[] }).said.join('\n')))
     .toContain('On TV: Terraria, game 3 of 3');
-  await page.waitForTimeout(600); // and nothing after
+  await page.clock.runFor(600); // and nothing after
   // One send, of what the lightbox landed on once the media came, not the Cover first.
   expect((await terraria()).map((m) => m.item.shotId)).toEqual([await lightboxShotId(page)]);
   expect(terrariaMedia.count).toBe(1);
@@ -1769,6 +1785,7 @@ test('C8 edge: P in the linked lightbox keeps what follows private, sticking unt
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect.poll(() => sentShots(shown)).toEqual(['s3']);
   await expect(lightbox.locator('.lb-status')).toContainText('Linked to the TV');
   await page.keyboard.press('p');
@@ -1781,7 +1798,7 @@ test('C8 edge: P in the linked lightbox keeps what follows private, sticking unt
   await page.getByRole('button', { name: 'Open in lightbox' }).click();
   await expect(lightbox).toHaveAttribute('open');
   await expect(page.locator('.panel-hero-present')).toHaveText('Open');
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   expect(await sentShots(shown)).toEqual(['s3']);
   // Its pill does as P: a click puts it back on the TV.
   await reachForControls(page);
@@ -1827,6 +1844,7 @@ test('C8 edge: a trailer in the linked lightbox plays on the TV only; private, i
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   await page.keyboard.press('ArrowLeft'); // the trailer
   await expect.poll(() => shown.locator('video.pres-media').evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
@@ -1834,7 +1852,7 @@ test('C8 edge: a trailer in the linked lightbox plays on the TV only; private, i
   await expect(lightbox.locator('.lb-img')).toBeVisible();
   await page.keyboard.press('p'); // private: the local trailer is there, but not started
   await expect(lightbox.locator('video')).toHaveCount(1);
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await lightbox.locator('video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await expect(lightbox.getByRole('button', { name: 'Play trailer' })).toBeVisible();
 });
@@ -1951,6 +1969,7 @@ test('C8 edge: a linked trailer goes back to the lightbox paused where the TV wa
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   const tv = shown.locator('video.pres-media');
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
   await tv.evaluate((v: HTMLVideoElement) => (v.currentTime = 30));
@@ -1972,7 +1991,7 @@ test('C8 edge: a linked trailer goes back to the lightbox paused where the TV wa
   await shown.close();
   await expect(lightbox.locator('.lb-tv')).toBeHidden();
   await expect(local).toHaveCount(1);
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await local.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });
 
@@ -1986,6 +2005,7 @@ test("C8 edge: the chip opens what's on the TV in the lightbox, steering it from
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect.poll(() => sentShots(shown)).toEqual(['s1']);
   await page.keyboard.press('Escape');
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
@@ -1993,7 +2013,7 @@ test("C8 edge: the chip opens what's on the TV in the lightbox, steering it from
   await page.getByRole('button', { name: "Open what's on the TV" }).click();
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades');
   await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   expect(await sentShots(shown)).toEqual(['s1']);
   await page.keyboard.press('ArrowDown');
   await expect(shown.locator('.pres-caption-name')).toHaveText('Valheim');
@@ -2008,6 +2028,7 @@ test("C8 edge: after a reload, the chip opens what's on the TV once its game's m
   const lightbox = page.locator('#screenshot-lightbox');
   await expect(lightbox.locator('.lb-caption-text')).toHaveText('Hades'); // opened: P is now the lightbox's
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect.poll(() => sentShots(shown)).toEqual(['s2']);
   await page.keyboard.press('Escape');
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' }).click();
@@ -2022,7 +2043,7 @@ test("C8 edge: after a reload, the chip opens what's on the TV once its game's m
   hadesMedia.release();
   await expect(lightbox.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   await expect(lightbox.locator('.lb-tv-toggle')).toHaveAccessibleName('On TV');
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   expect(await sentShots(shown)).toEqual(['s2']);
 });
 
@@ -2049,6 +2070,7 @@ test("C8 edge: keys pressed on the TV step it through the main window's lightbox
 }, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'a second screen is a desktop setup');
   await hookPresentation(page, {});
+  await page.clock.install();
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   await page.getByRole('button', { name: 'Screenshot 1 of 3' }).click();
@@ -2064,7 +2086,7 @@ test("C8 edge: keys pressed on the TV step it through the main window's lightbox
   await expect(lightbox).not.toHaveAttribute('open');
   await shown.keyboard.press('ArrowRight');
   await expect(shown.locator('.pres-caption')).toHaveClass(/pres-caption--on/); // the TV says what it still shows
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   await expect(lightbox).not.toHaveAttribute('open');
   expect(await sentShots(shown)).toEqual(['s1', 's2']);
 });
@@ -2089,7 +2111,7 @@ test('C8 edge: hidden behind a fullscreen TV, the main window sends a key held t
   for (let i = 0; i < 3; i++) await shown.keyboard.down('ArrowLeft');
   await shown.keyboard.up('ArrowLeft');
   await expect.poll(() => sentShots(shown)).toEqual(['s3', 's2', 'v1']); // the first at once, then on release
-  await shown.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await sentShots(shown)).toEqual(['s3', 's2', 'v1']);
 });
 
@@ -2267,17 +2289,18 @@ test('C8 edge: a click on the TV enters fullscreen, and no later click leaves it
   await page.goto('/game/1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   const fullscreen = () => shown.evaluate(() => !!document.fullscreenElement);
   // A double-click as the first: its second half doesn't undo the first's fullscreen.
   await shown.locator('.pres').dblclick();
   await expect.poll(fullscreen).toBe(true);
-  await shown.waitForTimeout(600);
+  await page.clock.runFor(600);
   await shown.locator('.pres').click(); // someone in the room
-  await shown.waitForTimeout(200);
+  await page.clock.runFor(200);
   expect(await fullscreen()).toBe(true);
   await shown.keyboard.press('Control+f'); // the browser's find
-  await shown.waitForTimeout(200);
+  await page.clock.runFor(200);
   expect(await fullscreen()).toBe(true);
   await shown.keyboard.press('f');
   await expect.poll(fullscreen).toBe(false);
@@ -2292,6 +2315,7 @@ test("C8 edge: P on what's already up doesn't restart it; on an ended trailer, i
   await page.goto('/game/1145360');
   await page.getByRole('button', { name: 'Trailer 1 of 1' }).click();
   const shown = await startPresenting(page);
+  await page.clock.install(); // after the TV opens: its windows below run on it too
   const video = shown.locator('video.pres-media');
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
   await video.evaluate((v: HTMLVideoElement) => {
@@ -2307,7 +2331,7 @@ test("C8 edge: P on what's already up doesn't restart it; on an ended trailer, i
       return { plays, ghosts };
     });
   await page.keyboard.press('p');
-  await shown.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(await seen()).toEqual({ plays: 0, ghosts: 0 });
   expect(await video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(30);
   await video.evaluate((v: HTMLVideoElement) => {
@@ -3808,6 +3832,7 @@ test("B3 edge: a shared list left before its bundle answers doesn't link the nex
     await held;
     await route.fallback();
   });
+  await page.clock.install();
   await page.goto(sharedUrl(`subtract:(o:${ALICE.steamid};w:${ALICE.steamid})`));
   await expect(rows(page)).toHaveCount(6);
   const bundleAsked = page.waitForRequest(/\/api\/bundles\/\d+/);
@@ -3823,7 +3848,7 @@ test("B3 edge: a shared list left before its bundle answers doesn't link the nex
   await expect(rows(page)).toHaveCount(6);
   release();
   await page.waitForResponse(/\/api\/bundles\/\d+/);
-  await page.waitForTimeout(200); // let the late answer land, if it would
+  await page.clock.runFor(200); // let the late answer land, if it would
   await expect(page.locator('.list-hero-actions').getByRole('link', { name: BUNDLE.title })).toHaveCount(0);
 });
 
@@ -4375,6 +4400,7 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
   await mockApi(page, { states: ['store-down'] });
   await asPlayer(page, ALICE);
   const metaAsked = gameMetaRequests(page);
+  await page.clock.install();
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('.list-status')).toContainText("Steam store didn't answer for 6 games");
@@ -4388,7 +4414,7 @@ test('D2 edge: a failed Steam store page is marked, not shown as missing data', 
   // Opened, it asks for no media: they come with the store page ↻ retries.
   await row(page, 'Hades').getByText('Hades').click();
   await expect(page.locator('#panel-title')).toHaveText('Hades');
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   expect(metaAsked).toEqual([]);
 });
 
@@ -4422,6 +4448,7 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
   });
   await asPlayer(page, ALICE);
   const metaAsked = gameMetaRequests(page);
+  await page.clock.install();
   await page.goto('/lists/owned?game=1145360&shot=s1');
   await expect(rows(page)).toHaveCount(6);
   await expect(page.locator('#panel-title')).toHaveText('Hades');
@@ -4434,7 +4461,7 @@ test("D2 edge: a link's screenshot of a game with no store page isn't opened on 
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await row(page, 'Portal 2').getByText('Portal 2').click();
   await expect(page.locator('#panel-title')).toHaveText('Portal 2');
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   await expect(lightbox).not.toHaveAttribute('open');
   expect(metaAsked).not.toContain('/api/game-meta/1145360'); // no store page, no media to ask for
 });
@@ -5039,6 +5066,7 @@ test("F1 edge: a lightbox Retry that lands after a step doesn't paint over the s
     retried();
   });
   await asPlayer(page, ALICE);
+  await page.clock.install();
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const lb = page.locator('#screenshot-lightbox');
   const img = lb.locator('.lb-img');
@@ -5047,7 +5075,7 @@ test("F1 edge: a lightbox Retry that lands after a step doesn't paint over the s
   await expect(lb.locator('.lb-status')).toContainText('Screenshot 2 of 3');
   await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
   await retryDone;
-  await page.waitForTimeout(300); // the stale onload's turn
+  await page.clock.runFor(300); // the stale onload's turn
   await expect(img).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
 });
 
@@ -5877,7 +5905,7 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   const box = (await img.boundingBox())!;
   await page.mouse.move(box.x + 5, 450); // the backdrop, beside the picture
   await page.mouse.move(box.x - 20, 450);
@@ -5892,12 +5920,15 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   expect(Math.abs(after.x + after.width - 40 * 1.15 - at.x)).toBeLessThan(1);
   await page.keyboard.press('z'); // back out
   await expect(img).not.toHaveAttribute('style', /scale/);
-  // One trackpad gesture, many events: one step.
+  // One trackpad gesture, many events: one step. Frozen, so a slow event can't end the gesture early.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 60_000);
+  const counter = page.locator('#screenshot-lightbox .lb-counter-n'); // not the status line: its debounce is frozen too
   for (let i = 0; i < 8; i++) await page.mouse.wheel(30, 0);
-  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
-  await page.waitForTimeout(400); // the gesture ends
+  await expect(counter).toHaveText('4 / 5'); // Screenshot 2 of 3
+  await page.clock.runFor(400); // the gesture ends
   for (let i = 0; i < 8; i++) await page.mouse.wheel(-30, 0);
-  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
+  await expect(counter).toHaveText('3 / 5'); // Screenshot 1 of 3
 });
 
 test('F1 edge: on a zoomed screenshot the arrows pan it, and Esc zooms back out before closing', async ({
@@ -5974,6 +6005,8 @@ test('M3 edge: on a phone, a double-tap seek leaves the trailer playing', async 
   await page.getByRole('button', { name: 'Play trailer' }).tap();
   await page.clock.runFor(3500); // controls idled out: the first tap only brings them back
   await expect(page.locator('#screenshot-lightbox')).toHaveClass(/lb-idle/);
+  // Paused, so a slow tap under load still lands within the double-tap's 300 ms.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   const box = (await page.locator('.lb-video').boundingBox())!;
   const point = { x: box.x + box.width * 0.85, y: box.y + box.height / 2 };
   const cdp = await page.context().newCDPSession(page);
@@ -6003,7 +6036,7 @@ test('F1 edge: on a phone, a sideways swipe drags the next media in beside the o
   // The panel's settle-delayed loads land right after the media do: a gesture during them loses touches (C224).
   const panelSettled = page.waitForResponse('**/api/game-news/**');
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   await panelSettled;
   const peek = page.locator('.lb-peek');
   const cdp = await page.context().newCDPSession(page);
@@ -6022,7 +6055,7 @@ test('F1 edge: on a phone, a pinch zooms around the point between the fingers', 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   const before = (await img.boundingBox())!;
   const mid = { x: before.x + before.width * 0.75, y: before.y + before.height / 2 };
   const cdp = await page.context().newCDPSession(page);
@@ -6387,6 +6420,7 @@ test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown
   page,
 }) => {
   await asPlayer(page, ALICE);
+  await page.clock.install();
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   const box = page.getByPlaceholder('Look up any game…');
@@ -6404,7 +6438,7 @@ test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown
   await page.keyboard.press('Escape');
   release();
   await page.waitForResponse(/search-games\?q=hades/);
-  await page.waitForTimeout(200); // let the late answer render, if it would
+  await page.clock.runFor(200); // let the late answer render, if it would
   await expect(dropdown).toBeHidden();
 
   await box.fill('hollow');
@@ -6412,19 +6446,20 @@ test('F1 edge: a search still pending when Esc or a pick closes the nav dropdown
   await page.keyboard.press('Backspace');
   await page.keyboard.press('Enter');
   await expect(page.locator('#panel-title')).toHaveText('Hollow Knight');
-  await page.waitForTimeout(500); // past the search debounce
+  await page.clock.runFor(500); // past the search debounce
   await expect(dropdown).toBeHidden();
 });
 
 test('F1 edge: tabbing out of the nav search box before its search answers opens no dropdown', async ({ page }) => {
   await asPlayer(page, ALICE);
+  await page.clock.install();
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   const box = page.getByPlaceholder('Look up any game…');
   await box.fill('hades');
   await page.keyboard.press('Tab');
   await expect(box).not.toBeFocused();
-  await page.waitForTimeout(500); // past the search debounce
+  await page.clock.runFor(500); // past the search debounce
   await expect(page.locator('#app-search-results')).toBeHidden();
 });
 
@@ -7251,6 +7286,7 @@ test('I2 edge: a hidden achievement is revealed by Enter, and by Space', async (
 
 test("I2 edge: Enter or Space on the panel's hero opens the lightbox once", async ({ page }) => {
   await asPlayer(page, ALICE);
+  await page.clock.install();
   await page.goto('/lists/owned?game=1145360');
   await expect(page.locator('#panel-title')).toHaveText('Hades');
   const entries = await page.evaluate(() => history.length);
@@ -7259,7 +7295,7 @@ test("I2 edge: Enter or Space on the panel's hero opens the lightbox once", asyn
     await page.getByRole('button', { name: 'Open in lightbox' }).focus();
     await page.keyboard.press(key);
     await expect(page.locator('.lb-surface')).toBeFocused();
-    await page.waitForTimeout(200); // past a second activation's close
+    await page.clock.runFor(200); // past a second activation's close
     await expect(page.locator('#screenshot-lightbox')).toHaveAttribute('open');
     expect(await page.evaluate(() => history.length)).toBe(entries + 1);
     await page.goBack();

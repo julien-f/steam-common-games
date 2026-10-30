@@ -11,6 +11,13 @@ globalThis.document = {
   body: { append: (el) => appended.push(el) },
 };
 
+// The copy settles in microtasks; the timers it then arms run on the mocked clock, never a real sleep.
+const settled = () => new Promise((r) => setImmediate(r));
+function fakeTimers(t) {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  return (ms) => t.mock.timers.tick(ms);
+}
+
 // Same navigator-stubbing shape tableViewPrefs.test.js already uses for its own share button.
 function withNavigator(t, clipboard) {
   const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -44,6 +51,7 @@ function fakeBtn(...children) {
 }
 
 test('copyText: writes to the clipboard and reports success', async (t) => {
+  const tick = fakeTimers(t);
   let copied = null;
   withNavigator(t, {
     writeText: async (text) => {
@@ -52,7 +60,7 @@ test('copyText: writes to the clipboard and reports success', async (t) => {
   });
   assert.equal(await copyText('gaben'), true);
   assert.equal(copied, 'gaben');
-  await new Promise((r) => setTimeout(r, 150));
+  tick(150);
   assert.equal(appended[0].textContent, 'Copied to clipboard');
 });
 
@@ -71,29 +79,32 @@ test('copyText: reports failure when writeText rejects (permission denied)', asy
 });
 
 test('copyWithFeedback: swaps label/title/class, then restores them', async (t) => {
+  const tick = fakeTimers(t);
   withNavigator(t, { writeText: async () => {} });
   const btn = fakeBtn();
   const before = [...btn.childNodes];
   const check = icon();
   copyWithFeedback(btn, 'https://example.test/game/400', { copied: check, copiedClass: 'x--copied' });
-  await new Promise((r) => setTimeout(r, 0));
+  await settled();
   assert.deepEqual(btn.childNodes, [check]);
   assert.equal(btn.childNodes[0], check);
   assert.equal(btn.title, 'Copied!');
   assert.equal(btn.classList.has('x--copied'), true);
 
-  await new Promise((r) => setTimeout(r, COPIED_MS + 10));
+  tick(COPIED_MS);
   assert.equal(btn.childNodes[0], before[0]);
   assert.equal(btn.title, 'Copy link');
   assert.equal(btn.classList.has('x--copied'), false);
 });
 
 test('copyWithFeedback: restores a label made of several nodes as they were', async (t) => {
+  const tick = fakeTimers(t);
   withNavigator(t, { writeText: async () => {} });
   const btn = fakeBtn(icon(), { text: ' Share view' });
   const before = [...btn.childNodes];
   copyWithFeedback(btn, 'https://example.test/?tv=x');
-  await new Promise((r) => setTimeout(r, COPIED_MS + 10));
+  await settled();
+  tick(COPIED_MS);
   assert.deepEqual(btn.childNodes, before);
   assert.equal(btn.childNodes[1], before[1]);
 });
@@ -103,20 +114,23 @@ test('copyWithFeedback: leaves the button alone when the copy failed', async (t)
   const btn = fakeBtn();
   const before = [...btn.childNodes];
   copyWithFeedback(btn, 'whatever');
-  await new Promise((r) => setTimeout(r, 0));
+  await settled();
   assert.equal(btn.childNodes[0], before[0]);
 });
 
 test('copyWithFeedback: a second copy while confirming still restores the original label', async (t) => {
+  const tick = fakeTimers(t);
   withNavigator(t, { writeText: async () => {} });
   const btn = fakeBtn();
   const before = [...btn.childNodes];
   copyWithFeedback(btn, 'a');
-  await new Promise((r) => setTimeout(r, COPIED_MS / 2));
+  await settled();
+  tick(COPIED_MS / 2);
   copyWithFeedback(btn, 'b');
-  await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
+  await settled();
+  tick(COPIED_MS / 2 + 10);
   assert.equal(btn.textContent, 'Copied!'); // the first timer no longer cuts the second short
-  await new Promise((r) => setTimeout(r, COPIED_MS / 2 + 10));
+  tick(COPIED_MS / 2);
   assert.equal(btn.childNodes[0], before[0]);
   assert.equal(btn.title, 'Copy link');
 });
