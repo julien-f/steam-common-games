@@ -60,7 +60,7 @@ export default function AboutRoute() {
         <h2>Contact</h2>
         <p>
           Questions, or want data related to your profile removed from the cache? Open an issue on{' '}
-          <a href="https://github.com/julien-f/steam-common-games/issues">GitHub</a>.
+          <a href="https://github.com/julien-f/playshelf/issues">GitHub</a>.
         </p>
       </section>
     </div>
