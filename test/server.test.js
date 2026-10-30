@@ -2710,6 +2710,54 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   server.close();
 });
 
+test('POST /api/game-details/stream: fully cached games come first, ahead of uncached ones listed before them', async (t) => {
+  _reset();
+  _resetAuth();
+  const cached = [1001, 1002, 1003, 1004, 1005];
+  for (const appid of cached) {
+    setCache(`rating:${appid}`, { total_reviews: 10, total_positive: 9, review_score_desc: 'Positive' });
+    setCache(`hltb:${appid}`, []);
+    setCache(`meta:${appid}`, { name: `Game ${appid}` });
+    setCache(`browse:${appid}`, { tagids: TAG_IDS });
+    setCache(`protondb:${appid}`, null);
+  }
+  setCache('tagnames:all', TAG_NAME_MAP);
+  // Uncached games' reviews hang until released, holding the workers that took them.
+  let started = 0;
+  let release;
+  const gate = new Promise((r) => {
+    release = r;
+  });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) => {
+    if (!String(url).includes('GetAppReviews')) return { ok: true, json: async () => ({}) };
+    started++;
+    await gate;
+    return { ok: true, json: async () => ({ response: { query_summary: { total_reviews: 0 } } }) };
+  });
+
+  const server = app.listen(0);
+  t.after(() => new Promise((r) => server.close(r)));
+  await new Promise((r) => server.once('listening', r));
+  const uncached = Array.from({ length: 20 }, (_, i) => i + 1);
+  const response = ssePost(server.address().port, '/api/game-details/stream', {
+    games: [...uncached, ...cached].map((appid) => ({ appid })),
+  });
+  // The pool's workers take their first game together, before any request goes out.
+  await until(() => started > 0, 'an uncached game reaching the reviews endpoint');
+  release();
+  const events = parseSseEvents((await response).body).filter((e) => e.appid);
+  assert.deepEqual(
+    events.slice(0, cached.length).map((e) => e.appid),
+    cached,
+  );
+  assert.equal(events.length, uncached.length + cached.length);
+  // Only the order changes: the same games reach the upstreams.
+  assert.equal(
+    fetchMock.mock.calls.filter(({ arguments: [url] }) => String(url).includes('GetAppReviews')).length,
+    uncached.length,
+  );
+});
+
 // ── Authentication (Steam OpenID) ────────────────────────────────────────────
 
 // supertest serves each request on a fresh port; the callback checks return_to against the host.

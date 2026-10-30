@@ -341,13 +341,15 @@ const DETAILS_SOURCES = { rating: 'rating', hltb: 'hltb', meta: 'meta', tags: 'b
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
 
+const allDetailsCached = (appid) => Object.values(DETAILS_SOURCES).every((prefix) => isCached(`${prefix}:${appid}`));
+
 const detailsLimit = namedRateLimit('details', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
     const { appid } = req;
     if (appid === undefined) return false; // POST /api/game-details/stream has no :appid
-    return Object.values(DETAILS_SOURCES).every((prefix) => isCached(`${prefix}:${appid}`));
+    return allDetailsCached(appid);
   },
 });
 
@@ -1225,14 +1227,17 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   // user's requests then waited behind. Pulling from a shared cursor instead means at most
   // STREAM_CONCURRENCY appids are ever in flight for one request, and `closed` is re-checked
   // before each one — so a disconnect stops the work within one appid per worker.
+  // Fully cached games first: behind the uncached ones, they'd wait on the upstreams' pace for nothing.
+  const cachedFirst = Map.groupBy(validated, allDetailsCached);
+  const ordered = [...(cachedFirst.get(true) ?? []), ...(cachedFirst.get(false) ?? [])];
   let next = 0;
   // Said once per stream; the workers go on, since cached games still fill in.
   let limitedSent = false;
   const worker = async () => {
     while (!closed) {
       const i = next++;
-      if (i >= validated.length) return;
-      const appid = validated[i];
+      if (i >= ordered.length) return;
+      const appid = ordered[i];
       try {
         const { limited, ...result } = await fetchGameDetails(appid);
         if (limited && !limitedSent) {
