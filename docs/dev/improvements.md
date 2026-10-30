@@ -24,6 +24,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U7 · minor · L3** — Reset view drops sort/filters instantly with no undo.
 - **U188 · minor · D2** — after a failed price batch the panel's Price card says "IsThereAnyDeal didn't answer." with no retry there, and its Refresh details retries bundles but not the price; the only retry is the hero's Prices tile, out of sight behind the panel on a phone. Offer the retry in the card (the Prices tile's refresh), or have Refresh details refetch the game's price.
 - **U195 · minor · D2, F1** — past the client share, `GET /api/game-details/:appid` still answers 200 with a `limited` message nothing reads, so Look up, Rank and the panel's Refresh details show per-source "didn't answer" notes and the ⚠ tooltip invites a retry that will be refused. Show the server's message there, as the list's status line does (or answer 429).
+- **U225 · minor · F1, L1** — a list whose games aren't cached yet shows "No rows" under "0 / 15 games loaded…", with no progress bar (`loadFraction` 0 is falsy, `ListRoute.tsx:4259`), until the first game's details land (1.9 s desktop, 5.1 s phone, measured): rows wait for details although their names are known (`isListed`, `ListRoute.tsx:1463`). Show the bar from 0 and "Loading…" instead of "No rows"; possibly named rows with placeholder cells (the sort then reshuffles as details land).
 
 ## Lists and selection
 
@@ -76,6 +77,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U192 · polish · R1** — right after **Continue**, Undo is disabled with no reason given, so the last answer before Esc can't be undone (R1's edge "Undo right after resuming"); the stack is in memory only. Keep the undo stack with the ranking, or say "Undo covers this session's answers".
 - **U223 · polish · F1** — tag and developer pills are filter buttons on list routes but inert on `/search` and the rank screen, styled the same (same border, only the cursor differs), so a click there does nothing with no hint why. Give the inert pills a plainer style.
 - **U224 · polish · F1, I2** — focus on open differs per page: list routes move it to the hero's "Open in lightbox", `/game/:appid` to Close, `/search` keeps it on the row and Enter on the current row doesn't move it into the panel. One rule (the panel's first stop) everywhere, Search's row ring aside.
+- **U226 · minor · M2, M3** — stepping from a trailer to a screenshot flashes a fully black frame, then fades up from black over ~200 ms (measured on a screencast): `fadeOutLbItem` ghosts only pictures (`lightbox.tsx:1847`) and the video is detached at once. Ghost the trailer's poster or current frame (a canvas copy, as the TV does), or skip the fade when leaving a video.
 
 ## Review tooling
 
