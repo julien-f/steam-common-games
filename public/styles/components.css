@@ -3067,6 +3067,14 @@
       opacity: 0;
     }
   }
+  .lb-ghost[style*='--lb-exit-to'] {
+    animation-name: lb-exit-x;
+  }
+  @keyframes lb-exit-x {
+    to {
+      translate: var(--lb-exit-to) 0;
+    }
+  }
   /* The neighbour a horizontal swipe drags in, a screen's width beside the item. */
   .lb-peek {
     position: absolute;

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - About's GitHub link points to the repository's new name, playshelf
+- Swiping between media in the lightbox slides the previous one out beside the next, instead of fading it where you let go
 
 ### Fixed
 

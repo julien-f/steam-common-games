@@ -1884,6 +1884,8 @@ function fadeOutLbItem(lb: HTMLElement) {
   }
   ghost.className = 'lb-ghost';
   ghost.ariaHidden = 'true';
+  // Swiped away: it carries on out as far as the next item comes in, so the two move as one.
+  if (lbSwipeEnterFrom !== null) ghost.style.setProperty('--lb-exit-to', `${-lbSwipeEnterFrom}px`);
   Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
   ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
   lbSurface(lb).append(ghost);

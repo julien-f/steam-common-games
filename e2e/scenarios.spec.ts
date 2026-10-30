@@ -7092,6 +7092,41 @@ test.describe('with motion on', () => {
     await expect(page.locator('.panel-hero-open')).toBeFocused();
   });
 
+  test('F1 edge: a swiped-away screenshot carries on out beside the next, not fading where it was let go', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'touch only');
+    await page.goto('/game/1145360?shot=s1');
+    const img = page.locator('#screenshot-lightbox .lb-img');
+    await expect(img).toHaveCSS('opacity', '1');
+    // Read as it's added: it lives only for its animation.
+    await page.evaluate(() => {
+      const w = window as unknown as { ghost: { animation: string; to: string } | null };
+      w.ghost = null;
+      new MutationObserver((records) => {
+        for (const r of records)
+          for (const n of r.addedNodes) {
+            const el = n as HTMLElement;
+            if (!el.classList?.contains('lb-ghost')) continue;
+            w.ghost = { animation: getComputedStyle(el).animationName, to: el.style.getPropertyValue('--lb-exit-to') };
+          }
+      }).observe(document.querySelector('.lb-surface')!, { childList: true });
+    });
+    const box = (await img.boundingBox())!;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
+    for (const x of [260, 200, 120])
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+    const ghost = await page.evaluate(() => (window as unknown as { ghost: { animation: string; to: string } }).ghost);
+    const enterFrom = await img.evaluate((el) => el.style.getPropertyValue('--lb-enter-from'));
+    // As far as the next one comes in, so the two move as one.
+    expect(ghost.animation).toBe('lb-exit-x');
+    expect(parseFloat(ghost.to)).toBe(-parseFloat(enterFrom));
+  });
+
   test('F1 edge: stepping off a trailer fades it out too, not through black', async ({ page }) => {
     await fakePlayback(page);
     await mockApi(page, { states: ['playable-trailers'] });
