@@ -1268,6 +1268,8 @@ test('C8 edge: the TV survives a reload of the main window, and an occluded TV i
   const shown = await startPresenting(page);
   const chip = page.getByRole('banner').locator('.present-chip');
   await expect(chip).toContainText('Hades');
+  // The TV up first: one reloaded before it has what to show has nothing to tell the reloaded main window.
+  await expect(shown.locator('.pres-caption-name')).toHaveText('Hades');
   // A reload says bye then main again: the TV stays.
   await page.reload();
   await expect(chip).toContainText('Hades');
