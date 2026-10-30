@@ -17,7 +17,7 @@ import {
   fmtReleaseDate,
   MEDIA_FAILED,
 } from './utils.ts';
-import { openLightbox, openLightboxFrom, lightboxShot } from './lightbox.tsx';
+import { openLightbox, openLightboxFrom, lightboxShot, lightboxOpen } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
 import { sampleArtTint } from './artTint.ts';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
@@ -66,7 +66,17 @@ import { withAccountParam, urlWithoutPanel } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 import type { DetailsAges, GameMeta, PriceFields, ReadonlyGame } from './types.ts';
 
-import { createSignal, createEffect, createMemo, createResource, createRoot, For, Show, type JSX } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  createResource,
+  createRoot,
+  For,
+  Show,
+  untrack,
+  type JSX,
+} from 'solid-js';
 import { Dynamic, render } from 'solid-js/web';
 import { A, useLocation } from '@solidjs/router';
 import { creatorListPath, type CreatorRole } from './creatorData.ts';
@@ -329,6 +339,7 @@ let pinnedSubnavTarget: string | null = null;
 // a scrollspy TOC. None qualifying means we're still above the first section, i.e. still
 // looking at the Overview (glance grid/description) itself.
 function updateSubnavScrollSpy() {
+  if (untrack(lightboxOpen)) return; // behind it, unseen: measured again on close
   const nav = document.querySelector('.panel-subnav');
   if (!nav) return;
   const body = document.getElementById('panel-body')!;
@@ -2001,6 +2012,7 @@ function PanelHero(): JSX.Element {
   // buildPanelHero/renderPanelHero had.
   createEffect(() => {
     heroIdx();
+    if (lightboxOpen()) return; // following the lightbox unseen: scrolled on close
     filmstripEl?.querySelector('.panel-film-item.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
   });
 
@@ -2581,6 +2593,7 @@ function PanelSubnav(props: { game: ReadonlyGame }): JSX.Element {
   // rebuilt every time some unrelated field of the game changes.
   createEffect(() => {
     items();
+    lightboxOpen();
     queueMicrotask(updateSubnavScrollSpy);
   });
 

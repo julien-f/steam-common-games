@@ -3054,6 +3054,10 @@
     cursor: pointer;
     transition: scale var(--dur-2) var(--ease-out);
   }
+  /* Behind the opaque lightbox, the panel follows each step unseen: not styled or laid out until it closes. */
+  body.lb-open #game-panel {
+    content-visibility: hidden;
+  }
   /* The item stepped from, fading out where it was (lightbox.tsx's fadeOutLbItem). */
   .lb-ghost {
     position: absolute;

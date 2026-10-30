@@ -5102,6 +5102,39 @@ test("F1 edge: a screenshot that loads but won't decode ahead still shows", asyn
   await expect(page.locator('.lb-error')).toBeHidden();
 });
 
+test('F1 edge: the panel behind the lightbox follows its steps unrendered, and is scrolled to them on close', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as Window & { filmScrolls?: number };
+    w.filmScrolls = 0;
+    const scroll = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element, ...args) {
+      if (this.closest('#panel-hero')) w.filmScrolls!++;
+      return scroll.apply(this, args);
+    };
+  });
+  await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
+  await page.goto('/game/1145360?shot=s1');
+  const panel = page.locator('#game-panel');
+  await expect(page.locator('.lb-caption-text')).toHaveText('Hades');
+  await expect(panel).toHaveCSS('content-visibility', 'hidden');
+  const filmScrolls = () => page.evaluate(() => (window as Window & { filmScrolls?: number }).filmScrolls);
+  await page.evaluate(() => ((window as Window & { filmScrolls?: number }).filmScrolls = 0));
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#panel-title')).toHaveText('Valheim'); // the panel did follow
+  await page.keyboard.press('ArrowUp'); // back to a game with a filmstrip
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  expect(await filmScrolls()).toBe(0);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#screenshot-lightbox')).toBeHidden();
+  await expect(panel).not.toHaveCSS('content-visibility', 'hidden');
+  await expect.poll(filmScrolls).toBeGreaterThan(0);
+});
+
 test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the game stepped to', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');

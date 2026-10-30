@@ -240,6 +240,9 @@ export function isLightboxOpen() {
   return lbGame() !== null;
 }
 
+// The same, changing only on open and close (not on each game step): for effects that pause behind it.
+export const lightboxOpen = createRoot(() => createMemo(() => lbGame() !== null));
+
 // The open game and the shot on screen — reactive, so the panel's hero can follow it.
 export function lightboxShot(): { appid: number; shotId: string } | null {
   const game = lbGame();
@@ -1715,6 +1718,7 @@ export function repointLightboxGame(game: ReadonlyGame) {
 // Shrinks a still back into the panel hero's picture when it's on screen; else the dialog fades (CSS).
 export function closeLightbox() {
   if (!isLightboxOpen()) return; // the `close` event that follows our own close()
+  document.body.classList.remove('lb-open'); // the panel rendered again, so its hero can be measured
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const hero = document.querySelector<HTMLImageElement>('#panel-hero .panel-hero-img');
