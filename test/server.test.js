@@ -390,6 +390,31 @@ test('POST /api/common-games: lastPlayed carries rtime_last_played per account, 
   assert.equal(res.body.lastPlayed[400][ID2], 0);
 });
 
+test('POST /api/common-games: recentPlaytime carries playtime_2weeks per account, only where played', async (t) => {
+  _reset();
+  const GAME1 = { appid: 400, name: 'Portal', playtime_2weeks: 90 };
+  const GAME2 = { appid: 400, name: 'Portal' }; // not played lately: Steam leaves the field out
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([GAME1], [GAME2]));
+
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.recentPlaytime, { 400: { [ID1]: 90 } });
+});
+
+test('POST /api/common-games: recentPlaytime leaves out a library cached over 14 days ago, whose two weeks are long gone', async (t) => {
+  _reset();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 0, 1) });
+  t.mock.method(globalThis, 'fetch', makeLibraryFetch([{ appid: 400, name: 'Portal', playtime_2weeks: 90 }]));
+  await api.post('/api/common-games').send({ members: [ID1] });
+
+  t.mock.timers.setTime(Date.UTC(2026, 0, 14));
+  const recent = await api.post('/api/common-games').send({ members: [ID1] });
+  assert.deepEqual(recent.body.recentPlaytime, { 400: { [ID1]: 90 } });
+  t.mock.timers.setTime(Date.UTC(2026, 0, 16));
+  const stale = await api.post('/api/common-games').send({ members: [ID1] });
+  assert.deepEqual(stale.body.recentPlaytime, {});
+});
+
 // ── POST /api/common-games — upstream / user errors ──────────────────────────
 
 test('POST /api/common-games: 502 when Steam API returns a server error', async (t) => {

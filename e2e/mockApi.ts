@@ -352,6 +352,12 @@ export function respond(
       players: members.map(playerJson),
       playtime,
       lastPlayed: {},
+      recentPlaytime: Object.fromEntries(
+        appids.flatMap((a) => {
+          const byPlayer = members.filter((p) => p.recent?.[a]).map((p) => [p.steamid, p.recent![a]]);
+          return byPlayer.length ? [[a, Object.fromEntries(byPlayer)]] : [];
+        }),
+      ),
       fetchedAt: accountFetchedAt(),
     });
   }

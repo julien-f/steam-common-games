@@ -458,15 +458,16 @@ test('fetchAccountOverview: builds per-member owners from the playtime/lastPlaye
       // 570 is owned by member 2 only — membership comes from these maps, not the players roster.
       playtime: { 440: { 1: 120, 2: 0 }, 570: { 2: 30 } },
       lastPlayed: { 440: { 1: 1000, 2: 0 }, 570: { 2: 2000 } },
+      recentPlaytime: { 440: { 1: 45 } },
     }),
   }));
 
   const { owners } = await fetchAccountOverview(['1', '2']);
   assert.deepEqual(owners.get(440), [
-    { name: 'Alice', minutes: 120, lastPlayedSec: 1000 },
-    { name: '2', minutes: 0, lastPlayedSec: 0 }, // no persona name known → the steamid stands in
+    { name: 'Alice', minutes: 120, lastPlayedSec: 1000, recentMinutes: 45 },
+    { name: '2', minutes: 0, lastPlayedSec: 0, recentMinutes: 0 }, // no persona name known → the steamid stands in
   ]);
-  assert.deepEqual(owners.get(570), [{ name: '2', minutes: 30, lastPlayedSec: 2000 }]);
+  assert.deepEqual(owners.get(570), [{ name: '2', minutes: 30, lastPlayedSec: 2000, recentMinutes: 0 }]);
 });
 
 test('fetchAccountOverview: a game nobody has an entry for gets no owners entry at all', async (t) => {

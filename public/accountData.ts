@@ -31,6 +31,7 @@ export interface GameOwner {
   name: string; // persona name, or the steamid when Steam knows no name for it
   minutes: number; // this member's own playtime
   lastPlayedSec: number; // 0 = owns it, never launched it
+  recentMinutes: number; // Steam's last two weeks, 0 when its library copy is older than that too
 }
 
 export interface AccountWishlistItem {
@@ -65,6 +66,7 @@ interface CommonGamesResponse {
   fetchedAt: number | null;
   playtime: Record<number, Record<string, number>>;
   lastPlayed: Record<number, Record<string, number>>;
+  recentPlaytime?: Record<number, Record<string, number>>;
 }
 
 // One member account's worth of display-ready data — everything Home's Account card renders,
@@ -201,12 +203,18 @@ export async function fetchAccountOverview(
   for (const game of data.games) {
     const pt = data.playtime?.[game.appid] ?? {};
     const lp = data.lastPlayed?.[game.appid] ?? {};
+    const recent = data.recentPlaytime?.[game.appid] ?? {};
     // Membership comes from the playtime map rather than the slot's full member list: the
     // response only carries an entry for a member who actually owns the game, which is exactly
     // the distinction this card exists to show for a Family.
     const entries = slotSteamIds
       .filter((id) => id in pt || id in lp)
-      .map((id) => ({ name: nameById.get(id) ?? id, minutes: pt[id] || 0, lastPlayedSec: lp[id] || 0 }));
+      .map((id) => ({
+        name: nameById.get(id) ?? id,
+        minutes: pt[id] || 0,
+        lastPlayedSec: lp[id] || 0,
+        recentMinutes: recent[id] || 0,
+      }));
     if (entries.length) owners.set(game.appid, entries);
   }
   return { games, players: data.players.map(toAccountPlayer), owners, fetchedAt: data.fetchedAt ?? null };

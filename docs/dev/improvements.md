@@ -52,7 +52,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U196 · minor · C5, F1** — a Deck player has only ProtonDB's crowd tier to go on. A **Deck rating** from `GetAppReviews`' `primarily_steam_deck` (Steam reviews by mostly-Deck players), beside ProtonDB; one more review call per uncached game, and many games will have too few reviews — measure how many of a typical library get one first.
 - **U197 · minor · C5, F1** — same for desktop Linux: a **Linux rating** from `GetAppReviews`' `hardware_os`, with U196's cost and sparsity caveats.
 - **U139 · polish · C4** — panel Owned by reads "never played · not played". One phrase.
-- **U228 · minor · C1, C6** — Compare doesn't say what a friend is playing these days, the easiest "join me tonight" pick. `GetOwnedGames`' `playtime_2weeks` (already cached with each library, unused) as a per-player column and a Players tile; as old as the library's Updated figure. From the Backloggd study (2026-10-30).
 
 ## Bundles and prices
 

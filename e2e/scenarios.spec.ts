@@ -1082,6 +1082,28 @@ test("C7.2: Players shows each player's top tags and archetype, open on desktop,
   await expect(row(page, 'The Witcher 3: Wild Hunt')).toHaveCount(0);
 });
 
+test('C1 edge: Players says what each player has been playing lately, each game opening its panel', async ({
+  page,
+}) => {
+  await page.goto('/lists/compare?u=dave&u=erin');
+  const players = await openPlayers(page);
+  const lately = playerLine(players, 'Erin').locator('.players-card-lately');
+  await expect(lately.getByRole('button')).toHaveText(["Tom Clancy's Rainbow Six Siege 6h", 'Deep Rock Galactic 1.5h']);
+  await expect(playerLine(players, 'Dave').locator('.players-card-lately')).toHaveCount(0); // nothing lately: no line
+  await lately.getByRole('button', { name: /^Deep Rock Galactic/ }).click();
+  await expect(page.locator('#panel-title')).toHaveText('Deep Rock Galactic');
+  // The same hours, per player, as a column to sort by.
+  await page.keyboard.press('Escape'); // the panel covers the page on a phone
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await page
+    .locator('.dt-dd')
+    .getByRole('button', { name: /^Play Time & Dates/ })
+    .click();
+  await page.locator('.dt-dd').getByRole('button', { name: 'Last 2 weeks (h) · Erin' }).click();
+  await page.keyboard.press('Escape');
+  await expect(row(page, 'Deep Rock Galactic').getByRole('cell', { name: '1.5', exact: true })).toBeVisible();
+});
+
 test('C7.3-4: Players says how many top tags each pair shares, which, and the favourites they have in common', async ({
   page,
 }) => {
@@ -1128,7 +1150,11 @@ test("C7 edge: each player's line names their own tags once, those everyone shar
 }) => {
   await page.goto('/lists/compare?u=dave&u=erin');
   const players = await openPlayers(page);
-  await expect(playerLine(players, 'Erin').getByRole('button')).toHaveText(['PvP', 'Horror', 'Co-op']);
+  await expect(playerLine(players, 'Erin').locator('.players-card-tags').getByRole('button')).toHaveText([
+    'PvP',
+    'Horror',
+    'Co-op',
+  ]);
   await expect(players).not.toContainText('more than');
   const common = players.locator('.players-ground-body').first().locator('.players-card-tags');
   await expect(common.getByRole('button')).toHaveText(['Action', 'FPS']);
@@ -1169,7 +1195,7 @@ test('C7 edge: a player whose top tags are all shared has none of their own, not
   });
   await page.goto('/lists/compare?u=bob&u=erin');
   const players = await openPlayers(page);
-  await expect(playerLine(players, 'Bob').getByRole('button')).toHaveCount(0);
+  await expect(playerLine(players, 'Bob').locator('.players-card-tags').getByRole('button')).toHaveCount(0);
   await expect(playerLine(players, 'Bob')).toContainText('no tags of their own');
 });
 

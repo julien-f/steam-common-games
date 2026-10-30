@@ -8,6 +8,7 @@ export interface Player {
   personaname: string;
   owned: number[];
   playtime?: Record<number, number>; // minutes
+  recent?: Record<number, number>; // minutes in Steam's last two weeks
   wishlist?: number[];
 }
 
@@ -87,6 +88,7 @@ export const ERIN: Player = {
     620: h(12),
     1426210: h(15),
   },
+  recent: { 359550: h(6), 548430: 90 }, // back on Deep Rock Galactic, which Dave plays too
 };
 
 export const PLAYERS = [ALICE, BOB, CAROL, DAVE, ERIN];

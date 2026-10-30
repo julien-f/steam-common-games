@@ -344,6 +344,28 @@ function playedByColumn(
   };
 }
 
+// A player's hours in Steam's last two weeks, as of their library's copy (none once that's older too).
+const recentPlayedByKey = (i: number) => `recentPlaytime:${i}`;
+const recentMinutes = (owners: GameOwner[] | undefined) => owners?.reduce((sum, o) => sum + o.recentMinutes, 0);
+function recentPlayedByColumn(
+  player: { label: string; owners: Map<number, GameOwner[]> },
+  i: number,
+): ColumnDef<Record<string, any>> {
+  return {
+    key: recentPlayedByKey(i),
+    label: `Last 2 weeks (h) · ${player.label}`,
+    type: 'number',
+    value: (row) => {
+      const minutes = recentMinutes(player.owners.get(row.appid));
+      return minutes == null ? null : hoursFromMinutes(minutes);
+    },
+    format: (v) => ((v as number) > 0 ? Number(v).toFixed(1) : '—'),
+    compare: compareNumMissingLast,
+    defaultSortDir: 'desc',
+    category: 'Play Time & Dates',
+  };
+}
+
 const fmtPercent = (v: unknown) => (v == null ? '—' : `${v}%`);
 
 const TASTE_FIT_KEY = 'tasteFit';
@@ -679,6 +701,7 @@ interface DetailsEvent extends GameDetailsReply {
 
 const PLAYS_MOSTLY_SHOWN = 6;
 const PLAYER_TAGS_SHOWN = 3;
+const LATELY_SHOWN = 3; // a Players card's Playing lately games
 
 // A score column leads the sort while its source is set; unset, it goes, with its row-hiding range.
 function syncLeadColumn(t: TableState<Game>, key: string, active: boolean): void {
@@ -2779,6 +2802,7 @@ export default function ListRoute() {
                         RECENT_COLUMNS,
                         'hltbCompletionist',
                         ...comparePlayers.map(playedByColumn),
+                        ...comparePlayers.map(recentPlayedByColumn),
                         groupFitColumn(
                           groupFits,
                           comparePlayers.map((p) => p.label),
@@ -3481,6 +3505,11 @@ export default function ListRoute() {
         tags: topPlayedTags(rows, PLAYER_TAGS_SHOWN, ofRow).tags.map((t) => t.tag),
         style,
         archetype: archetypeOf(style, storyGames(rows, ofRow), { family: player.family }),
+        lately: [...player.owners]
+          .map(([appid, owners]) => ({ appid, minutes: recentMinutes(owners)! }))
+          .filter((g) => g.minutes > 0 && rowStore.getRow(g.appid))
+          .sort((a, b) => b.minutes - a.minutes)
+          .slice(0, LATELY_SHOWN),
       };
     });
     const compared = comparePlayers.map((player): ComparedPlayer => ({
@@ -3608,6 +3637,18 @@ export default function ListRoute() {
                             </Show>
                           </div>
                         </div>
+                        <Show when={p.lately.length}>
+                          <div class="players-card-lately">
+                            <span class="profile-label">Playing lately</span>
+                            <For each={p.lately}>
+                              {(g) => (
+                                <button type="button" onClick={() => openGame(rowStore.getRow(g.appid)!)}>
+                                  {rowStore.getRow(g.appid)?.name} <span>{fmtHours(hoursFromMinutes(g.minutes))}</span>
+                                </button>
+                              )}
+                            </For>
+                          </div>
+                        </Show>
                         <Show when={p.tags.length}>
                           <div class="players-card-tags">
                             {/* Once compared, what sets them apart: what they share is under In common. */}

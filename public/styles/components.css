@@ -977,6 +977,31 @@
     flex-wrap: wrap;
     gap: 6px;
   }
+  .players-card-lately {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    font-size: var(--fs-meta);
+  }
+  /* Links in a sentence, not chips: the tags below are the card's buttons. */
+  .players-card-lately button {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-body);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+  .players-card-lately button:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+  .players-card-lately button span {
+    color: var(--muted);
+  }
   .player-avatar {
     display: grid;
     flex: none;
