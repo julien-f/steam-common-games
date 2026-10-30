@@ -1,5 +1,5 @@
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
-import { loadHlsModule, playHls, stopHls } from './hlsPlayer.ts';
+import { loadHlsModule, playHls, stopHls, trailerStill } from './hlsPlayer.ts';
 import {
   control,
   flashCaption,
@@ -1871,18 +1871,11 @@ function fadeOutLbItem(lb: HTMLElement) {
   const rect = lbSwipeLeft ?? (video ?? img).getBoundingClientRect();
   lbSwipeLeft = null;
   if (!rect.width) return;
-  let ghost: HTMLImageElement | HTMLCanvasElement;
+  let ghost: HTMLImageElement | HTMLCanvasElement | null;
   if (video) {
-    // Its frame, else its poster: the video is detached at once, which would leave a black frame.
-    if (video.readyState >= 2) {
-      ghost = document.createElement('canvas');
-      ghost.width = video.videoWidth;
-      ghost.height = video.videoHeight;
-      ghost.getContext('2d')?.drawImage(video, 0, 0);
-    } else if (video.poster) {
-      ghost = document.createElement('img');
-      ghost.src = video.poster;
-    } else return;
+    // A still of it: the video is detached at once, which would leave a black frame.
+    ghost = trailerStill(video);
+    if (!ghost) return;
     ghost.style.height = `${rect.height}px`; // letterboxed as the video is
   } else {
     if (!lbShowingImage() || img.style.opacity === '0' || !img.src) return;
@@ -1890,6 +1883,7 @@ function fadeOutLbItem(lb: HTMLElement) {
     ghost.removeAttribute('style');
   }
   ghost.className = 'lb-ghost';
+  ghost.ariaHidden = 'true';
   Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px` });
   ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
   lbSurface(lb).append(ghost);

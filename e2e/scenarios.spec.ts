@@ -7027,18 +7027,38 @@ test.describe('with motion on', () => {
     await fakePlayback(page);
     await mockApi(page, { states: ['playable-trailers'] });
     await page.goto('/game/1145360?shot=v1');
-    await expect(page.locator('#screenshot-lightbox .lb-video')).toBeVisible();
-    // Not loaded yet (the fixture stream never is): its poster fades out.
+    const video = page.locator('#screenshot-lightbox .lb-video');
+    await expect(video).toBeVisible();
+    // Counted as added: each lives only for its fade.
+    await page.evaluate(() => {
+      const w = window as unknown as { ghosts: string[] };
+      w.ghosts = [];
+      new MutationObserver((records) => {
+        for (const r of records)
+          for (const n of r.addedNodes) {
+            const el = n as HTMLElement;
+            if (el.classList?.contains('lb-ghost')) w.ghosts.push(el instanceof HTMLImageElement ? el.src : el.tagName);
+          }
+      }).observe(document.querySelector('.lb-surface')!, { childList: true });
+    });
+    const ghosts = () => page.evaluate(() => (window as unknown as { ghosts: string[] }).ghosts);
+    // No frame yet (the fixture stream never has one, whatever its readyState says): its poster fades out.
+    await video.evaluate((v: HTMLVideoElement) =>
+      Object.defineProperty(v, 'readyState', { configurable: true, get: () => 2 }),
+    );
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('img.lb-ghost')).toHaveAttribute('src', /Trailer/);
-    await expect(page.locator('.lb-ghost')).toHaveCount(0);
-    // Loaded: its current frame does.
+    await expect.poll(ghosts).toEqual([expect.stringMatching(/Trailer/)]);
+    // A frame: it does.
     await page.keyboard.press('ArrowLeft');
-    await page.locator('#screenshot-lightbox .lb-video').evaluate((v: HTMLVideoElement) => {
-      Object.defineProperty(v, 'readyState', { configurable: true, get: () => 2 });
+    await video.evaluate((v: HTMLVideoElement) => {
+      for (const [k, n] of [
+        ['videoWidth', 320],
+        ['videoHeight', 180],
+      ] as const)
+        Object.defineProperty(v, k, { configurable: true, get: () => n });
     });
     await page.keyboard.press('ArrowRight');
-    await expect(page.locator('canvas.lb-ghost')).toHaveCount(1);
+    await expect.poll(ghosts).toEqual([expect.stringMatching(/Trailer/), expect.anything(), 'CANVAS']);
   });
 
   test('I2 edge: a nav popover rises to rest and Esc hands focus back', async ({ page }) => {

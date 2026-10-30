@@ -5,7 +5,7 @@ import { render } from 'solid-js/web';
 import Cast from 'lucide-solid/icons/cast';
 import TriangleAlert from 'lucide-solid/icons/triangle-alert';
 import VolumeX from 'lucide-solid/icons/volume-x';
-import { playHls, stopHls } from './hlsPlayer.ts';
+import { playHls, stopHls, trailerStill } from './hlsPlayer.ts';
 import type { HlsVideo } from './hlsPlayer.ts';
 import { canPlace, placementGranted, remember, targetScreen } from './presentationScreen.ts';
 import type { ScreenDetailed } from './presentationScreen.ts';
@@ -81,21 +81,15 @@ function PresentationView() {
     }, FADE_MS);
   }
 
-  // What was on screen fades out over the new media, copied (the DOM is never rebuilt): a trailer's
-  // current frame, not its poster — a cross-origin one taints the canvas, which still draws.
+  // What was on screen fades out over the new media, copied (the DOM is never rebuilt).
   function fadeOut() {
-    let ghost: HTMLImageElement | HTMLCanvasElement;
-    if (!video.hidden && video.readyState >= 2) {
-      ghost = document.createElement('canvas');
-      ghost.width = video.videoWidth;
-      ghost.height = video.videoHeight;
-      ghost.getContext('2d')?.drawImage(video, 0, 0);
-    } else {
-      const src = !img.hidden ? img.currentSrc : !video.hidden ? video.poster : '';
-      if (!src) return;
+    let ghost: HTMLImageElement | HTMLCanvasElement | null = null;
+    if (!video.hidden) ghost = trailerStill(video);
+    else if (!img.hidden && img.currentSrc) {
       ghost = document.createElement('img');
-      ghost.src = src;
+      ghost.src = img.currentSrc;
     }
+    if (!ghost) return;
     ghost.className = 'pres-ghost';
     ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
     root.append(ghost);

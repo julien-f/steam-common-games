@@ -71,3 +71,19 @@ export function stopHls(videoEl: HlsVideo | null) {
   }
   videoEl.removeAttribute('src');
 }
+
+// What a trailer shows, for a fade over the next media: its current frame (a cross-origin one taints the canvas,
+// which still draws), else its poster before it has one.
+export function trailerStill(video: HTMLVideoElement): HTMLCanvasElement | HTMLImageElement | null {
+  if (video.readyState >= 2 && video.videoWidth) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    return canvas;
+  }
+  if (!video.poster) return null;
+  const img = document.createElement('img');
+  img.src = video.poster;
+  return img;
+}
