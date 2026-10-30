@@ -6,115 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-30
+
 ### Added
 
 - Search boxes have a × to clear them in one tap, select their text when focused, and show a Search key on phone keyboards
-- A game's panel links to its developers' and publishers' games on Steam, each opening as a list
-- A developer's or publisher's list shows which of its games you don't own, and can be saved as a list
+- A game's panel links to its developers' and publishers' games on Steam, each opening as a list that shows which you don't own and can be saved
 - `GET /api/health` says which version and commit the server runs, and since when
 - `GET /api/metrics` keeps 30 days of outbound status counts per day, across restarts, to date when an upstream started failing
-- Owned says whether the account mostly plays single-player, co-op or PvP games and how many story games it plays through
-- Owned's count of games played 2 h or less opens its Play next view, best Taste fit first
-- A comparison's Players section shows each player's own tags and play style, the tags and favourites they share, and what to suggest to each
-- Saved views of Owned and Wishlist, as tabs under the list's header: ready-made Recently played, Play next and Bargains, or the table as it is
-- Short games suggested view on Owned: barely played games with a main story of 5 h or less, best rated first
+- Owned's player profile card: an archetype (mostly single-player, co-op or PvP), the tags played most as bars, a story-games ring, and the count of games played 2 h or less, which opens Play next
+- Saved views of Owned and Wishlist, as tabs under the list's header: ready-made Recently played, Play next, Short games and Bargains, each showing only the columns it uses, or the table as it is
+- A comparison shows each player as a card with avatar, archetype, own tags and play style, the tags and favourites they share with game art, and what to suggest to each
 - Present trailers and screenshots on a second screen (straight onto the TV in Chrome and Edge) while browsing, and steer it from the lightbox
 - PC Game Pass list: the Steam games in your region's PC Game Pass catalog, from a Home card, and combinable with your wishlist or library
 
 ### Changed
 
-- The side panel's similar games now come from the account's library instead of the open list, on every page
-- Screen readers find each page's landmarks, headings and field names; the shortcuts dialog and the nav menus use the browser's own
 - The app is now called Playshelf, with a new look: a night-blue palette, larger game art, icons and smoother transitions
-- Home gathers your account, recent accounts, quick links and your lists, each list with one actions menu
-- Screen readers tell a game's tags, genres and categories apart, and their dots differ by shape
-- Plays mostly shows how much each tag weighs, and **Why these?** lists the played games behind it.
-- On a phone, a game table keeps each game's name in view while you scroll its columns sideways
-- A bundle's summary leads with its price tiers and what it adds to your library, so a phone shows them without a swipe
-- Number columns (ratings, hours, prices, discounts, counts) align right, so their digits line up.
-- Tables show separate chips for a column both grouped and sorted, no pager when everything fits on one page, and "≥ 5.0" for an open-ended range.
-- Expired bundles stay dimmed even with the Bundle column hidden, and a phone's Filter pane sits centred.
-- On search results, the open game's row is marked like in every other list, without an extra outline.
-- Home's recent accounts are now Accounts: one avatar tile each (overlapping faces for a Steam Family), yours first then by name everywhere, filterable past 8; star yours from the account card
-- Plays mostly, Taste fit and Group fit leave software such as Wallpaper Engine out, and Plays mostly says how many played games it's built from
-- Owned's player profile is a card: an archetype, the tags played most as bars, a story-games ring and the barely-played count
-- Why these? opens each figure's games in place, with their art and hours, and story games against their main story's length
-- A comparison shows each player as a card with avatar and archetype, and what they share with game art
-- Suggested views show only the columns that matter to them, the one they sort or filter on first
-- The screenshot and trailer viewer gives the screen to the media: its controls show only for the mouse or a tap, it follows photo and video players' keys and gestures, and trailers remember muting and offer a replay.
-- Home's Explore cards sit in two even rows of three
-- A list whose games are already cached fills in a little faster
-- Home loads about 10 KB less code before showing
-- Sorting a large list or the bundles by a date column is faster
-- Owned's profile and taste, and a comparison's player profiles, no longer hold up the page as the last game details land, and a game's Refresh details no longer recomputes them
-- Game lists load less data: a game's screenshots and trailers load when it's opened
+- Home gathers your account, Accounts (one avatar tile each, yours first, filterable past 8; star yours from the account card), quick links in two even rows, and your lists, each with one actions menu
+- Plays mostly shows how much each tag weighs and how many played games it's built from; Why these? opens each figure's games in place, with art and hours. It, Taste fit and Group fit leave software such as Wallpaper Engine out
+- The side panel's similar games now come from the account's library instead of the open list, on every page
+- Screen readers find each page's landmarks, headings and field names, and tell a game's tags, genres and categories apart; the shortcuts dialog and nav menus use the browser's own
+- Tables align number columns right, keep a game's name in view while scrolling sideways on a phone, show separate chips for a column both grouped and sorted, drop the pager when everything fits, and show "≥ 5.0" for an open-ended range
+- A bundle's summary leads with its price tiers and what it adds to your library; expired bundles stay dimmed with the Bundle column hidden, and a phone's Filter pane sits centred
+- On search results, the open game's row is marked like in every other list
+- The screenshot and trailer viewer gives the screen to the media: controls show only for the mouse or a tap, it follows photo and video players' keys and gestures, and trailers remember muting and offer a replay
+- Faster: Home loads about 10 KB less code, lists load less data (a game's media loads when opened), cached lists fill in sooner, date sorts are quicker, and player profiles no longer hold up the page
 - Game search leaves out demos; a game's panel still links its own
 - Recently Looked Up keeps the last 500 games instead of 10; the search box still suggests the latest 10
 
 ### Fixed
 
-- The combined-list form fits a phone's width
+- The combined-list form fits a phone's width, and Compare on a phone no longer shows an empty More actions button
 - A game's DLC no longer reorder and reload once they all arrive
-- Friends' profile links and a bundle's IsThereAnyDeal and Fanatical links open only plain web addresses
-- Game search ignores malformed results from Steam instead of showing them
+- Friends' profile links and a bundle's IsThereAnyDeal and Fanatical links open only plain web addresses, and game search ignores malformed results from Steam
 - Taste fit's note says when the account has too few games played, dates its taste as YYYY-MM-DD, and no longer asks a link's viewer to open the sender's Owned list
-- A comparison link with an unknown combine operation opens as the default comparison, and saving it no longer stores a list that never loads
+- A damaged or outdated shared link (comparison, view or layout) opens as the default or keeps what's valid, instead of breaking the page or saving a list that never loads
 - Signing in on a browser whose storage is full or disabled no longer reloads the page forever
-- A shared view link with a damaged layout no longer breaks the bundles page or a list's view saving; it opens on your own view instead
-- The limit on game lists loading at once now counts an IPv6 client by its network, as the rate limits do, so rotating addresses can't get around it
-- A large synced setting, such as many lists, now saves to your account instead of being refused past 100 KB
+- When the browser's storage is full, changes are no longer silently lost: cached tastes make room first, and a banner says when a change still couldn't be saved
+- A large synced setting, such as many lists, now saves to your account instead of being refused past 100 KB, and quick lookups no longer exhaust the account's sync allowance
+- One visitor can no longer use up the app's hourly Steam and IsThereAnyDeal lookups for everyone, IPv6 clients counting by network; past their share they are told once
 - Back closes the open game or screenshot in a tab with a long history, instead of only changing the address
-- The game panel's More links menu closes on Esc, leaving the game open, and no longer repeats Similar games' More like this on Steam link
-- On a phone, Compare's players form no longer shows a More actions button with nothing behind it
-- Enter in an empty player field on Compare adds the suggestion you pointed at, or else starts the comparison once two players are in
+- The panel's More links menu closes on Esc, leaving the game open, and no longer repeats Similar games' More like this on Steam link
+- Compare's player boxes: Enter in an empty one adds the suggestion pointed at, or starts the comparison, and ArrowDown steps through every suggestion
 - Keyboard focus stays in place after Look up, Add to list and stepping onto the last bundle
-- ArrowDown in a Compare player box steps through every suggestion instead of sticking on one
-- When the browser's storage is full, list and preference changes are no longer silently lost: cached tastes make room first, and a banner says when a change still couldn't be saved
-- One visitor can no longer use up the app's hourly Steam and IsThereAnyDeal lookups for everyone: past their share they are told once that they made too many new lookups, and everyone else is unaffected
-- With wider system fonts such as Ubuntu's, the shortcut keys no longer overflow their column, the phone table toolbar no longer takes an extra line, and list links and remove buttons keep a full tap area
+- With wider system fonts such as Ubuntu's, shortcut keys, the phone table toolbar and list links' tap areas keep their layout
 - Steam review scores load again for games without a cached score: Steam retired the endpoint the app used
-- A shared layout link with one outdated setting keeps the rest of its layout instead of falling back to yours.
-- The server no longer stalls for every visitor while recording a busy hour's metrics
-- Marking which games you own or wishlist (✓/☆) on a long list takes far less time
-- Looking up games in quick succession while signed in no longer exhausts the account's sync allowance, which made the next settings change or sign-in fail.
-- Skimming games with the arrow keys no longer looks up every game passed, which could exhaust the bundle lookups for the session; a refused bundle lookup now says why, and is tried again the next time the game opens.
-- Leaving the search page with a game open no longer keeps its panel open on the next page
-- On the search page, a game opened from the panel keeps its way back to the game before it
-- On the search page, a game whose details fail to load says so, as on list pages
-- The panel's Refresh details reloads the game on the search page, and shows how old the details are there, on the ranking screen and for a game looked up outside a list
+- The server no longer stalls for every visitor while recording a busy hour's metrics, and marking owned/wishlisted games on a long list is far faster
+- Skimming games with the arrow keys no longer looks up every game passed; a refused bundle lookup says why and is retried when the game next opens
+- The search page keeps the open game's way back, says when its details fail, refreshes them, no longer offers a random pick outside the results or drops a trailing space, and closes its panel when you leave
+- A game whose lookup fails says its sources didn't answer, with Refresh to retry, no longer claims fresh details, and joins Recently Looked Up once Refresh brings it in
+- Refresh details shows how old the details are on the ranking screen and for a game looked up outside a list, where closing it returns to the page you came from
 - On the ranking screen, ↓, S and Z no longer answer the pair while a game's details panel is open
-- On the search page, a game opened from its panel that isn't among the results no longer offers a random pick from them
-- A game whose lookup fails says its sources didn't answer, with Refresh to retry, instead of loading forever
-- Closing a game looked up from Home, Bundles or About returns to that page instead of Recently Looked Up
-- The search page's box no longer drops a trailing space typed while results load
-- A game whose lookup failed joins Recently Looked Up once Refresh details brings it in
-- A game whose details didn't load no longer claims they were refreshed just now, and a shared link's screenshot opens once Refresh details brings them in
-- The side panel no longer shows the previous game's bundles while the next game's bundles load
+- The side panel no longer shows the previous game's bundles while the next game's load
 - The side panel's Try the Free Demo button links to the demo's store page again, instead of an undefined one
 
 ### Development
 
 - The setup check flags permission allows that would pre-approve git clean, git restore, npm publish or deleting a remote branch
-- setup-facts --transcripts=DATE shows commits made since DATE next to the commits its sessions made
+- setup-facts: `--transcripts=DATE` shows commits made since DATE, counts only real doc reads and skills subagents follow, keeps failed runs out of the cost baseline, and no longer shows NaN
 - Feature-branch commits defer their changelog entries to the branch's merge; new code comments may take two lines
-- setup-facts counts only real doc reads, keeps failed runs out of the cost baseline and shows each reply's last paragraph in digests
 - Backlog runs log their review yield and the bugs later traced back to them, summarized for setup reviews
 - The stylesheet is split into cascade layers and icons come from lucide-solid
-- The mock API answers an unknown game instead of crashing
-- The long-comment check prints plain paths under a mnemonic-prefix git config
-- The long-comment check lets an existing comment be rewrapped when its words are unchanged
-- setup-facts' per-agent gate and tool times no longer read NaN
-- Setup facts count skills that subagents follow, and no longer take background task notifications for prompts
+- The mock API answers an unknown game instead of crashing, and has two players with rich libraries, Dave and Erin
+- The long-comment check prints plain paths under a mnemonic-prefix git config, allows rewrapping unchanged comments and catches a comment grown past two lines
 - End-to-end tests render with bundled DejaVu fonts, so layout checks measure the same locally and in CI
-- A Steam store endpoint that starts redirecting now logs where it redirects to and shows as a 302 in the metrics, instead of a JSON parse error
-- Each git worktree runs end-to-end tests on its own port, so agents testing in parallel don't collide.
-- Each worktree's mock server runs on its own port, and `node scripts/worktree.js <branch>` sets up a worktree in one step.
-- Two mock players with rich libraries, Dave and Erin, for the profile and comparison tests
-- The long-comment check also catches a comment grown past two lines by an edit
-- Setup review's skill-run times no longer show NaN or count a run twice
-- node scripts/session-end.js lists what's left before closing a session
-- The checks stop with a clear message when node_modules is behind package-lock.json
-- Fix-batch lanes install their own dependencies before their first commit
+- A Steam store endpoint that starts redirecting logs where it redirects to and counts as a 302 in the metrics, instead of a JSON parse error
+- `node scripts/worktree.js <branch>` sets up a worktree in one step, with its own e2e and mock server ports
+- `node scripts/session-end.js` lists what's left before closing a session
+- The checks stop with a clear message when node_modules is behind package-lock.json, and fix-batch lanes install their own dependencies first
 - Dependencies updated, including a fix for a denial-of-service flaw in the request body parser
 
 ## [0.11.0] - 2026-10-14
