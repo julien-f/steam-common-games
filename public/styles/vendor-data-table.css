@@ -81,6 +81,19 @@ html:root {
   scale: 0.995;
   transition: scale var(--dur-1) var(--ease-out);
 }
+/* Grow rather than rise like the nav popovers: the library flips a menu upward only after its first
+   style. `scale` composes with its inline `transform`; it unmounts them on close, so no exit. */
+.dt-dd {
+  transition:
+    opacity var(--dur-2) var(--ease-out),
+    scale var(--dur-2) var(--ease-out);
+}
+@starting-style {
+  .dt-dd {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
 /* An image column (thumbnails, /bundles' covers) only as wide as its images: a sized cell takes none of the table's spare width. */
 .dt-td:has(.game-thumb, .bundle-covers) {
   width: 1px;

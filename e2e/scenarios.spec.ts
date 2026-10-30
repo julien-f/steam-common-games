@@ -7286,6 +7286,23 @@ test.describe('with motion on', () => {
     await expect(panel).toBeHidden();
     await expect(prefs).toBeFocused();
   });
+
+  test('L3 edge: a table menu fades in from its first frame to rest', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    const columns = page.getByRole('button', { name: 'Columns', exact: true });
+    await columns.waitFor();
+    // Read in the frame the menu first paints: its transition has only just started there.
+    const firstFrame = await columns.evaluate(async (b: HTMLElement) => {
+      b.click();
+      await new Promise(requestAnimationFrame);
+      return Number(getComputedStyle(document.querySelector('.dt-dd')!).opacity);
+    });
+    expect(firstFrame).toBeLessThan(1);
+    const menu = page.locator('.dt-dd');
+    await expect(menu).toHaveCSS('opacity', '1');
+    await expect(menu).toHaveCSS('scale', 'none');
+  });
 });
 
 test('I2 edge: closing a game with no row returns focus to the row it was opened from', async ({ page }) => {
