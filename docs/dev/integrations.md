@@ -11,6 +11,7 @@ Every upstream this app talks to, and what is undocumented about each. Cache tie
 - **Pacing**: Steam's store takes 2 requests in flight, each slot pausing `STORE_MIN_INTERVAL_MS` before reuse; HLTB's search, ProtonDB, the store browse API and Steam reviews take 3 each, pausing `UPSTREAM_MIN_INTERVAL_MS` — enough to keep pace with the store on a cold load. A store or reviews 429 pauses every request to that upstream for its `Retry-After`, uncapped (2 s, 4 s, then 8 s on successive 429s when it sends none); a request is retried at most twice before failing.
 
 - [HLTB — no npm package](#hltb--no-npm-package)
+- [Owned games — `GetOwnedGames`' playtime fields](#owned-games--getownedgames-playtime-fields)
 - [Wishlist — undocumented endpoint](#wishlist--undocumented-endpoint)
 - [Friends — documented, keyed endpoint](#friends--documented-keyed-endpoint)
 - [Tags & demo link — store browse data](#tags--demo-link--store-browse-data)
@@ -44,6 +45,11 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 - **Times** (`pickBestMatch`): `main` (`comp_main`), `extra` (`comp_plus`), `completionist` (`comp_100`) and `all` (`comp_all`), seconds converted to hours rounded to the half hour, as HLTB's own site shows them.
   - `all` ("All PlayStyles") is **not** the average of the other three: it pools every submission regardless of category (`comp_all_count` = the sum of the three counts), so it usually lands near Main Story.
   - Being one representative number, it's the default HLTB column (`hltbAll`, "HLTB (h)"), the ranking card's "10.5 h to beat", and the first figure in the panel's How Long To Beat section.
+
+## Owned games — `GetOwnedGames`' playtime fields
+
+- `playtime_forever` and `rtime_last_played` feed Played and Last Played; `playtime_2weeks` (minutes, sent only when above 0) feeds Compare's **Playing lately** and its **Last 2 weeks** columns. Valve's wiki lists `playtime_2weeks` as minutes played in the last two weeks, from memory: the page answered 403 when checked (2026-10-30), so this is unconfirmed.
+- The window is Steam's two weeks before the library's cached copy, which lives up to `LIBRARY_CACHE_TTL_MINUTES`. `/api/common-games` leaves an account out of `recentPlaytime` once its copy is over 14 days old: its two weeks then say nothing about now.
 
 ## Wishlist — undocumented endpoint
 

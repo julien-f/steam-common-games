@@ -572,6 +572,8 @@ const gameBundlesLimit = namedRateLimit('gameBundles', {
   },
 });
 
+const RECENT_PLAYTIME_MS = 14 * 24 * 60 * 60 * 1000; // GetOwnedGames' playtime_2weeks
+
 app.post('/api/common-games', searchLimit, async (req, res) => {
   const members = parseMembers(req, res);
   if (!members) return;
@@ -617,7 +619,23 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       }
     });
 
-    res.json({ games, players, playtime, lastPlayed, fetchedAt: oldestCachedAt(ids.map((id) => `games:${id}`)) });
+    // Steam's own two-week window, which says nothing of now once the cached library is older than that.
+    const recentPlaytime = {};
+    ids.forEach((steamId, i) => {
+      if (Date.now() - (getCachedAt(`games:${steamId}`) ?? Date.now()) > RECENT_PLAYTIME_MS) return;
+      for (const game of libraries[i]) {
+        if (game.playtime_2weeks) (recentPlaytime[game.appid] ??= {})[steamId] = game.playtime_2weeks;
+      }
+    });
+
+    res.json({
+      games,
+      players,
+      playtime,
+      lastPlayed,
+      recentPlaytime,
+      fetchedAt: oldestCachedAt(ids.map((id) => `games:${id}`)),
+    });
   } catch (err) {
     sendRouteError(res, 'common-games', err);
   }

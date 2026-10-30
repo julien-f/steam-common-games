@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Mark a game you own Finished or Abandoned from its panel: Play next and Short games leave it out, and the story games tile takes your word over the hours
+- Compare shows what each player has been playing lately, from their last two weeks on Steam
+
 ### Changed
 
 - About's GitHub link points to the repository's new name, playshelf

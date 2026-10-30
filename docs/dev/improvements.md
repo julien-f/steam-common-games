@@ -18,6 +18,7 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U125 · minor · S1, C1, S3** — List, bundle and compare links all preview identically, and a `/lists/<id>` list that exists only in the sender's browser can't be described at all. Server-side per-route `og:title` from the path alone (Owned games, Wishlist, Compare libraries, Shared list, bundle name from cache), generic for `/lists/<id>`.
 - **U172 · minor · S3, B1, I3** — a dead link to a list (`/lists/<unknown id>`) or a bundle (`/lists/bundle/<unknown id>`) shows one bare status line: no h1, no way back, and the bundle's reads "Error: Bundle not found". Page not found has a heading and Go to Home; give these the same, with All bundles for a bundle.
+- **U229 · minor · R3, L1, S1** — manual and ranked lists can't be shared by link ("my top 10 co-op games"); the share grammar has no token for a list of appids or an order ([lists-and-accounts.md](lists-and-accounts.md#ranked-lists)). A snapshot token (appids in order), read-only on arrival. From the Backloggd study (2026-10-30).
 
 ## Loading and feedback
 
@@ -40,6 +41,8 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 
 - **U204 · minor · F3, B1** — idled games (card farming, left running) skew Plays mostly, Taste fit and Group fit, and nothing tells them apart from real play. An "exclude from my profile" toggle per game.
 - **U215 · minor · F3, L5** — with too few played games, Taste fit is "—" on every row, so Play next (sorted by it) shows its games in no useful order; only a line above the table says why. Fall back to the rating, or say in the view that it sorts by rating until Taste fit can be computed.
+- **U230 · minor · R1, C7, F3** — a ranking stays inside its own list: Owned and Compare can't show or use it, and Taste fit learns from hours, not from what the player said they prefer. A **My rank** column on Owned, and the ranking as a taste signal where one exists. From the Backloggd study (2026-10-30).
+- **U231 · polish · A5** — no look back over a year of play (Backloggd's stats pages). Steam gives only the last launch date per game, no history: at best "played this year" with total hours, not per-year hours or first launches. From the Backloggd study (2026-10-30).
 
 ## Comparing
 

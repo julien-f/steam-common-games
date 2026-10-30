@@ -1,3 +1,4 @@
+import type { GameStatus } from './gameStatuses.ts';
 import { isSoftware } from './tagTaste.ts';
 
 // Facts about how an account plays, beyond Plays mostly's tags: said as sentences, each silent
@@ -103,12 +104,16 @@ export interface StoryGames {
   fellShort: number[];
 }
 
-// Of the played single-player games with an end, which were played for their main story's
-// length; hours can't say the story was finished, only that it could have been.
-export function storyGames(games: readonly ProfileGame[], hours: (g: ProfileGame) => number): StoryGames | null {
-  const story = games.filter((g) => isPlayed(g, hours(g)) && isStoryGame(g));
+// Of the played single-player games with an end, which were played for their main story's length (hours
+// can't say it was finished, only that it could have been), unless the player marked it (gameStatuses.ts).
+export function storyGames(
+  games: readonly ProfileGame[],
+  hours: (g: ProfileGame) => number,
+  status: (g: ProfileGame) => GameStatus | null = () => null,
+): StoryGames | null {
+  const story = games.filter((g) => (status(g) || isPlayed(g, hours(g))) && !isSoftware(g) && isStoryGame(g));
   if (story.length < MIN_GAMES) return null;
-  const reached = (g: ProfileGame) => hours(g) >= STORY_SHARE * g.hltbMain!;
+  const reached = (g: ProfileGame) => (status(g) ? status(g) === 'finished' : hours(g) >= STORY_SHARE * g.hltbMain!);
   const byHours = story.sort((a, b) => hours(b) - hours(a));
   return {
     reached: byHours.filter(reached).map((g) => g.appid),

@@ -6,6 +6,7 @@ import Handshake from 'lucide-solid/icons/handshake';
 import Play from 'lucide-solid/icons/play';
 import Swords from 'lucide-solid/icons/swords';
 import Users from 'lucide-solid/icons/users';
+import { STATUS_LABELS, type GameStatus } from './gameStatuses.ts';
 import type { Archetype, StoryGames } from './playerProfile.ts';
 import type { PlayedTag } from './tagTaste.ts';
 import { fadeInOnLoad, fmtHours, roundHours } from './utils.ts';
@@ -109,6 +110,7 @@ export interface ProfileGameInfo {
   art: string | null;
   hours: number;
   main: number | null; // How Long To Beat's main story, hours
+  status?: GameStatus | null; // set by the player, deciding over hours
 }
 
 const STORY_GAMES_SHOWN = 5;
@@ -157,6 +159,7 @@ function StoryList(props: {
                         <span style={{ width: `${g().main ? Math.min(100, (100 * g().hours) / g().main!) : 0}%` }} />
                       </span>
                       <span class="profile-story-hours">
+                        {g().status && `${STATUS_LABELS[g().status!]} · `}
                         {g().main ? `${roundHours(g().hours)} / ${roundHours(g().main!)} h` : fmtHours(g().hours)}
                       </span>
                     </button>
@@ -263,7 +266,8 @@ export function OwnedProfile(props: {
                   <Show when={props.story}>
                     <li>
                       Story games: single-player, with a How Long To Beat main story and no endless tag (roguelike,
-                      sandbox…), counted when played for at least 80% of it.
+                      sandbox…), counted when played for at least 80% of it, or marked Finished or Abandoned in its
+                      panel.
                     </li>
                   </Show>
                 </ul>

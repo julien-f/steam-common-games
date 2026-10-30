@@ -74,6 +74,14 @@ test('storyGames: endless, multiplayer, unknown-length and unplayed games are no
   assert.equal(storyGames([...games, ...others], hours), null);
 });
 
+test('storyGames: a status the player set wins over hours, even under an hour', () => {
+  const games = [1, 2, 3, 4, 5, 6, 7, 8].map((id) => story(id, 10));
+  const hours = hoursFrom({ 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 2, 8: 0 });
+  const status = (g) => ({ 7: 'finished', 8: 'finished', 1: 'abandoned' })[g.appid] ?? null;
+  assert.deepEqual(storyGames(games, hours, status), { reached: [2, 3, 4, 5, 6, 7, 8], fellShort: [1] });
+  assert.equal(storyGames(games, hours), null, 'game 8, unplayed, counts only once marked');
+});
+
 test('archetypeOf: a title from the play style, story finishers among single-player profiles', () => {
   const story = (reached, of) => ({ reached: Array(reached).fill(0), fellShort: Array(of - reached).fill(0) });
   assert.equal(archetypeOf('solo', story(4, 8)).name, 'Story finisher');
