@@ -546,9 +546,9 @@ function retryCurrentShot() {
   }
 }
 
-// Swaps `src` in once decoded (sooner paints a blank frame), at once if already in memory (a preload), unless a later
-// load started since; opacity 0 on error hides the broken-image icon. Returns whether it's shown already.
-function loadLbImage(src: string) {
+// Swaps `src` in at once if already in memory (a preload), else once loaded and decoded, with `placeholder` (or
+// nothing) shown meanwhile, unless a later load started since; opacity 0 on error hides the broken-image icon.
+function loadLbImage(src: string, placeholder?: string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const token = ++lbImgToken;
@@ -561,18 +561,17 @@ function loadLbImage(src: string) {
     setLbLoading(lb, false);
     syncLbZoomBtn(lb);
   };
-  if (full.complete && full.naturalWidth) {
-    show();
-    return true;
-  }
+  if (full.complete && full.naturalWidth) return show();
+  img.style.opacity = placeholder ? '1' : '0';
+  if (placeholder) img.src = placeholder;
   setLbLoading(lb, true);
   full.decode().then(show, () => {
+    if (full.complete && full.naturalWidth) return show(); // loaded, only the early decode failed
     if (token !== lbImgToken) return;
     img.style.opacity = '0';
     setLbLoading(lb, false);
     showLbError("Couldn't load this image.");
   });
-  return false;
 }
 
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
@@ -1984,14 +1983,7 @@ function renderLightbox() {
     } else {
       // Until the full image loads, its thumbnail (cached from the hero carousel) rather than the previous shot;
       // the banner has no separate one (thumb === main): blank there.
-      if (!loadLbImage(shot.main!)) {
-        if (shot.thumb && shot.thumb !== shot.main) {
-          img.style.opacity = '1';
-          img.src = shot.thumb;
-        } else {
-          img.style.opacity = '0';
-        }
-      }
+      loadLbImage(shot.main!, shot.thumb !== shot.main ? shot.thumb : undefined);
       schedHideLbChrome();
     }
   }

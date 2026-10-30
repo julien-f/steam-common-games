@@ -4964,6 +4964,21 @@ test('F1 edge: stepping onto a preloaded screenshot shows it at once, not its th
   ]);
 });
 
+test("F1 edge: a screenshot that loads but won't decode ahead still shows", async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLImageElement.prototype.decode = function (this: HTMLImageElement) {
+      return new Promise((_, reject) =>
+        this.addEventListener('load', () => reject(new DOMException('', 'EncodingError')), { once: true }),
+      );
+    };
+  });
+  await mockApi(page, { states: ['slow-media'] }); // not in memory yet: it waits for the decode
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toHaveAttribute('src', /Screenshot%201\.svg\?full/);
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toHaveCSS('opacity', '1');
+  await expect(page.locator('.lb-error')).toBeHidden();
+});
+
 test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the game stepped to', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');
