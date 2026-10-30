@@ -1716,8 +1716,9 @@ test('GET /api/search-games: a repeated query is served from cache, no re-fetch'
     json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
   }));
   await api.get('/api/search-games?q=portal');
+  const firstCalls = fetchMock.mock.callCount();
   await api.get('/api/search-games?q=portal');
-  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(fetchMock.mock.callCount(), firstCalls);
 });
 
 test('GET /api/search-games: ?refresh=1 is ignored — a cached term never re-fetches', async (t) => {
@@ -1727,8 +1728,9 @@ test('GET /api/search-games: ?refresh=1 is ignored — a cached term never re-fe
     json: async () => ({ items: [{ id: 400, name: 'Portal' }] }),
   }));
   await api.get('/api/search-games?q=portal');
+  const firstCalls = fetchMock.mock.callCount();
   await api.get('/api/search-games?q=portal&refresh=1');
-  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(fetchMock.mock.callCount(), firstCalls);
 });
 
 test('GET /api/search-games: 502 when the store search endpoint errors', async (t) => {

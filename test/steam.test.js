@@ -1683,7 +1683,7 @@ test('searchStoreGames: caches result — second call skips fetch', async (t) =>
   }));
   await searchStoreGames('portal');
   await searchStoreGames('portal');
-  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(fetchMock.mock.callCount(), 2, 'one search and one demo check, both for the first call');
 });
 
 test('searchStoreGames: cache key is case-insensitive', async (t) => {
@@ -1694,7 +1694,61 @@ test('searchStoreGames: cache key is case-insensitive', async (t) => {
   }));
   await searchStoreGames('Portal');
   await searchStoreGames('PORTAL');
-  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(fetchMock.mock.callCount(), 2, 'one search and one demo check, both for the first call');
+});
+
+// Storesearch lists a game and its demo alike (`type: "app"`); GetItems' `type` 1 marks the demo.
+function mockSearchWithBrowse(t, browse) {
+  return t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('/storesearch/')) {
+      return {
+        ok: true,
+        json: async () => ({
+          items: [
+            { id: 4338750, name: 'Stack Order' },
+            { id: 4645100, name: 'Stack Order Demo' },
+          ],
+        }),
+      };
+    }
+    assert.match(url, /IStoreBrowseService\/GetItems/);
+    return browse(url);
+  });
+}
+
+test('searchStoreGames: drops demos in one batched store browse call', async (t) => {
+  _reset();
+  const fetchMock = mockSearchWithBrowse(t, (url) => {
+    const { ids } = JSON.parse(decodeURIComponent(url.split('input_json=')[1]));
+    assert.deepEqual(ids, [{ appid: 4338750 }, { appid: 4645100 }]);
+    return {
+      ok: true,
+      json: async () => ({
+        response: {
+          store_items: [
+            { success: 1, appid: 4338750, type: 0 },
+            { success: 1, appid: 4645100, type: 1 },
+          ],
+        },
+      }),
+    };
+  });
+  assert.deepEqual(await searchStoreGames('stack order'), [{ appid: 4338750, name: 'Stack Order', tinyImage: null }]);
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('searchStoreGames: keeps demos, briefly cached, when the store browse call fails', async (t) => {
+  _reset();
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  mockSearchWithBrowse(t, () => ({ ok: false, status: 500 }));
+  const results = await searchStoreGames('stack order');
+  assert.deepEqual(
+    results.map((r) => r.appid),
+    [4338750, 4645100],
+  );
+  assert.match(warnMock.mock.calls[0].arguments[0], /^\[search\]/);
+  const { expires } = db.prepare('SELECT expires FROM cache_search WHERE key = ?').get('search:stack order');
+  assert.ok(expires - Date.now() <= MISS_CACHE_TTL_MS);
 });
 
 test('searchStoreGames: throws isUpstream when fetch fails', async (t) => {
