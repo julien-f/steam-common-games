@@ -100,3 +100,33 @@ test('suggestedTemplates: per kind, minus created ones (even renamed), priced on
   renameListView('owned', v.id, 'Lately');
   assert.deepEqual(ids('owned', true), ['play-next', 'short-games']);
 });
+
+test('Play next and Short games leave out finished and abandoned games', () => {
+  const { VIEW_TEMPLATES, createFromTemplate } = views();
+  for (const id of ['play-next', 'short-games']) {
+    const v = createFromTemplate(VIEW_TEMPLATES.find((t) => t.id === id));
+    assert.deepEqual(v.tableView.excludeFilters, { status: ['Finished', 'Abandoned'] });
+    assert.ok(v.tableView.visibleCols.includes('status'));
+  }
+});
+
+test('a Play next view created before statuses gets their exclusion, unless it was edited', () => {
+  const { getListViews } = views();
+  const legacy = {
+    rangeFilters: { playtime: { min: '', max: '2' } },
+    sorts: [{ key: 'tasteFit', dir: 'desc' }],
+    visibleCols: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres'],
+    columnOrder: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres'],
+  };
+  const edited = { ...legacy, sorts: [{ key: 'hltbAll', dir: 'asc' }] };
+  require('../public/prefs.ts').setPref('listViews', {
+    owned: [
+      { id: 'a', name: 'Play next', template: 'play-next', tableView: legacy },
+      { id: 'b', name: 'Mine', template: 'play-next', tableView: edited },
+    ],
+  });
+  const [patched, kept] = getListViews('owned');
+  assert.deepEqual(patched.tableView.excludeFilters, { status: ['Finished', 'Abandoned'] });
+  assert.ok(patched.tableView.visibleCols.includes('status'));
+  assert.deepEqual(kept.tableView, edited);
+});

@@ -167,6 +167,7 @@ import {
   saveListViewTable,
   templateView,
 } from './listViews.ts';
+import { STATUS_LABELS, getStatus, statusesApply } from './gameStatuses.ts';
 import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
 import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
@@ -430,6 +431,21 @@ const LAST_PLAYED_COLUMN: ColumnDef<Record<string, any>> = {
   category: 'Play Time & Dates',
 };
 
+// The viewer's own status (gameStatuses.ts), on their own account's games only; its label is the
+// value, which Play next's exclusion filter matches.
+const STATUS_COLUMN: ColumnDef<Record<string, any>> = {
+  key: 'status',
+  label: 'Status',
+  groupable: true,
+  value: (row) => {
+    const status = statusesApply() ? getStatus(row.appid) : null;
+    return status && STATUS_LABELS[status];
+  },
+  format: fmt.str,
+  keepVisibleWhenGrouped: true,
+  category: 'Play Time & Dates',
+};
+
 const WISHLIST_RANK_COLUMN: ColumnDef<Record<string, any>> = {
   key: 'priority',
   label: 'Wishlist Rank',
@@ -452,7 +468,13 @@ const WISHLIST_DATE_ADDED_COLUMN: ColumnDef<Record<string, any>> = {
   category: 'Play Time & Dates',
 };
 
-const OWNED_COLUMNS = insertColumnsAfter(CORE_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
+const OWNED_COLUMNS = insertColumnsAfter(
+  CORE_COLUMNS,
+  'hltbCompletionist',
+  PLAYTIME_COLUMN,
+  LAST_PLAYED_COLUMN,
+  STATUS_COLUMN,
+);
 const OWNED_DEFAULT_VISIBLE = ['capsule', 'name', 'steamdbRating', 'hltbAll', 'releaseDate', 'genres', 'playtime'];
 
 // 'recent' (the "Recently Looked Up" system list) is CORE_COLUMNS plus OWNERSHIP_STATUS_COLUMN
@@ -481,7 +503,13 @@ const LOOKED_UP_DEFAULT_VISIBLE = ['lookedUp', ...RECENT_DEFAULT_VISIBLE];
 const LOOKED_UP_DEFAULT_SORT: SortEntry[] = [{ key: 'lookedUp', dir: 'asc' }];
 // A user list also gets the current account's Played/Last Played (stamped from myOwnership.ts,
 // the same fetch as the ✓/☆ markers) — hidden by default, there to filter/sort on.
-const USER_COLUMNS = insertColumnsAfter(RECENT_COLUMNS, 'hltbCompletionist', PLAYTIME_COLUMN, LAST_PLAYED_COLUMN);
+const USER_COLUMNS = insertColumnsAfter(
+  RECENT_COLUMNS,
+  'hltbCompletionist',
+  PLAYTIME_COLUMN,
+  LAST_PLAYED_COLUMN,
+  STATUS_COLUMN,
+);
 
 const WISHLIST_COLUMNS = insertColumnsAfter(
   insertColumnsAfter(insertColumnsAfter(CORE_COLUMNS, 'name', WISHLIST_RANK_COLUMN), 'priority', ...PRICE_COLUMNS),
@@ -3711,6 +3739,7 @@ export default function ListRoute() {
     return rows ? topPlayedTags(rows, PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 };
   });
   const playsMostly = () => playsMostlyProfile().tags;
+  const ownStatus = (g: { appid: number }) => (statusesApply() ? getStatus(g.appid) : null);
   // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
   const playtimeHidden = createMemo(() => {
     const rows = profileRows();
@@ -3720,12 +3749,14 @@ export default function ListRoute() {
     const rows = profileRows();
     if (!rows) return { style: null, story: null };
     const hours = (g: ProfileGame) => (g as Game).playtime ?? 0;
-    return { style: playStyle(rows, hours), story: storyGames(rows, hours) };
+    return { style: playStyle(rows, hours), story: storyGames(rows, hours, ownStatus) };
   });
   // The games Play next lists (listViews.ts), counted the same way so the two agree.
   const unplayed = createMemo(() => {
     const rows = profileRows();
-    return rows && !playtimeHidden() ? rows.filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS).length : 0;
+    return rows && !playtimeHidden()
+      ? rows.filter((g) => (g.playtime ?? 0) <= PLAY_NEXT_MAX_HOURS && !ownStatus(g)).length
+      : 0;
   });
   const backlogShown = () => activeView()?.template === PLAY_NEXT;
   // Opens the Play next view (created the first time), or back to All games when it's open.
@@ -3770,6 +3801,7 @@ export default function ListRoute() {
               art: artOf(appid),
               hours: row.playtime ?? 0,
               main: row.hltbMain ?? null,
+              status: ownStatus(row),
             }
           );
         }}

@@ -2264,6 +2264,22 @@
   .panel-ownership-badge:hover {
     text-decoration: underline;
   }
+  /* Floated, not flex: the release line's " · " separator keeps its spaces. */
+  .panel-status {
+    float: right;
+    margin-left: 8px;
+    height: 24px;
+    padding: 0 2px 0 6px;
+    border: 0;
+    border-radius: var(--radius-2);
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    color: var(--muted);
+    font-size: var(--fs-meta);
+  }
+  .panel-status.set {
+    color: var(--text);
+    font-weight: 600;
+  }
   /* The narrowest phones: the mark alone, so the action row stays one line (the link keeps its name). */
   @media (max-width: 359px) {
     .panel-ownership-label {

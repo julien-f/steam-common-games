@@ -36,7 +36,6 @@ UX backlog from `ux-review` runs against [journeys.md](journeys.md) and [ui-guid
 - **U194 · minor · L1, I2** — focus still drops to `<body>` when the selection bar unmounts after Exclude, Remove from this list, Clear selection or Re-rank (Add now hands focus to a selected row). Have the bar hand focus back on unmount whenever it held focus.
 - **U214 · minor · F3, L5** — Play next ranks an owned game that isn't out yet ("Coming soon", e.g. a pre-order) at the top, though it can't be played tonight. Leave unreleased games out of Play next and Short games.
 - **U216 · minor · F3, L5, P1** — no view answers "runs on my Linux PC or Steam Deck": filtering on ProtonDB Gold or better (or native Linux) is several clicks each time. A suggested view on Owned, and on Wishlist if it proves useful; rated the most useful missing view in a persona review.
-- **U227 · minor · F3, L5, A5** — Steam can't tell a finished or dropped game from one never started: Play next and Short games offer games already finished or abandoned (often under 2 h), and the story tile infers "played through" from hours. Personal statuses (Playing, Finished, Abandoned, Shelved) set from the panel, a Status column, and Play next/Short games leaving finished and abandoned games out. From the Backloggd study (2026-10-30).
 
 ## Taste profile
 

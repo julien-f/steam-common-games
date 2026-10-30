@@ -833,6 +833,36 @@ test('A5 edge: what to play next counts a preorder, which its Released date show
   await expect(row(page, 'Counter-Strike 2')).toHaveCount(1); // free, but playable now
 });
 
+test('F3 edge: a game marked Finished in its panel leaves Play next and its count, and stays marked', async ({
+  page,
+}) => {
+  await asPlayer(page, DAVE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(DAVE.owned.length);
+  await page.getByRole('button', { name: 'Play next: 4 games played 2 h or less' }).click();
+  await expect(rows(page)).toHaveCount(4);
+  await row(page, 'Counter-Strike 2').getByText('Counter-Strike 2').click();
+  const status = page.locator('.game-panel').getByRole('combobox', { name: 'Status' });
+  await status.selectOption('Finished');
+  await expect(rows(page)).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'Play next: 3 games played 2 h or less' })).toBeVisible();
+  await page.reload();
+  await expect(rows(page)).toHaveCount(3);
+  await page.keyboard.press('Escape'); // the reload reopened the panel, over the page on a phone
+  await page.getByRole('button', { name: 'Play next: 3 games played 2 h or less' }).click(); // back to All games
+  await expect(row(page, 'Counter-Strike 2').getByRole('cell', { name: 'Finished' })).toHaveCount(0); // Status is hidden
+  await row(page, 'Counter-Strike 2').getByText('Counter-Strike 2').click();
+  await expect(status).toHaveValue('finished');
+});
+
+test("F3 edge: someone else's library from a link offers no status to set", async ({ page }) => {
+  await asPlayer(page, DAVE);
+  await page.goto(`/lists/owned?u=${ALICE.steamid}&game=620`);
+  const panel = page.locator('.game-panel');
+  await expect(panel.getByRole('link', { name: 'In library' })).toBeVisible();
+  await expect(panel.getByRole('combobox', { name: 'Status' })).toHaveCount(0);
+});
+
 test('A5 edge: an account with no playtime at all says why it has no profile', async ({ page }) => {
   await asPlayer(page, BOB);
   await page.goto('/lists/owned');

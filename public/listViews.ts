@@ -5,6 +5,7 @@ import { getPref, setPref } from './prefs.ts';
 import { stripTransientViewFields } from './tableViewSync.ts';
 import type { SavedView } from './types.ts';
 import { DEAL_RECORD_TIERS } from './utils.ts';
+import { STATUS_LABELS } from './gameStatuses.ts';
 
 export type ViewKind = 'owned' | 'wishlist';
 type ListViews = Partial<Record<ViewKind, SavedView[]>>;
@@ -12,7 +13,8 @@ type ListViews = Partial<Record<ViewKind, SavedView[]>>;
 export const LIST_VIEWS_KEY = 'listViews';
 
 function read(): ListViews {
-  return getPref<ListViews>(LIST_VIEWS_KEY, {});
+  const views = getPref<ListViews>(LIST_VIEWS_KEY, {});
+  return { ...views, owned: views.owned?.map(withStatusExclusion) };
 }
 function write(kind: ViewKind, views: SavedView[]): void {
   setPref(LIST_VIEWS_KEY, { ...read(), [kind]: views });
@@ -73,6 +75,9 @@ export interface ViewTemplate {
   needsPrices?: boolean;
 }
 
+// Barely played isn't unplayed: a game finished elsewhere or dropped early isn't one to play next.
+const NOT_DONE = { status: [STATUS_LABELS.finished, STATUS_LABELS.abandoned] };
+
 // Price Status at a 1-year low or better.
 const BARGAIN_STATUSES = DEAL_RECORD_TIERS.filter((t) => t.tier !== '3mo').map((t) => t.statusLabel);
 
@@ -91,9 +96,10 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
     name: 'Play next',
     view: {
       rangeFilters: { playtime: { min: '', max: String(PLAY_NEXT_MAX_HOURS) } },
+      excludeFilters: NOT_DONE,
       sorts: [{ key: 'tasteFit', dir: 'desc' }],
     },
-    cols: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres'],
+    cols: ['capsule', 'name', 'tasteFit', 'steamdbRating', 'hltbAll', 'playtime', 'genres', 'status'],
   },
   {
     id: 'short-games',
@@ -106,9 +112,10 @@ export const VIEW_TEMPLATES: readonly ViewTemplate[] = [
         // https://github.com/vatesfr/data-table/issues/47 is fixed.
         hltbMain: { min: '0.1', max: '5' },
       },
+      excludeFilters: NOT_DONE,
       // No sort: Owned's default, best rated first.
     },
-    cols: ['capsule', 'name', 'hltbMain', 'steamdbRating', 'tasteFit', 'playtime', 'genres'],
+    cols: ['capsule', 'name', 'hltbMain', 'steamdbRating', 'tasteFit', 'playtime', 'genres', 'status'],
   },
   {
     id: 'bargains',
@@ -141,13 +148,20 @@ export function templateView(kind: ViewKind, templateId: string): SavedView | un
   return getListViews(kind).find((v) => v.template === templateId);
 }
 
+// `visibleCols` is a set: the order comes from `columnOrder`.
+const stamp = ({ view, cols }: Pick<ViewTemplate, 'view' | 'cols'>) =>
+  stripTransientViewFields({ ...view, visibleCols: cols, columnOrder: cols });
+
 export function createFromTemplate(template: ViewTemplate): SavedView {
-  // `visibleCols` is a set: the order comes from `columnOrder`.
-  const { cols } = template;
-  return createListView(
-    template.kind,
-    template.name,
-    { ...template.view, visibleCols: cols, columnOrder: cols },
-    template.id,
-  );
+  return createListView(template.kind, template.name, stamp(template), template.id);
+}
+
+// A view created before statuses existed, never edited since, gets their exclusion; an edited one is left as it is.
+// Remove once no stored view predates it.
+function withStatusExclusion(saved: SavedView): SavedView {
+  const template = VIEW_TEMPLATES.find((t) => t.id === saved.template && t.view.excludeFilters === NOT_DONE);
+  if (!template) return saved;
+  const { excludeFilters: _added, ...view } = template.view;
+  const before = stamp({ view, cols: template.cols.filter((c) => c !== 'status') });
+  return JSON.stringify(saved.tableView) === JSON.stringify(before) ? { ...saved, tableView: stamp(template) } : saved;
 }

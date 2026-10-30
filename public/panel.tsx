@@ -26,6 +26,7 @@ import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
+import { STATUS_LABELS, getStatus, setStatus, statusesApply, type GameStatus } from './gameStatuses.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
 import { accountDisplayLabel, getEffectiveCurrentAccount } from './accountsStore.ts';
@@ -2486,6 +2487,24 @@ function RefreshButton(props: { game: ReadonlyGame }): JSX.Element {
 // name-cell markers (see gameColumns.ts) — a standalone lookup or a DLC hop is never one of those
 // rows and would have no badge at all. The resource answers for any open game, and both go
 // through myOwnership.ts's one cached pair of sets, so they can't disagree.
+// The player's own status for a game of theirs (gameStatuses.ts), which Steam can't tell from hours.
+function StatusSelect(props: { appid: number }): JSX.Element {
+  const status = () => getStatus(props.appid);
+  return (
+    <select
+      class="panel-status"
+      classList={{ set: !!status() }}
+      aria-label="Status"
+      title="Marked finished or abandoned, Play next leaves it out"
+      value={status() ?? ''}
+      onChange={(e) => setStatus(props.appid, (e.currentTarget.value || null) as GameStatus | null)}
+    >
+      <option value="">{status() ? 'No status' : 'Mark…'}</option>
+      <For each={Object.entries(STATUS_LABELS)}>{([value, label]) => <option value={value}>{label}</option>}</For>
+    </select>
+  );
+}
+
 function OwnershipRow(props: { game: ReadonlyGame }): JSX.Element {
   const own = () => panelData.ownership();
   return (
@@ -2625,6 +2644,8 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
   // whether there's a base game to show.
   const releaseDate = () => meta()?.releaseDate;
   const hasBaseGame = () => !g.loading && !!meta()?.fullgame;
+  // On this line, which has room: the action row below has none on a phone.
+  const statusShown = () => !!panelData.ownership()?.inLibrary && statusesApply();
 
   return (
     <>
@@ -2650,7 +2671,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
             <h2 class="panel-title" id="panel-title">
               {g.name || `App ${g.appid}`}
             </h2>
-            <Show when={releaseDate() || hasBaseGame()}>
+            <Show when={releaseDate() || hasBaseGame() || statusShown()}>
               <div class="panel-release">
                 <Show when={releaseDate()}>{(r) => <DayText text={fmtReleaseDate(r())} />}</Show>
                 <Show when={releaseDate() && hasBaseGame()}>
@@ -2658,6 +2679,9 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
                 </Show>
                 <Show when={hasBaseGame()}>
                   <BaseGameLink game={g} />
+                </Show>
+                <Show when={statusShown()}>
+                  <StatusSelect appid={g.appid} />
                 </Show>
               </div>
             </Show>

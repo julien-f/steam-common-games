@@ -37,8 +37,8 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Views** of Owned and Wishlist keep several named layouts of one list (columns, sort, grouping, filters), opened as tabs under its header: **All games**, then each view.
   - **New view** (beside Rank this list) saves the table as it is now, or offers ready-made ones, each showing only the columns that matter to it:
     - **Recently played** (Owned): last played first.
-    - **Play next** (Owned): played 2 h or less, best Taste fit first.
-    - **Short games** (Owned): played 2 h or less with a main story of 5 h or less on How Long To Beat, best rated first.
+    - **Play next** (Owned): played 2 h or less and not marked Finished or Abandoned (see [Statuses](#statuses)), best Taste fit first.
+    - **Short games** (Owned): the same, with a main story of 5 h or less on How Long To Beat, best rated first.
     - **Bargains** (Wishlist): at a 1-year or all-time low, biggest discount first.
   - Changing a view's table doesn't save it: **Save** or **Revert** in the banner above it; leaving the view drops the changes. Its **⋯** renames or deletes it.
   - A view follows the account you're exploring, like Owned and Wishlist themselves; Home's Owned and Wishlist cards link each one.
@@ -50,7 +50,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
 - **Your player profile**, on Owned once every game's details are in, from 5 played games (software such as Wallpaper Engine or RPG Maker counts toward none of it). With no playtime on any game — Steam lets an account keep its playtime private — it says so instead.
   - **An archetype**: Story finisher, Solo explorer, Co-op crew, Competitor or Squad player, from whether the account mostly plays single-player, co-op or PvP games and how many story games it plays through. A Family gets none, its profile mixing its members.
   - **Plays mostly**: the Steam tags the account spends its time on (weighted by playtime, tags most of the library carries counting less), each a bar showing its weight next to the top one, and a button filtering the list by that tag (4 on a phone, 6 otherwise). It says how many played games it's built from.
-  - **Story games**: a ring counting the story games played for as long as their main story takes on How Long To Beat.
+  - **Story games**: a ring counting the story games played for as long as their main story takes on How Long To Beat; one you marked Finished counts whatever its hours, one marked Abandoned falls short.
   - **Barely played**: how many games were played 2 h or less, with **Play next** opening the **Play next** [view](#lists) — creating it the first time — and a second click going back to All games. Zero hours also covers games played before Steam tracked playtime, or on another account.
   - The play style and story games each need 8 played games (an hour or more). **Why these?** opens the evidence in place: under each tag, the played games counting most toward it with their hours; in the story tile, each story game's hours against its main story (the 5 most played that reached it, then those that fell short); and a folded **How it's counted**. Every game opens its panel.
 - **Filtering by Steam tag** (the Tags column, or a tag in a game's panel) ranks the matches by **Tag match**: how strongly players tagged each game with them, from 100% (its top tag) down. With several tags it's their average, or on the filter's **All** mode the weakest one, so a game must carry them all. Filter Tag match (e.g. 50% and up) to keep only the games where the tag really matters. Clearing the tag filter restores the previous sort and drops that Tag match filter. In the game's panel, a gauge under each Steam tag shows that same strength.
@@ -144,6 +144,13 @@ Clicking a screenshot or trailer (or **Enter** on it) opens it full-window:
 - Trailers play with sound where the browser allows it; where it doesn't, muted, with an **Unmute** button. Muting is remembered for the next trailers, and one that ends offers a replay.
 - Its controls show when the mouse moves or on a tap, and stay out of the way otherwise; used from the keyboard, nothing but the media shows, plus a brief counter after each step. The first time, a hint says what the arrows do.
 - The media fills the screen, its controls over it: the game's name and its place in the list top-left, then which media of the game (`3 / 12`); the Zoom button only when a screenshot is shown smaller than its real size.
+
+### Statuses
+
+**Status**, beside the release date of a game you own: mark it **Finished** or **Abandoned**, which Steam can't tell from hours (a game finished on another platform, or dropped after 20 minutes). Play next and Short games leave those games out, the Barely played count too, and the story games tile takes your word over the hours. A **Status** column (hidden by default) shows them on Owned and on your lists.
+
+- Statuses are yours: they show on your ★ account (or a Family you're in), or with no ★ account on the one you picked — not on someone else's library, even from a link. Signed in, they sync like your lists.
+- A Play next or Short games view you never edited picks up the exclusion; one you edited stays as you left it.
 
 ### Presenting on a second screen
 

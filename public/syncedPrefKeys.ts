@@ -7,6 +7,7 @@ export const SYNCED_PREF_KEYS: readonly string[] = [
   'currentAccount',
   'recentAccounts',
   'recentGames',
+  'gameStatuses',
   'bundleSnapshots',
   'region',
   'lists',

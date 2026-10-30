@@ -113,8 +113,8 @@ export function setPref(key: string, value: unknown): void {
   else pushPrefToServer(key, value, updatedAt);
 }
 
-// Written per compare answer, list view change or lookup: pushing each would trip PUT /api/me/prefs/:key's per-minute limit.
-const DEBOUNCED_PUSH_PREFIXES = ['ranking:', 'lists', 'recentGames'];
+// Written per compare answer, list view change, lookup or status: pushing each would trip PUT /api/me/prefs/:key's per-minute limit.
+const DEBOUNCED_PUSH_PREFIXES = ['ranking:', 'lists', 'recentGames', 'gameStatuses'];
 const PUSH_DEBOUNCE_MS = 3000;
 const pendingPushes = new Map<string, ReturnType<typeof setTimeout>>();
 
