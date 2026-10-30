@@ -79,6 +79,7 @@ import Trophy from 'lucide-solid/icons/trophy';
 import Users from 'lucide-solid/icons/users';
 import X from 'lucide-solid/icons/x';
 import type { AccountSlot, Folder, GameList, ListRef, CombineOp } from './types.ts';
+import { MAX_RECENT_GAMES } from './recentGames.ts';
 
 // `personastate`/`gameextrainfo` ride on the same 6h library cache tier as the rest of an
 // account's data (see toAccountPlayer in accountData.ts) — real data, just not live — so the
@@ -305,7 +306,7 @@ export default function HomeRoute() {
       name: 'Recently Looked Up',
       href: accountLink('/game'),
       icon: RotateCcwClock,
-      description: 'The last 10 games you searched for',
+      description: `The last ${MAX_RECENT_GAMES} games you searched for`,
     },
   ];
 

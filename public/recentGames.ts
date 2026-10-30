@@ -18,7 +18,7 @@ import { getPref, setPref } from './prefs.ts';
 // listResolve.ts), so there's no soft-delete concern to carry over.
 
 const RECENT_GAMES_PREF_KEY = 'recentGames';
-export const MAX_RECENT_GAMES = 10;
+export const MAX_RECENT_GAMES = 500;
 
 export interface RecentGame {
   appid: number;

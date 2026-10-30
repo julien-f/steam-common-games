@@ -104,6 +104,9 @@ export function gameSearchMoreHtml(label: string, active = false): string {
 // genuinely empty box: one or more characters typed means the user is searching, and a
 // half-typed term (below GAME_SEARCH_MIN_CHARS) showing an unrelated recents list instead of
 // simply nothing would read as a broken search, not as a shortcut.
+// The dropdown shows the latest few; its "see all" row opens the whole history.
+const RECENTS_SHOWN = 10;
+
 export function shouldShowRecents(rawValue: string): boolean {
   return rawValue.trim() === '';
 }
@@ -258,7 +261,7 @@ export function initGameSearch({
   function showRecents(): boolean {
     const list = recents();
     if (!list.length) return false;
-    showResults(list, { recent: true });
+    showResults(list.slice(0, RECENTS_SHOWN), { recent: true });
     return true;
   }
 

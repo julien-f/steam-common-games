@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Owned's profile and taste, and a comparison's player profiles, no longer hold up the page as the last game details land, and a game's Refresh details no longer recomputes them
 - Game lists load less data: a game's screenshots and trailers load when it's opened
 - Game search leaves out demos; a game's panel still links its own
+- Recently Looked Up keeps the last 500 games instead of 10; the search box still suggests the latest 10
 
 ### Fixed
 

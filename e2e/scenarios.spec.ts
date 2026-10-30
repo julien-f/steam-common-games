@@ -10,6 +10,7 @@ import {
   BOB,
   BUNDLE,
   CAROL,
+  CATALOG,
   DAVE,
   ERIN,
   PICK_BUNDLE,
@@ -3266,7 +3267,7 @@ test('L5 edge: a link to a deleted view shows the whole list, and says so', asyn
   await expect(page.getByText('This view no longer exists')).toBeVisible();
 });
 
-test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 10', async ({ page }) => {
+test('L4 edge: Recently Looked Up lists the latest lookup first, and says it keeps 500', async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
@@ -3284,9 +3285,19 @@ test('L4 edge: Recently Looked Up lists the latest lookup first, and says it kee
   await page.goto('/game');
   await expect(rows(page)).toHaveCount(2);
   await expect(rows(page).first()).toContainText('Valheim');
-  await expect(page.locator('.list-hero')).toContainText('last 10');
+  await expect(page.locator('.list-hero')).toContainText('last 500');
   // A number column whose cells read as text ("Latest") stays start-aligned.
   await expect(page.locator('.dt-td[data-col-key="lookedUp"]').first()).toHaveCSS('text-align', 'start');
+});
+
+test('L4 edge: the search box lists the latest 10 lookups, and links the rest', async ({ page }) => {
+  const recents = CATALOG.slice(0, 11).map((g) => g.appid);
+  await asPlayer(page, ALICE, { recentGames: recents });
+  await page.goto('/game');
+  await expect(rows(page)).toHaveCount(11);
+  await page.getByPlaceholder('Look up any game…').click();
+  await expect(page.locator('.game-search-result')).toHaveCount(10);
+  await expect(page.locator('.game-search-result').first()).toContainText(CATALOG[0].name);
 });
 
 test("R1 edge: a ranking card's HLTB time is the table's, rounded and labelled", async ({ page }) => {
