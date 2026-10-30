@@ -1184,6 +1184,13 @@ async function sentOnAir(shown: Page) {
       .map((m) => m.onAir as { appid: number; item: { shotId: string } }),
   );
 }
+// The lightbox's still drawn among all its game's media: not loading alone holds before they arrive.
+async function stillShown(page: Page, status: string) {
+  const lb = page.locator('#screenshot-lightbox');
+  await expect(lb.locator('.lb-status')).toContainText(status);
+  await expect(lb).not.toHaveClass(/lb--loading/);
+}
+
 async function sentShots(shown: Page) {
   return (await sentOnAir(shown)).map((m) => m.item.shotId);
 }
@@ -5843,7 +5850,7 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   const box = (await img.boundingBox())!;
   await page.mouse.move(box.x + 5, 450); // the backdrop, beside the picture
   await page.mouse.move(box.x - 20, 450);
@@ -5974,7 +5981,7 @@ test('F1 edge: on a phone, a sideways swipe drags the next media in beside the o
   // The panel's settle-delayed loads land right after the media do: a gesture during them loses touches (C224).
   const panelSettled = page.waitForResponse('**/api/game-news/**');
   await page.goto('/lists/owned?game=1145360&shot=s1');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   await panelSettled;
   const peek = page.locator('.lb-peek');
   const cdp = await page.context().newCDPSession(page);
@@ -5993,7 +6000,7 @@ test('F1 edge: on a phone, a pinch zooms around the point between the fingers', 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
-  await expect(page.locator('#screenshot-lightbox')).not.toHaveClass(/lb--loading/);
+  await stillShown(page, 'Screenshot 1 of 3');
   const before = (await img.boundingBox())!;
   const mid = { x: before.x + before.width * 0.75, y: before.y + before.height / 2 };
   const cdp = await page.context().newCDPSession(page);
