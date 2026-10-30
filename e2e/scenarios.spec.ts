@@ -4176,17 +4176,17 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
 
 test("B2 edge: another region's prices state their own age, not the previous region's", async ({ page }) => {
   await asPlayer(page, ALICE);
-  let fetchedAt = Date.now() - 3 * 86400_000;
+  const threeDaysAgo = Date.now() - 3 * 86400_000;
   await page.route(/\/api\/prices\?/, (route) => {
     const req = route.request();
     const { body } = respond(req.method(), new URL(req.url()), req.postData());
-    return route.fulfill({ json: { ...JSON.parse(body), fetchedAt } });
+    return route.fulfill({ json: { ...JSON.parse(body), fetchedAt: threeDaysAgo } });
   });
   await page.goto('/lists/wishlist');
   const prices = page.locator('.list-stat', { hasText: 'Prices' });
   await expect(prices).toContainText('3 days ago');
 
-  fetchedAt = Date.now(); // not the mock's own, which dates from the worker's start
+  await page.unroute(/\/api\/prices\?/);
   await page.getByTitle('Preferences').click();
   await page.locator('#nav-region-select').selectOption({ label: 'United States (USD)' });
   await expect(prices).toContainText('United States');
