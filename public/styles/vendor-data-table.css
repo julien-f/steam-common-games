@@ -94,6 +94,16 @@ html:root {
     scale: 0.98;
   }
 }
+/* A load's first rows, staggered (motion.ts's cascadeFirstRows). */
+.dt-tr--arrive {
+  animation: row-arrive var(--dur-3) var(--ease-out) calc(var(--i) * 30ms) backwards;
+}
+@keyframes row-arrive {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
 /* An image column (thumbnails, /bundles' covers) only as wide as its images: a sized cell takes none of the table's spare width. */
 .dt-td:has(.game-thumb, .bundle-covers) {
   width: 1px;

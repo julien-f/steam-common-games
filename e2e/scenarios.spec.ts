@@ -7142,6 +7142,28 @@ test('I2 edge: under reduced motion, a section shuts at once', async ({ page }) 
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
 
+  test("A1 edge: a list's first rows come in staggered, and a refresh doesn't replay it", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { arrivals: string[] };
+      w.arrivals = [];
+      new MutationObserver((records) => {
+        for (const r of records)
+          if ((r.target as Element).classList.contains('dt-tr--arrive'))
+            w.arrivals.push((r.target as HTMLElement).dataset.procIdx!);
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    });
+    const arrivals = () => page.evaluate(() => (window as unknown as { arrivals: string[] }).arrivals);
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await expect(rows(page)).toHaveCount(6);
+    await expect.poll(arrivals).toEqual(['0', '1', '2', '3', '4', '5']);
+    await expect(page.locator('.dt-tr--arrive')).toHaveCount(0);
+    await page.getByRole('button', { name: /^Updated\b/ }).click();
+    await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
+    await expect(rows(page)).toHaveCount(6);
+    expect(await arrivals()).toHaveLength(6);
+  });
+
   test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
     page,
   }) => {

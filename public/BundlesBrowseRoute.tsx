@@ -23,6 +23,7 @@ import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } 
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
+import { cascadeFirstRows } from './motion.ts';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
 import { fadeInOnLoad, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
@@ -303,6 +304,11 @@ export default function BundlesBrowseRoute() {
   const table = createTableState<BundleRow>(rows, COLUMNS, {
     initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
   });
+  let tableContainer: HTMLDivElement | undefined;
+  cascadeFirstRows(
+    () => table.processedData().length,
+    () => tableContainer,
+  );
   // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
@@ -504,7 +510,7 @@ export default function BundlesBrowseRoute() {
         <Show when={statusText()}>
           <div class="bundles-status">{statusText()}</div>
         </Show>
-        <div class="table-container">
+        <div class="table-container" ref={tableContainer}>
           <DataTableView<BundleRow>
             table={table}
             rowKey="id"
