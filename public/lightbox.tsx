@@ -478,7 +478,7 @@ function toggleLbFullscreen(lb: HTMLElement) {
 }
 
 // Firefox for Android puts the system orientation back over our landscape lock when a trailer loaded
-// before fullscreen ends or is stepped off: enter with none, held where it was. Remove once fixed upstream.
+// before fullscreen ends or is stepped off: enter with none, held where it was. Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=2087592 is fixed.
 const FIREFOX_ANDROID = /Android.*Firefox\//.test(navigator.userAgent);
 function holdLbTrailerForFullscreen() {
   if (!FIREFOX_ANDROID || !lbShowingVideo() || lbHeld || lbTvTrailer() || !lbVideoEl.currentSrc) return false;
