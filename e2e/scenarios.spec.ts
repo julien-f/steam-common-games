@@ -5852,12 +5852,15 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   expect(Math.abs(after.x + after.width - 40 * 1.15 - at.x)).toBeLessThan(1);
   await page.keyboard.press('z'); // back out
   await expect(img).not.toHaveAttribute('style', /scale/);
-  // One trackpad gesture, many events: one step.
+  // One trackpad gesture, many events: one step. Frozen, so a slow event can't end the gesture early.
+  await page.clock.install();
+  await page.clock.pauseAt(Date.now() + 60_000);
+  const counter = page.locator('#screenshot-lightbox .lb-counter-n'); // not the status line: its debounce is frozen too
   for (let i = 0; i < 8; i++) await page.mouse.wheel(30, 0);
-  await expect(page.locator('.lb-status')).toContainText('Screenshot 2 of 3');
-  await page.waitForTimeout(400); // the gesture ends
+  await expect(counter).toHaveText('4 / 5'); // Screenshot 2 of 3
+  await page.clock.runFor(400); // the gesture ends
   for (let i = 0; i < 8; i++) await page.mouse.wheel(-30, 0);
-  await expect(page.locator('.lb-status')).toContainText('Screenshot 1 of 3');
+  await expect(counter).toHaveText('3 / 5'); // Screenshot 1 of 3
 });
 
 test('F1 edge: on a zoomed screenshot the arrows pan it, and Esc zooms back out before closing', async ({
