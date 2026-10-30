@@ -1661,15 +1661,16 @@
   }
 
   /* ── The side panel (panel.tsx): a dark column on a hairline, its hero full-bleed. ── */
-  .game-panel {
+  .game-panel,
+  .panel-ghost {
     --panel-pad: 20px;
     /* A trace of the game's art (artTint.ts); --surface itself until it's read, or if it can't be. */
     --panel-ground: color-mix(in oklch, var(--surface), var(--panel-tint, var(--surface)) 12%);
     border-left: 1px solid var(--line-strong);
     background: var(--panel-ground);
   }
-  /* Slides in: from the right beside the content, from the bottom over a phone's screen. Its
-     content goes on close, so it leaves at once. */
+  /* Slides in: from the right beside the content, from the bottom over a phone's screen; its copy
+     (panel.tsx's leavePanelGhost) slides back out the same way. */
   .game-panel.open {
     transition:
       opacity var(--dur-3) var(--ease-out),
@@ -1679,6 +1680,22 @@
     .game-panel.open {
       opacity: 0;
       translate: 24px 0;
+    }
+  }
+  .panel-ghost {
+    pointer-events: none;
+    animation: panel-leave var(--dur-2) var(--ease-out) forwards;
+  }
+  @keyframes panel-leave {
+    to {
+      opacity: 0;
+      translate: 24px 0;
+    }
+  }
+  @keyframes panel-leave-down {
+    to {
+      opacity: 0;
+      translate: 0 32px;
     }
   }
   /* A row click morphs its thumbnail into the hero instead (panel.tsx's openPanelFromRow): the
@@ -1705,7 +1722,8 @@
     object-fit: cover;
   }
   @media (max-width: 768px) {
-    .game-panel {
+    .game-panel,
+    .panel-ghost {
       --panel-pad: var(--gutter);
       border-left: 0;
     }
@@ -1713,6 +1731,9 @@
       .game-panel.open {
         translate: 0 32px;
       }
+    }
+    .panel-ghost {
+      animation-name: panel-leave-down;
     }
   }
 

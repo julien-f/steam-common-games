@@ -44,7 +44,8 @@
 
   /* The side panel (AppShell.tsx): docked beside the content, not modal. Fixed and full-height, so its
      body scrolls on its own; hidden until a game is open. */
-  .game-panel {
+  .game-panel,
+  .panel-ghost {
     display: none;
     position: fixed;
     top: 0;
@@ -58,7 +59,8 @@
     height: 100dvh;
     overflow: hidden;
   }
-  .game-panel.open {
+  .game-panel.open,
+  .panel-ghost {
     display: flex;
   }
   .panel-body {
@@ -67,7 +69,8 @@
   }
   /* Phone: it covers the screen, edge to edge rather than 100vw, which counts the scrollbar. */
   @media (max-width: 768px) {
-    .game-panel.open {
+    .game-panel.open,
+    .panel-ghost {
       z-index: 101;
       left: 0;
       width: auto;

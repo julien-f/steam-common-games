@@ -7093,8 +7093,88 @@ test('F1 edge: under reduced motion the lightbox opens and closes without morphi
   expect(await page.evaluate(() => (window as unknown as { transitions: number }).transitions)).toBe(0);
 });
 
+// Counts the panel's sliding-out copies, and the ids they duplicate while there.
+async function watchPanelGhosts(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { ghosts: number; dupIds: number };
+    w.ghosts = 0;
+    w.dupIds = 0;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if ((n as Element).classList?.contains('panel-ghost')) {
+            w.ghosts++;
+            const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
+            w.dupIds += ids.length - new Set(ids).size;
+          }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  return () => page.evaluate(() => (window as unknown as { ghosts: number; dupIds: number }).ghosts);
+}
+
+test('I2 edge: under reduced motion, a closed panel leaves no sliding copy', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const ghosts = await watchPanelGhosts(page);
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('#panel-title')).toBeHidden();
+  expect(await ghosts()).toBe(0);
+});
+
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
+
+  test('I2 edge: a closed panel slides out as a copy without ids, which then goes', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect.poll(ghosts).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { dupIds: number }).dupIds)).toBe(0);
+    await expect(page.locator('.panel-ghost')).toHaveCount(0);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    await expect(row(page, 'Hades')).toBeFocused();
+  });
+
+  test('I2 edge: leaving the route closes the panel without a sliding copy', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    // A DOM click: on a phone the panel covers the nav.
+    await page.getByRole('link', { name: 'Home', exact: true }).evaluate((a: HTMLElement) => a.click());
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    expect(await ghosts()).toBe(0);
+  });
+
+  test('I2 edge: on a phone, a swiped-away panel leaves no second, sliding copy', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'touch only');
+    await page.clock.install();
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    // Synthetic events: Chromium holds back real touchmoves within its slop.
+    await page.locator('#panel-title').evaluate((title) => {
+      const y = title.getBoundingClientRect().top + 5;
+      const fire = (type: string, x: number) => {
+        const touch = new Touch({ identifier: 1, target: title, clientX: x, clientY: y });
+        const touches = type === 'touchend' ? [] : [touch];
+        title.dispatchEvent(
+          new TouchEvent(type, { bubbles: true, cancelable: true, touches, changedTouches: [touch] }),
+        );
+      };
+      fire('touchstart', 40);
+      for (const x of [50, 100, 160, 220]) fire('touchmove', x);
+      fire('touchend', 220);
+    });
+    await page.clock.runFor(500);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    expect(await ghosts()).toBe(0);
+  });
 
   test('I2 edge: the panel slides in to rest, focus on its hero', async ({ page }) => {
     await asPlayer(page, ALICE);
