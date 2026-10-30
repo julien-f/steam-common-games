@@ -7122,8 +7122,54 @@ test('I2 edge: under reduced motion, a closed panel leaves no sliding copy', asy
   expect(await ghosts()).toBe(0);
 });
 
+// Clicks a section's toggle and reports, in that same task, its body's state.
+const toggleSectionNow = (toggle: Locator) =>
+  toggle.evaluate((b: HTMLElement) => {
+    b.click();
+    const body = b.closest('.panel-achievements-card')!.querySelector<HTMLElement>('.panel-collapsible-body');
+    return body && { animations: body.getAnimations().length, inert: body.inert };
+  });
+
+test('I2 edge: under reduced motion, a section shuts at once', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const toggle = page.locator('#panel-section-dlc').getByRole('button', { name: /DLC · 25 available/ });
+  await toggle.click();
+  await expect(page.locator('#panel-section-dlc .panel-collapsible-body')).toBeVisible();
+  expect(await toggleSectionNow(toggle)).toBeNull();
+});
+
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
+
+  test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    const card = page.locator('#panel-section-dlc');
+    const toggle = card.getByRole('button', { name: /DLC · 25 available/ });
+    const body = card.locator('.panel-collapsible-body');
+    // Not the loading shimmer's endless loop, which can't be finished.
+    const finishAll = () =>
+      page.evaluate(() =>
+        document.getAnimations().forEach((a) => a.effect?.getComputedTiming().endTime !== Infinity && a.finish()),
+      );
+    expect(await toggleSectionNow(toggle)).toEqual({ animations: 1, inert: false });
+    await finishAll();
+    await expect(body).toBeVisible();
+    expect(await toggleSectionNow(toggle)).toEqual({ animations: 1, inert: true });
+    await finishAll();
+    await expect(body).toHaveCount(0);
+    await toggle.click();
+    await finishAll();
+    await page.getByRole('button', { name: 'Next game' }).click();
+    await expect(page.locator('#panel-title')).not.toHaveText('Hades');
+    await page.getByRole('button', { name: 'Previous game' }).click();
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    await expect(body).toBeVisible();
+    expect(await body.evaluate((b) => b.getAnimations().length)).toBe(0);
+  });
 
   test('I2 edge: a closed panel slides out as a copy without ids, which then goes', async ({ page }) => {
     await asPlayer(page, ALICE);

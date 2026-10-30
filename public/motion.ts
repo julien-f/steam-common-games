@@ -15,3 +15,11 @@ export function animate(el: Element, keyframes: Keyframe[], options: KeyframeAni
     () => undefined,
   );
 }
+
+// A `--dur-*` token in ms and `--ease-out`, read from tokens.css, which stays their one source.
+export function durationToken(name: string): number {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+}
+export function easeOut(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue('--ease-out').trim();
+}

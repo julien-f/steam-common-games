@@ -19,7 +19,7 @@ import {
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot, lightboxOpen } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
-import { prefersReducedMotion } from './motion.ts';
+import { animate, durationToken, easeOut, prefersReducedMotion } from './motion.ts';
 import { sampleArtTint } from './artTint.ts';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
@@ -1151,6 +1151,33 @@ function CollapsibleCard(props: {
   linkTitle: string;
 }): JSX.Element {
   const expanded = () => isSectionExpanded(props.appid, props.section);
+  // A click (only: a section opened by itself or reopened on ↑/↓ just shows) slides the body open
+  // or shut; it stays mounted, inert, until a collapse ends, and a click mid-way turns it around.
+  const [closing, setClosing] = createSignal(false);
+  let body: HTMLDivElement | undefined;
+  let slides = 0;
+  const onToggle = () => {
+    const opening = !expanded();
+    const live = body?.isConnected ? body : undefined;
+    const from = live?.getBoundingClientRect().height ?? 0;
+    for (const a of live?.getAnimations() ?? []) a.cancel();
+    setClosing(!opening && !prefersReducedMotion());
+    toggleSection(props.appid, props.section);
+    const el = body?.isConnected ? body : undefined;
+    if (!el) return;
+    el.inert = !opening;
+    const slide = ++slides;
+    const to = opening ? el.getBoundingClientRect().height : 0;
+    const frames = [
+      { height: `${from}px`, overflow: 'clip' },
+      { height: `${to}px`, overflow: 'clip' },
+    ];
+    void animate(el, frames, { duration: durationToken('--dur-3'), easing: easeOut() }).then(() => {
+      if (slide !== slides) return;
+      if (!opening) setClosing(false);
+      updateSubnavScrollSpy();
+    });
+  };
   const numSpan = () =>
     props.num != null ? (
       <span class="panel-glance-num" style={props.numColor ? { color: props.numColor } : undefined}>
@@ -1167,7 +1194,7 @@ function CollapsibleCard(props: {
             type="button"
             class="panel-achievements-chip panel-collapsible-chip"
             aria-expanded={expanded() ? 'true' : 'false'}
-            onClick={() => toggleSection(props.appid, props.section)}
+            onClick={onToggle}
           >
             {numSpan()}
             <span class="panel-glance-val">{props.val}</span>
@@ -1189,8 +1216,10 @@ function CollapsibleCard(props: {
           )}
         </Show>
       </div>
-      <Show when={expanded()}>
-        <div class="panel-achievements-list">{props.body}</div>
+      <Show when={expanded() || closing()}>
+        <div class="panel-collapsible-body" ref={body}>
+          <div class="panel-achievements-list">{props.body}</div>
+        </div>
       </Show>
     </div>
   );
