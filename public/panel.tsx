@@ -2707,7 +2707,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
         {(demo) => (
           <a
             class="btn panel-demo-banner"
-            href={safeHref(`https://store.steampowered.com/app/${demo().appid}`) || undefined}
+            href={safeHref(`https://store.steampowered.com/app/${demo()}`) || undefined}
             target="_blank"
             rel="noopener"
           >

@@ -177,7 +177,7 @@ function details(appid: number, states: ReadonlySet<string>) {
       : g.categories.includes('Co-op')
         ? { tags: ['Action', 'Co-op'], tagWeights: { Action: 1, 'Co-op': COOP_WEIGHT[appid] ?? 0.5 } }
         : { tags: ['Singleplayer'], tagWeights: { Singleplayer: 1 } }),
-    demo: DEMO_OF[appid] ? { appid: DEMO_OF[appid] } : null,
+    demo: DEMO_OF[appid] ?? null,
     protondb: g.protondb ? { tier: g.protondb, confidence: 'strong', total: 100 } : null,
   };
 }

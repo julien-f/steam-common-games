@@ -67,7 +67,7 @@ export interface GameDetails {
   tags: string[] | null;
   tagWeights?: Record<string, number | null> | null; // relative to the game's top tag, 0–1
   protondb: ProtonDb | null;
-  demo: { appid: number } | null;
+  demo: number | null; // the free demo's appid
 }
 
 // /api/game-details/:appid's reply: the details, their ages, and the sources that errored.
