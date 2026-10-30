@@ -4946,6 +4946,24 @@ async function fakePlayback(page: Page) {
   });
 }
 
+test('F1 edge: stepping onto a preloaded screenshot shows it at once, not its thumbnail first', async ({ page }) => {
+  await mockApi(page, { states: ['slow-media'] }); // a screenshot's thumbnail and full image apart
+  await page.goto('/game/1145360?shot=s1');
+  const next = page.locator('.lb-preload[data-src*="Screenshot%202.svg?full"]');
+  await expect.poll(() => next.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  await page.locator('#screenshot-lightbox .lb-img').evaluate((img: HTMLImageElement) => {
+    const w = window as Window & { srcs?: string[] };
+    w.srcs = [];
+    const src = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
+    Object.defineProperty(img, 'src', { get: src.get, set: (v: string) => (w.srcs!.push(v), src.set!.call(img, v)) });
+  });
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toHaveAttribute('src', /Screenshot%202\.svg\?full/);
+  expect(await page.evaluate(() => (window as Window & { srcs?: string[] }).srcs)).toEqual([
+    expect.stringMatching(/Screenshot%202\.svg\?full/),
+  ]);
+});
+
 test('F1 edge: stepping games in the lightbox on Recently Looked Up shows the game stepped to', async ({ page }) => {
   await asPlayer(page, ALICE, { recentGames: [620, 1145360, 892970] });
   await page.goto('/game/1145360?shot=s1');

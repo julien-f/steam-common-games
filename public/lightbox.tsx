@@ -107,7 +107,7 @@ let lbZoom = 1,
   lbLastDir = 0,
   lbVcTimer: ReturnType<typeof setTimeout> | undefined,
   lbCounterTimer: ReturnType<typeof setTimeout> | undefined;
-// Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s onload checks it's still current
+// Bumped on every renderLightbox() call and loadLbImage(); a detached Image()'s decode checks it's still current
 // before touching the shared img element, so a slow load from a shot the viewer already
 // navigated away from can't clobber the one currently displayed — img is reused across shots
 // same as videoEl's _hlsToken guard above.
@@ -546,27 +546,33 @@ function retryCurrentShot() {
   }
 }
 
-// Swaps `src` in once loaded unless a later load started since; opacity 0 on error hides the broken-image icon.
+// Swaps `src` in once decoded (sooner paints a blank frame), at once if already in memory (a preload), unless a later
+// load started since; opacity 0 on error hides the broken-image icon. Returns whether it's shown already.
 function loadLbImage(src: string) {
   const lb = document.getElementById('screenshot-lightbox')!;
   const img = lb.querySelector<HTMLImageElement>('.lb-img')!;
   const token = ++lbImgToken;
-  setLbLoading(lb, true);
   const full = new Image();
-  full.onload = () => {
+  full.src = src;
+  const show = () => {
     if (token !== lbImgToken) return;
     img.src = src;
     img.style.opacity = '1';
     setLbLoading(lb, false);
     syncLbZoomBtn(lb);
   };
-  full.onerror = () => {
+  if (full.complete && full.naturalWidth) {
+    show();
+    return true;
+  }
+  setLbLoading(lb, true);
+  full.decode().then(show, () => {
     if (token !== lbImgToken) return;
     img.style.opacity = '0';
     setLbLoading(lb, false);
     showLbError("Couldn't load this image.");
-  };
-  full.src = src;
+  });
+  return false;
 }
 
 // ── Zoom / pan ─────────────────────────────────────────────────────────────
@@ -1976,18 +1982,16 @@ function renderLightbox() {
       lb.querySelector('.lb-vc-scrub')!.setAttribute('aria-label', 'Seek on the TV');
       schedHideLbChrome();
     } else {
-      // Show a degraded placeholder (the thumbnail, already loaded/cached from
-      // the hero carousel) instead of leaving the *previous* shot on screen
-      // while the full-size image loads. The banner shot has no separate
-      // thumbnail (thumb === main), so there's nothing degraded to show — fall
-      // back to blank there.
-      if (shot.thumb && shot.thumb !== shot.main) {
-        img.style.opacity = '1';
-        img.src = shot.thumb;
-      } else {
-        img.style.opacity = '0';
+      // Until the full image loads, its thumbnail (cached from the hero carousel) rather than the previous shot;
+      // the banner has no separate one (thumb === main): blank there.
+      if (!loadLbImage(shot.main!)) {
+        if (shot.thumb && shot.thumb !== shot.main) {
+          img.style.opacity = '1';
+          img.src = shot.thumb;
+        } else {
+          img.style.opacity = '0';
+        }
       }
-      loadLbImage(shot.main!);
       schedHideLbChrome();
     }
   }
