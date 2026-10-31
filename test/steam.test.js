@@ -484,6 +484,18 @@ test('getOwnedGames: throws user error when library is private', async (t) => {
   );
 });
 
+test('resolveSteamId and getOwnedGames: a reply of another shape is an upstream error, not cached', async (t) => {
+  _reset();
+  let calls = 0;
+  const bodies = [{}, { response: { success: 1 } }, {}, { response: { games: {} } }];
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => bodies[calls++] }));
+  await assert.rejects(() => resolveSteamId('shape'), { isUpstream: true });
+  await assert.rejects(() => resolveSteamId('shape'), { isUpstream: true });
+  await assert.rejects(() => getOwnedGames('76561198000000011'), { isUpstream: true });
+  await assert.rejects(() => getOwnedGames('76561198000000011'), { isUpstream: true });
+  assert.equal(calls, 4);
+});
+
 // ── getWishlist ───────────────────────────────────────────────────────────────
 
 test('getWishlist: fetches and returns wishlist items', async (t) => {
@@ -2184,6 +2196,17 @@ test('getGameNews: returns empty array when newsitems is missing', async (t) => 
     json: async () => ({ appnews: { appid: 400, count: 0 } }),
   }));
   assert.deepEqual(await getGameNews(400), []);
+});
+
+test('getGameNews: a reply of another shape is an upstream error, not cached', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => (calls === 1 ? {} : { appnews: { newsitems: {} } }) };
+  });
+  for (let i = 0; i < 2; i++) await assert.rejects(() => getGameNews(400), { isUpstream: true });
+  assert.equal(calls, 2);
 });
 
 test('getGameNews: feedLabel is null when absent', async (t) => {

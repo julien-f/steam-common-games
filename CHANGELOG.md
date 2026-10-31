@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Games no longer all show no tags after Steam answers the tag list with an empty reply
 - Refreshing an account while Steam fails keeps its known name and avatar instead of showing its Steam ID
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
+- An unexpected reply from Steam or IsThereAnyDeal no longer breaks bundles for hours or shows a cryptic error: it fails that once and is retried
 
 ### Development
 

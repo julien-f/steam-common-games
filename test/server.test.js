@@ -430,6 +430,17 @@ test('POST /api/common-games: 502 when Steam API returns a server error', async 
   assert.equal(res.status, 502);
 });
 
+test('POST /api/common-games: 502 when GetOwnedGames answers {}', async (t) => {
+  _reset();
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('GetPlayerSummaries')) return { ok: true, json: async () => ({ response: { players: [] } }) };
+    return { ok: true, json: async () => ({}) };
+  });
+  const res = await api.post('/api/common-games').send({ members: [ID1, ID2] });
+  assert.equal(res.status, 502);
+});
+
 test('POST /api/common-games: 400 when a library is private', async (t) => {
   _reset();
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -2207,6 +2218,45 @@ test('GET /api/bundles: 502 when the upstream call fails', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
   const res = await api.get('/api/bundles');
   assert.equal(res.status, 502);
+});
+
+test('GET /api/bundles and /api/game-bundles: a non-array 200 is a 502, refetched next time', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  t.mock.method(console, 'error', () => {});
+  setCache('itad-gid:400', 'gid-1');
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    return { ok: true, json: async () => ({ error: 'oops' }) };
+  });
+  for (const path of ['/api/bundles', '/api/bundles', '/api/game-bundles/400', '/api/game-bundles/400']) {
+    const res = await api.get(path);
+    assert.equal(res.status, 502, path);
+  }
+  assert.equal(calls, 4);
+});
+
+test('an unexpected error answers 500 with a generic message, an unreadable reply 502 without quoting it', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const logged = t.mock.method(console, 'error', () => {});
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => {
+      throw new TypeError('Cannot read properties of undefined (internal detail)');
+    },
+  }));
+  let res = await api.get('/api/bundles');
+  assert.equal(res.status, 500);
+  assert.doesNotMatch(res.body.error, /internal detail/);
+  assert.match(String(logged.mock.calls.at(-1).arguments[1]), /internal detail/);
+
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => new Response('<!DOCTYPE html><p>secret</p>', { status: 200 }));
+  res = await api.get('/api/bundles');
+  assert.equal(res.status, 502);
+  assert.doesNotMatch(res.body.error, /DOCTYPE|secret/);
 });
 
 // ── GET /api/game-bundles/:appid ──────────────────────────────────────────────
