@@ -3,7 +3,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { DEMO_OF, LIMITED, mockApi, respond } from './mockApi.ts';
 import { HEARTBEAT_MS, PRESENTATION_CHANNEL } from '../public/presentationProtocol.ts';
 import { hookPresentation, type PresTest } from './presentationHooks.ts';
-import { asPlayer, gate, shot } from './state.ts';
+import { asPlayer, gate, shot, visibleBox } from './state.ts';
 import { row, rows } from './rows.ts';
 import {
   ALICE,
@@ -5067,7 +5067,7 @@ test('M1 edge: on a phone, a double-tap zoom leaves the controls as they were', 
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const lb = page.locator('#screenshot-lightbox');
   await expect(lb).not.toHaveClass(/lb-idle/);
-  const box = (await page.locator('#screenshot-lightbox .lb-img').boundingBox())!;
+  const box = await visibleBox(page.locator('#screenshot-lightbox .lb-img'));
   const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   const cdp = await page.context().newCDPSession(page);
   for (let i = 0; i < 2; i++) {
@@ -5827,7 +5827,7 @@ test('F1 edge: on a phone, a swipe steps without bringing the controls back, and
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const lb = page.locator('#screenshot-lightbox');
-  const box = (await page.locator('#screenshot-lightbox .lb-img').boundingBox())!;
+  const box = await visibleBox(page.locator('#screenshot-lightbox .lb-img'));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
   await page.clock.runFor(3500);
@@ -5900,9 +5900,9 @@ test('F1 edge: on a phone, the previous/next media buttons sit clear of the medi
   type Box = { x: number; y: number; width: number; height: number };
   const clear = async (selector: string) => {
     for (const el of await page.locator(selector).all()) {
-      const m = (await el.boundingBox())!;
+      const m = await visibleBox(el);
       for (const name of ['Previous screenshot', 'Next screenshot']) {
-        const b = (await page.getByRole('button', { name }).boundingBox())!;
+        const b = await visibleBox(page.getByRole('button', { name }));
         expect(overlap(b, m), `${name} vs ${selector}`).toBe(false);
       }
     }

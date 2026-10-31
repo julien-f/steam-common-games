@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Unit tests wait on the state they expect instead of sleeping
 - `node scripts/upstream-bugs.js` lists the workarounds waiting on a browser or library fix, and `session-end.js` flags those ready to remove
 - Drop the dotenv dependency: settings files now load with Node's built-in loader
+- Phone lightbox e2e tests no longer fail now and then under load
 
 ## [0.12.0] - 2026-10-30
 

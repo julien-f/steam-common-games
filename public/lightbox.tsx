@@ -1273,7 +1273,7 @@ function wireTouchHandlers(lb: HTMLElement) {
         lbY = e.touches[0].clientY;
         lbActive = true;
         dragAxis = null;
-        dragStart = e.timeStamp;
+        dragStart = performance.now();
         dragMediaCount = shots().length;
         dragHasGameList = _getGamePosition() !== null;
         if (lbZoom > 1) {
@@ -1341,7 +1341,7 @@ function wireTouchHandlers(lb: HTMLElement) {
           axis: dragAxis,
           dx,
           dy,
-          dt: e.timeStamp - dragStart,
+          dt: performance.now() - dragStart,
           mediaCount: dragMediaCount,
           hasGameList: dragHasGameList,
         });

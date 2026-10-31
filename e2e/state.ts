@@ -1,4 +1,4 @@
-import { test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { game, type Player } from './fixtures.ts';
 
 // Seeds `player` as both my ★ account and the current one, once per tab: later reloads keep
@@ -67,4 +67,10 @@ export async function gate(page: Page, url: string) {
 export async function shot(page: Page, name: string): Promise<void> {
   if (test.info().project.use.screenshot !== 'on') return;
   await page.screenshot({ path: test.info().outputPath(`${name}.png`) });
+}
+
+// `boundingBox()` doesn't wait: it's null while the element isn't shown yet.
+export async function visibleBox(locator: Locator) {
+  await expect(locator).toBeVisible();
+  return (await locator.boundingBox())!;
 }
