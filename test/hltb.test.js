@@ -385,6 +385,33 @@ test('getHLTB: throttles the "[HLTB] search failed" warning to once per 30s wind
   assert.equal(warnMock.mock.callCount(), 2);
 });
 
+test('getHLTB: an error the throttle held back is marked logged only if it repeats the warned one', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  t.mock.method(console, 'warn', () => {});
+  let malformed = false;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    if (malformed)
+      return {
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError('Unexpected token <');
+        },
+      };
+    return { ok: false, status: 500 };
+  });
+
+  const error = (fn) => fn().then(assert.fail, (err) => err);
+  assert.equal((await error(() => getHLTB(1, 'Portal'))).isLogged, true);
+  assert.equal((await error(() => getHLTB(2, 'Half-Life'))).isLogged, true, 'same failure, already warned');
+  malformed = true;
+  assert.ok(!(await error(() => getHLTB(3, 'Portal 2'))).isLogged, 'a different failure the throttle held back');
+});
+
 test('getHLTB: throws when init fails', async (t) => {
   _reset();
   _resetAuth();

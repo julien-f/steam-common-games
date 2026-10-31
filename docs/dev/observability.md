@@ -76,7 +76,7 @@ Logged at the moment they happen, once per event rather than once per affected r
 - **`[semaphore:<name>] queue saturated …`** — every rejection, unthrottled: it should never fire, so each one matters.
 - **`[HLTB] search failed …`** — throttled to one per `HLTB_SEARCH_WARN_THROTTLE_MS` (30 s); the searches themselves still run and fail normally. `[HLTB] init failed` is throttled by the auth retry backoff.
 
-All are `console.warn`: degraded but recoverable. An error marked `isCircuitOpen` (thrown by `assertClosed` while a breaker is open) or `isBudgetExhausted` (thrown by `chargeBudget` past a budget) is not logged again by `routeErrorStatus` or `fetchGameDetails`, since the trip or the exhaustion already warned; without that, one open breaker or spent budget logs a line per game in a large load. Likewise `fetchGameDetails` skips HLTB errors marked `isLogged`: the `[HLTB]` lines above already covered them.
+All are `console.warn`: degraded but recoverable. An error marked `isCircuitOpen` (thrown by `assertClosed` while a breaker is open) or `isBudgetExhausted` (thrown by `chargeBudget` past a budget) is not logged again by `routeErrorStatus` or `fetchGameDetails`, since the trip or the exhaustion already warned; without that, one open breaker or spent budget logs a line per game in a large load. Likewise `fetchGameDetails` skips HLTB errors marked `isLogged`: a repeat of the failure the last `[HLTB]` line warned about, or an auth hold whose cause was already logged.
 
 Deliberately not done:
 

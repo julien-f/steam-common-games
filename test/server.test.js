@@ -1626,6 +1626,7 @@ for (const [what, hltbFetch, line] of [
     _reset();
     _resetAuth();
     t.after(_resetAuth);
+    t.mock.timers.enable({ apis: ['Date'], now: Date.now() }); // the batch stays in one 30 s window
     const warnMock = t.mock.method(console, 'warn', () => {});
     t.mock.method(globalThis, 'fetch', async (url) => {
       if (url.includes('howlongtobeat.com')) return hltbFetch(url);

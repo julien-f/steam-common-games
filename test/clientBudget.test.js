@@ -177,6 +177,26 @@ test('a client waiting on another client’s refused HLTB login logs in on its o
   assert.equal((await b)?.id, 1);
 });
 
+test('one client’s refused HLTB search doesn’t hold back the warning for an HLTB failure', async (t) => {
+  let searchStatus = 200;
+  const { warn } = setup(t, async (url) => {
+    if (url.includes('search/site/init'))
+      return { ok: true, json: async () => ({ token: 't', hpKey: 'k', hpVal: 'v' }) };
+    return { ok: false, status: searchStatus };
+  });
+  const hltb = createTrackedFetch('hltb');
+  await runAsClient('a', async () => {
+    await hltb('spend', 'https://example.com/');
+    assert.equal((await refusal(() => getHLTB(1, 'Portal')))?.isClientBudgetExhausted, true);
+  });
+  searchStatus = 500;
+  await runAsClient('b', () => refusal(() => getHLTB(2, 'Half-Life')));
+  assert.deepEqual(
+    warn.mock.calls.map((c) => String(c.arguments[0])).filter((l) => l.startsWith('[HLTB]')),
+    ['[HLTB] search failed for "Half-Life":'],
+  );
+});
+
 test('one client’s refused Fanatical call isn’t cached as a failure for everyone', async (t) => {
   setup(t, async () => ({ ok: true, json: async () => ({ pickandmix: [] }) }));
   const fanatical = createTrackedFetch('fanatical');
