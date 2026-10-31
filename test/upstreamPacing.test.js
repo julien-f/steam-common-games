@@ -34,28 +34,44 @@ for (const [name, call, respond] of [
         : { ok: true, status: 200, json: async () => ({ data: [] }) },
   ],
 ]) {
-  test(`${name}: a slot waits UPSTREAM_MIN_INTERVAL_MS before its next request`, async (t) => {
-    _reset();
-    _resetAuth();
-    t.mock.timers.enable({ apis: ['setTimeout'] });
-    const urls = [];
-    t.mock.method(globalThis, 'fetch', async (url) => {
-      urls.push(url);
-      return respond(url);
+  // A failed request (here a network error) holds its slot too: an erroring upstream must not get unpaced retries.
+  for (const fails of [false, true]) {
+    test(`${name}: a slot waits UPSTREAM_MIN_INTERVAL_MS before its next request${fails ? ', even after a failure' : ''}`, async (t) => {
+      _reset();
+      _resetAuth();
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      const urls = [];
+      const isPaced = (url) => !url.includes('search/site/init');
+      const paced = () => urls.filter(isPaced).length;
+      t.mock.method(globalThis, 'fetch', async (url) => {
+        urls.push(url);
+        if (fails && isPaced(url)) throw new TypeError('fetch failed');
+        return respond(url);
+      });
+
+      const calls = Promise.allSettled(Array.from({ length: 6 }, (_, i) => call(i)));
+      try {
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 3, 'only 3 in flight before any slot frees up');
+
+        t.mock.timers.tick(999);
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 3, 'a slot stays busy for the whole interval');
+
+        t.mock.timers.tick(1);
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 6);
+        assert.deepEqual(
+          (await calls).map(({ status }) => status),
+          Array(6).fill(fails ? 'rejected' : 'fulfilled'),
+        );
+      } finally {
+        // Frees every slot, even after a failed assertion: the next variant shares this semaphore.
+        for (let round = 0; round < 2; round++) {
+          t.mock.timers.tick(1000);
+          for (let i = 0; i < 5; i++) await flush();
+        }
+      }
     });
-    const paced = () => urls.filter((url) => !url.includes('search/site/init')).length;
-
-    const calls = Array.from({ length: 6 }, (_, i) => call(i));
-    for (let i = 0; i < 5; i++) await flush();
-    assert.equal(paced(), 3, 'only 3 in flight before any slot frees up');
-
-    t.mock.timers.tick(999);
-    for (let i = 0; i < 5; i++) await flush();
-    assert.equal(paced(), 3, 'a slot stays busy for the whole interval');
-
-    t.mock.timers.tick(1);
-    for (let i = 0; i < 5; i++) await flush();
-    assert.equal(paced(), 6);
-    await Promise.all(calls);
-  });
+  }
 }
