@@ -3143,7 +3143,7 @@
     color: #fff;
   }
   /* Firefox for Android draws a video under a blur a few pixels lower: it jumped as the chrome showed and hid.
-     Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=TODO is fixed. */
+     Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=2087749 is fixed. */
   #screenshot-lightbox.lb--ff-android:has(.lb-video) .lb-glass {
     backdrop-filter: none;
   }
