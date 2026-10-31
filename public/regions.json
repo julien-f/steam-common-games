@@ -1,0 +1,17 @@
+[
+  { "code": "US", "name": "United States", "currency": "USD" },
+  { "code": "GB", "name": "United Kingdom", "currency": "GBP" },
+  { "code": "DE", "name": "Europe / Germany", "currency": "EUR" },
+  { "code": "CA", "name": "Canada", "currency": "CAD" },
+  { "code": "AU", "name": "Australia", "currency": "AUD" },
+  { "code": "JP", "name": "Japan", "currency": "JPY" },
+  { "code": "BR", "name": "Brazil", "currency": "BRL" },
+  { "code": "RU", "name": "Russia", "currency": "RUB" },
+  { "code": "TR", "name": "Turkey", "currency": "TRY" },
+  { "code": "UA", "name": "Ukraine", "currency": "UAH" },
+  { "code": "AR", "name": "Argentina", "currency": "ARS" },
+  { "code": "IN", "name": "India", "currency": "INR" },
+  { "code": "CN", "name": "China", "currency": "CNY" },
+  { "code": "KR", "name": "South Korea", "currency": "KRW" },
+  { "code": "MX", "name": "Mexico", "currency": "MXN" }
+]

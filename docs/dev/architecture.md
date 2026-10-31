@@ -74,6 +74,13 @@ Rate limits ([observability.md](observability.md), [data.md](data.md)):
 - A middleware after the JSON body parser runs each request under its client's key (`clientKey`, the limiters' key) in an `AsyncLocalStorage`, so the outbound calls it makes are charged to that client's share of the outbound budgets ([observability.md](observability.md#outbound-budgets)).
 - No limiter: health, metrics, `GET /api/me`, logout, `/opensearch.xml` and the SPA shell (cache-only, no upstream call).
 
+Inputs (`server.js`) — each lands in a cache key, so only what the frontend sends is accepted:
+
+- `members` (and `/api/achievements`' `steamids`): a Steam64 id, a custom-URL name or a `steamcommunity.com/id|profiles/…` URL holding one (`isSteamIdentifier`); anything else is a 400.
+- `gids`: ITAD game ids (UUIDs); anything else is a 400.
+- `country`: one of `public/regions.json`'s codes (the region picker's list), else US.
+- `/api/bundles`: `sort` is always `-publish`; `offset` and `limit` are integers, `limit` clamped, and an `offset` past `MAX_BUNDLES_OFFSET` gets an empty page, which ends Load more.
+
 ## Request flow
 
 1. Frontend POSTs `{ members: ["alice", "bob_family"] }` to `/api/common-games`: one account, or a Steam Family's member accounts, whose libraries are unioned. A comparison makes one call per player and combines them in the browser.

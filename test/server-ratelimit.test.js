@@ -237,19 +237,19 @@ test('bundles resolve limiter: counts cache misses but never counts fully-cached
     return { ok: true, json: async () => Object.fromEntries(gids.map((g) => [g, ['app/1']])) };
   });
 
-  setCache('itad-appid:cached-gid', 555);
+  setCache('itad-appid:018d937f-0000-7000-8000-000000000000', 555);
 
-  for (const gid of ['gid-a', 'gid-b']) {
+  for (const gid of ['018d937f-0000-7000-8000-00000000000a', '018d937f-0000-7000-8000-00000000000b']) {
     const res = await api.post('/api/bundles/resolve').send({ gids: [gid] });
     assert.equal(res.status, 200, `miss "${gid}" should succeed within budget`);
   }
 
-  const over = await api.post('/api/bundles/resolve').send({ gids: ['gid-c'] });
+  const over = await api.post('/api/bundles/resolve').send({ gids: ['018d937f-0000-7000-8000-00000000000c'] });
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
 
-  const cached = await api.post('/api/bundles/resolve').send({ gids: ['cached-gid'] });
+  const cached = await api.post('/api/bundles/resolve').send({ gids: ['018d937f-0000-7000-8000-000000000000'] });
   assert.equal(cached.status, 200, 'an all-cached gid batch must bypass the limiter');
-  assert.deepEqual(cached.body.appids, { 'cached-gid': 555 });
+  assert.deepEqual(cached.body.appids, { '018d937f-0000-7000-8000-000000000000': 555 });
 });
 
 // A limiter actually rejecting a request must be visible in GET /api/metrics's own

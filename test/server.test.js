@@ -21,7 +21,7 @@ const path = require('node:path');
 const supertest = require('supertest');
 const morgan = require('morgan');
 const { app } = require('../server');
-const { _reset, setCache, getCachedAt } = require('../lib/cache');
+const { _reset, setCache, getCachedAt, getCacheEntryCounts } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { PREFS_MAX_BYTES, SYNCED_PREF_KEYS, getUserPrefs, setUserPref } = require('../lib/auth');
 const { _resetAuth } = require('../lib/hltb');
@@ -38,6 +38,9 @@ const api = supertest(app);
 // Fixed Steam64 IDs that bypass the vanity-URL resolve step.
 const ID1 = '76561198000000001';
 const ID2 = '76561198000000002';
+// ITAD game ids, the UUIDs the gid routes accept.
+const GID1 = '018d937f-07a2-7270-8a54-6fd2c8f3c4b1';
+const GID2 = '018d937f-07a2-7270-8a54-6fd2c8f3c4b2';
 
 function makeLibraryFetch(games1 = [], games2 = []) {
   return async (url) => {
@@ -2195,9 +2198,9 @@ test('POST /api/prices: reports fetchedAt for the batch', async (t) => {
   process.env.ITAD_API_KEY = 'test-itad-key';
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
-    return { ok: true, json: async () => [{ id: 'g1', deals: [], historyLow: { all: null, y1: null, m3: null } }] };
+    return { ok: true, json: async () => [{ id: GID1, deals: [], historyLow: { all: null, y1: null, m3: null } }] };
   });
-  const res = await api.post('/api/prices').send({ gids: ['g1'] });
+  const res = await api.post('/api/prices').send({ gids: [GID1] });
   assert.equal(res.status, 200);
   assert.equal(typeof res.body.fetchedAt, 'number');
 });
@@ -2296,7 +2299,7 @@ test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async 
   process.env.ITAD_API_KEY = 'test-itad-key';
   setCache('itad-gid:400', 'gid-1');
   t.mock.method(globalThis, 'fetch', async (url) => {
-    assert.match(String(url), /\/games\/bundles\/v2\?.*id=gid-1.*country=FR/);
+    assert.match(String(url), /\/games\/bundles\/v2\?.*id=gid-1.*country=DE/);
     return {
       ok: true,
       json: async () => [
@@ -2311,7 +2314,7 @@ test('GET /api/game-bundles/:appid: 200 with the bundles the game is in', async 
       ],
     };
   });
-  const res = await api.get('/api/game-bundles/400?country=fr');
+  const res = await api.get('/api/game-bundles/400?country=de');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.bundles, [
     {
@@ -2466,12 +2469,12 @@ test('POST /api/bundles/resolve: 200 with resolved appids map', async (t) => {
   t.mock.method(globalThis, 'fetch', async (url, opts) => {
     if (String(url).includes('/service/shops/')) return { ok: true, json: async () => [{ id: 61, title: 'Steam' }] };
     const gids = JSON.parse(opts.body);
-    const body = Object.fromEntries(gids.map((g) => [g, g === 'gid-1' ? ['app/400'] : null]));
+    const body = Object.fromEntries(gids.map((g) => [g, g === GID1 ? ['app/400'] : null]));
     return { ok: true, json: async () => body };
   });
-  const res = await api.post('/api/bundles/resolve').send({ gids: ['gid-1', 'gid-2'] });
+  const res = await api.post('/api/bundles/resolve').send({ gids: [GID1, GID2] });
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { appids: { 'gid-1': 400, 'gid-2': null } });
+  assert.deepEqual(res.body, { appids: { [GID1]: 400, [GID2]: null } });
 });
 
 test('POST /api/bundles/resolve: a gid whose Steam expansion errored is reported as failed, not as no Steam listing', async (t) => {
@@ -2488,9 +2491,9 @@ test('POST /api/bundles/resolve: a gid whose Steam expansion errored is reported
   });
   const res = await api
     .post('/api/bundles/resolve')
-    .send({ gids: ['gid-1'] })
+    .send({ gids: [GID1] })
     .expect(200);
-  assert.deepEqual(res.body, { appids: {}, failed: ['gid-1'] });
+  assert.deepEqual(res.body, { appids: {}, failed: [GID1] });
 });
 
 test('POST /api/prices: 503 when ITAD_API_KEY is not configured', async () => {
@@ -2512,7 +2515,7 @@ test('POST /api/prices: 400 with neither gids nor appids', async () => {
 
 test('POST /api/prices: 400 with both gids and appids', async () => {
   process.env.ITAD_API_KEY = 'test-itad-key';
-  const res = await api.post('/api/prices').send({ gids: ['gid-1'], appids: [400] });
+  const res = await api.post('/api/prices').send({ gids: [GID1], appids: [400] });
   assert.equal(res.status, 400);
 });
 
@@ -2526,7 +2529,7 @@ test('POST /api/prices: 200 with Steam regular price and historical lows, by gid
         ok: true,
         json: async () => [
           {
-            id: 'gid-1',
+            id: GID1,
             historyLow: { all: { amount: 1, amountInt: 100, currency: 'USD' }, y1: null, m3: null },
             deals: [
               {
@@ -2547,9 +2550,9 @@ test('POST /api/prices: 200 with Steam regular price and historical lows, by gid
     }
     return { ok: false, status: 500 };
   });
-  const res = await api.post('/api/prices?country=US').send({ gids: ['gid-1'] });
+  const res = await api.post('/api/prices?country=US').send({ gids: [GID1] });
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body.prices['gid-1'], {
+  assert.deepEqual(res.body.prices[GID1], {
     steamRegular: { amount: 20, amountInt: 2000, currency: 'USD' },
     lowAll: { amount: 1, amountInt: 100, currency: 'USD' },
     lowY1: null,
@@ -2666,10 +2669,10 @@ test('POST /api/prices: 200 by appids — resolves to gids first, then prices, k
 
 for (const [name, path, body, error] of [
   [
-    'POST /api/prices: 400 when gids are not all non-empty strings',
+    'POST /api/prices: 400 when gids are not all ITAD ids',
     '/api/prices',
-    { gids: ['gid-1', 42] },
-    /gids must be non-empty strings/,
+    { gids: [GID1, 42] },
+    /gids must be ITAD game ids/,
   ],
   [
     'POST /api/prices: 400 with more than 500 games',
@@ -2680,7 +2683,7 @@ for (const [name, path, body, error] of [
   [
     'POST /api/bundles/resolve: 400 with more than 500 games',
     '/api/bundles/resolve',
-    { gids: Array.from({ length: 501 }, (_, i) => `gid-${i}`) },
+    { gids: Array.from({ length: 501 }, (_, i) => `00000000-0000-0000-0000-${String(i).padStart(12, '0')}`) },
     /Too many games/,
   ],
 ]) {
@@ -2698,8 +2701,8 @@ for (const [name, path, body, error] of [
 // Every upstream call answers 500: each route maps the failure to a 502 with its message.
 for (const [name, request] of [
   ['GET /api/bundles/:id', () => api.get('/api/bundles/9001')],
-  ['POST /api/bundles/resolve', () => api.post('/api/bundles/resolve').send({ gids: ['gid-x'] })],
-  ['POST /api/prices', () => api.post('/api/prices').send({ gids: ['gid-x'] })],
+  ['POST /api/bundles/resolve', () => api.post('/api/bundles/resolve').send({ gids: [GID1] })],
+  ['POST /api/prices', () => api.post('/api/prices').send({ gids: [GID1] })],
   ['GET /api/game-news/:appid', () => api.get('/api/game-news/9002')],
   ['GET /api/achievements/:appid', () => api.get('/api/achievements/9003')],
 ]) {
@@ -2715,6 +2718,111 @@ for (const [name, request] of [
     assert.match(res.body.error, /error 500/);
   });
 }
+
+// ── Route input validation (each input lands in a cache key) ─────────────────
+
+const cacheRows = () => Object.values(getCacheEntryCounts()).reduce((a, b) => a + b, 0);
+
+for (const path of ['/api/bundles/resolve', '/api/prices']) {
+  test(`POST ${path}: 400 for a gid that isn't an ITAD id, nothing fetched or cached`, async (t) => {
+    _reset();
+    process.env.ITAD_API_KEY = 'test-itad-key';
+    const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({}) }));
+    const res = await api.post(path).send({ gids: [GID1, 'x'.repeat(90_000)] });
+    assert.equal(res.status, 400);
+    assert.equal(typeof res.body.error, 'string');
+    assert.equal(fetchMock.mock.callCount(), 0);
+    assert.equal(cacheRows(), 0);
+  });
+}
+
+test('POST /api/common-games: 400 for a 90 KB vanity name, nothing fetched or cached', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 42 } }),
+  }));
+  const res = await api.post('/api/common-games').send({ members: ['x'.repeat(90_000)] });
+  assert.equal(res.status, 400);
+  assert.ok(res.body.error.length < 200, 'the error does not echo the whole input');
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(cacheRows(), 0);
+});
+
+test('GET /api/achievements/:appid: 400 for a steamids value that is no Steam account, nothing fetched or cached', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 42 } }),
+  }));
+  const res = await api.get(`/api/achievements/400?steamids=${ID1},${'x'.repeat(4000)}`);
+  assert.equal(res.status, 400);
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(cacheRows(), 0);
+});
+
+// Every form the frontend sends: a Steam64 id (signed-in user, resolved accounts), a vanity name
+// (Home's normalizeInput), a profile URL (Compare's typed slots and `u=` links pass it through raw).
+for (const member of [
+  ID1,
+  'gaben',
+  ' gaben ',
+  'some_name-2',
+  'https://steamcommunity.com/id/gaben/',
+  'https://steamcommunity.com/id/gaben',
+  `https://steamcommunity.com/profiles/${ID1}`,
+  `https://steamcommunity.com/profiles/${ID1}/`,
+]) {
+  test(`POST /api/common-games: accepts the frontend's member form ${JSON.stringify(member)}`, async (t) => {
+    _reset();
+    const library = makeLibraryFetch([{ appid: 1, name: 'A' }]);
+    t.mock.method(globalThis, 'fetch', async (url) =>
+      url.includes('ResolveVanityURL')
+        ? { ok: true, json: async () => ({ response: { success: 1, steamid: ID1 } }) }
+        : library(url),
+    );
+    const res = await api.post('/api/common-games').send({ members: [member] });
+    assert.equal(res.status, 200, res.body.error);
+  });
+}
+
+test('GET /api/bundles: a country outside the region list falls back to US', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(String(url));
+    return { ok: true, json: async () => [] };
+  });
+  await api.get('/api/bundles?country=zz').expect(200);
+  await api.get('/api/bundles?country=de').expect(200);
+  assert.match(urls[0], /country=US/);
+  assert.match(urls[1], /country=DE/);
+});
+
+test('GET /api/bundles: an unknown sort falls back to the default, offset is an integer', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(new URL(String(url)).searchParams);
+    return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
+  });
+  await api.get('/api/bundles?sort=junk&offset=50.5').expect(200);
+  assert.equal(urls[0].get('sort'), '-publish');
+  assert.equal(urls[0].get('offset'), '50');
+});
+
+// Load more stops at an empty page: a clamped offset would serve the cap's page again and again.
+test('GET /api/bundles: an empty page past the offset cap, without an upstream call', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [{ id: 1 }] }));
+  const res = await api.get('/api/bundles?offset=1e9').expect(200);
+  assert.deepEqual(res.body.bundles, []);
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(cacheRows(), 0);
+});
 
 // ── fetchedAt (how old the served data is) ────────────────────────────────────
 

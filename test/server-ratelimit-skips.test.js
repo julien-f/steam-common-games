@@ -169,8 +169,12 @@ test('prices limiter: counts cache misses but never counts cache hits, for gids 
   _reset();
   const calls = mockUpstreams(t);
   setCache('itad-shop:steam', 61);
-  setCache('itad-price:US:cached-gid', { id: 'cached-gid', historyLow: {}, deals: [] });
-  setCache('itad-gid:600', 'cached-gid');
+  setCache('itad-price:US:018d937f-0000-7000-8000-000000000000', {
+    id: '018d937f-0000-7000-8000-000000000000',
+    historyLow: {},
+    deals: [],
+  });
+  setCache('itad-gid:600', '018d937f-0000-7000-8000-000000000000');
   setCache('itad-gid:601', null); // not on ITAD: nothing left to price
   setCache('itad-gid:602', 'unpriced-gid');
 
@@ -180,13 +184,13 @@ test('prices limiter: counts cache misses but never counts cache hits, for gids 
       api.post(`/api/prices${query}`).send(body);
   await assertMissesCountHitsDont(calls, {
     misses: {
-      'uncached gid': prices({ gids: ['new-gid'] }),
+      'uncached gid': prices({ gids: ['018d937f-0000-7000-8000-000000000001'] }),
       'unresolved appid': prices({ appids: [650] }),
     },
     over: prices({ appids: [602] }),
-    refresh: prices({ gids: ['cached-gid'] }, '?refresh=1'),
+    refresh: prices({ gids: ['018d937f-0000-7000-8000-000000000000'] }, '?refresh=1'),
     hits: {
-      'cached gid': prices({ gids: ['cached-gid'] }),
+      'cached gid': prices({ gids: ['018d937f-0000-7000-8000-000000000000'] }),
       'appids with cached price and null gid': prices({ appids: [600, 601] }),
     },
   });
@@ -220,7 +224,7 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
   });
   setCache('itad-shop:microsoft store', 48);
   setCache('itad-appid:g1', 10);
-  setCache('gamepass:pc:FR', [{ id: 'A', gid: 'g1' }]);
+  setCache('gamepass:pc:CA', [{ id: 'A', gid: 'g1' }]);
   setCache('itad-appid:g2', null);
   setCache('msstore-title:B', 'Not on Steam');
   setCache('msstore-title:C', 'Not on ITAD');
@@ -231,16 +235,16 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
     { id: 'E', gid: 'g2' }, // another edition of B: the route never fetches its title
   ]);
   // The route still resolves uncached gids and fetches uncached titles behind a cached catalog.
-  setCache('gamepass:pc:IT', [{ id: 'A', gid: 'g-unresolved' }]);
-  setCache('gamepass:pc:ES', [{ id: 'D', gid: undefined }]);
+  setCache('gamepass:pc:AU', [{ id: 'A', gid: 'g-unresolved' }]);
+  setCache('gamepass:pc:MX', [{ id: 'D', gid: undefined }]);
 
   const gamePass = (query) => () => api.get(`/api/game-pass?${query}`);
   await assertMissesCountHitsDont(calls, {
     misses: { 'uncached market': gamePass('country=US'), 'another market': gamePass('country=DE') },
     over: gamePass('country=JP'),
-    refresh: gamePass('country=fr&refresh=1'),
-    hits: { 'cached market': gamePass('country=fr'), 'cached titles': gamePass('country=gb') },
+    refresh: gamePass('country=ca&refresh=1'),
+    hits: { 'cached market': gamePass('country=ca'), 'cached titles': gamePass('country=gb') },
   });
-  assert.equal((await gamePass('country=it')()).status, 429, 'an unresolved gid behind a cached catalog counts');
-  assert.equal((await gamePass('country=es')()).status, 429, 'an uncached title behind a cached catalog counts');
+  assert.equal((await gamePass('country=au')()).status, 429, 'an unresolved gid behind a cached catalog counts');
+  assert.equal((await gamePass('country=mx')()).status, 429, 'an uncached title behind a cached catalog counts');
 });
