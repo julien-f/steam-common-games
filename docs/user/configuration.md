@@ -21,7 +21,7 @@ Everything else in `default.env` is a limit or a lifetime with a sensible defaul
 - **Client share** (`OUTBOUND_CLIENT_SHARE_PERCENT`) — how much of each outbound budget one client (an IP address, or an IPv6 /56) may spend, so one visitor can't use it up for everyone; past it, that visitor's new lookups are refused until the window rolls over. `0` disables.
   - A cold library costs about one call per game not yet cached to each service (Steam store, Steam reviews…), so a client's share covers about `OUTBOUND_HOURLY_MAX × share` such games an hour.
   - Behind a reverse proxy without `TRUST_PROXY`, every visitor is the proxy's address: they all share one client's share.
-- **Upstream pacing** (`STORE_MIN_INTERVAL_MS`, 500; `UPSTREAM_MIN_INTERVAL_MS`, 1000) — the pause before a request slot is reused: Steam's store, then HLTB, ProtonDB and Steam's store browse API. Leave them: lowering them raises traffic to undocumented endpoints.
+- **Upstream pacing** (`STORE_MIN_INTERVAL_MS`, `UPSTREAM_MIN_INTERVAL_MS`) — the pause before a request slot is reused: Steam's store, then HLTB, ProtonDB, Steam reviews and Steam's store browse API. Leave them: lowering them raises traffic to undocumented endpoints.
 - **Cache lifetimes** (`*_CACHE_TTL_MINUTES`) — how long each kind of upstream data is kept. They're generous on purpose; every screen that shows cached data says how old it is, and the age itself is the button that fetches fresh.
 - **Session lifetime** (`SESSION_TTL_DAYS`) — how long "Sign in with Steam" lasts before signing in again.
 

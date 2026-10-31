@@ -11,7 +11,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ## Tests run slowly when started without `npm test`
 
 - **Symptom**: `node --test` on store-backed tests spends most of its time idle.
-- **Cause**: upstream calls are paced by `STORE_MIN_INTERVAL_MS` (500 ms) and `UPSTREAM_MIN_INTERVAL_MS` (1000 ms, both in `default.env`), which `npm test` sets to 0.
+- **Cause**: upstream calls are paced by `STORE_MIN_INTERVAL_MS` and `UPSTREAM_MIN_INTERVAL_MS` (both in `default.env`), which `npm test` sets to 0.
 - **Fix**: run a single file with `npm run test:one test/<name>.test.js`, which sets them to 0.
 
 ## A unit test still sees an earlier test's module state after `delete require.cache[…]`
