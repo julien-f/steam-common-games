@@ -35,6 +35,10 @@ function mockUpstreams(t) {
     if (url.includes('GetOwnedGames')) return json({ response: { games: [] } });
     if (url.includes('GetFriendList')) return json({ friendslist: { friends: [] } });
     if (url.includes('GetNewsForApp')) return json({ appnews: { newsitems: [] } });
+    if (url.includes('appdetails')) {
+      const appid = url.match(/appids=(\d+)/)[1];
+      return json({ [appid]: { success: true, data: { name: 'Game' } } });
+    }
     if (url.includes('GetSchemaForGame'))
       return json({ game: { availableGameStats: { achievements: [{ name: 'A', displayName: 'A' }] } } });
     if (url.includes('GetGlobalAchievementPercentages')) return json({ achievementpercentages: { achievements: [] } });
@@ -243,4 +247,31 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
   });
   assert.equal((await gamePass('country=it')()).status, 429, 'an unresolved gid behind a cached catalog counts');
   assert.equal((await gamePass('country=es')()).status, 429, 'an uncached title behind a cached catalog counts');
+});
+
+test('meta limiter: counts cache misses but never counts cache hits', async (t) => {
+  _reset();
+  const calls = mockUpstreams(t);
+  setCache('meta:810', { name: 'Cached' });
+
+  const meta = (appid) => api.get(`/api/game-meta/${appid}`);
+  assert.equal((await meta(800)).status, 200);
+  assert.equal((await meta(801)).status, 200);
+  assert.equal((await meta(802)).status, 429, 'a cache miss past the budget should be rate limited');
+  const before = calls.length;
+  assert.equal((await meta(810)).status, 200, 'a cached game must bypass the limiter');
+  assert.deepEqual(calls.slice(before), [], 'a cached game must not fetch upstream');
+});
+
+// No skip on these two: every request counts, whatever the cache holds.
+test('bundle-by-id limiter: counts every request, twice the bundles budget', async () => {
+  const max = Number(process.env.BUNDLES_RATE_LIMIT_MAX) * 2;
+  for (let i = 0; i < max; i++) assert.equal((await api.get('/api/bundles/abc')).status, 400);
+  assert.equal((await api.get('/api/bundles/abc')).status, 429);
+});
+
+test('auth limiter: login, callback and pref writes share one budget', async () => {
+  for (let i = 0; i < 20; i++) assert.equal((await api.get('/auth/steam/login')).status, 302);
+  assert.equal((await api.get('/auth/steam/callback')).status, 429);
+  assert.equal((await api.put('/api/me/prefs/theme').send({ value: 'dark' })).status, 429);
 });
