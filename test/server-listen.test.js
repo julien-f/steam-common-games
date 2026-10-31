@@ -10,7 +10,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 // Express 5 still runs app.listen's callback on a bind error, so it must exit rather than idle.
-test('server exits 1 when its port is already taken', { timeout: 20_000 }, async () => {
+test('server exits 1 when its port is already taken', { timeout: 20_000 }, async (t) => {
   const holder = net.createServer();
   holder.listen(0, '127.0.0.1');
   await once(holder, 'listening');
@@ -27,7 +27,9 @@ test('server exits 1 when its port is already taken', { timeout: 20_000 }, async
         PORT: String(holder.address().port),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      signal: t.signal, // kills it on a timeout, should a regression make it idle instead
     });
+    child.on('error', () => {}); // the abort above, reported by the timeout itself
     let stderr = '';
     child.stderr.on('data', (chunk) => (stderr += chunk));
     const [code] = await once(child, 'exit');
