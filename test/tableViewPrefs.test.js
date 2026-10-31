@@ -195,7 +195,7 @@ test('layoutDraft: compares against the stored layout as the table applies it, t
       },
       getViewState: () => state,
     };
-    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), ['similarity']);
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), { cols: ['similarity'] });
     layout.restore();
     assert.deepEqual(layout.changes(), []);
     table.setViewState({ ...state, sorts: [{ key: 'similarity', dir: 'desc' }], visibleCols: ['similarity', 'name'] });
@@ -217,12 +217,41 @@ test('layoutDraft: Discard keeps the search and page, which were never part of t
 test('layoutDraft: a sort holding only a temporary column is the default sort, not a change', () => {
   withLocation('', () => {
     const table = fakeTable();
-    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), ['similarity'], {
-      sorts: [{ key: 'rating', dir: 'desc' }],
-    });
+    const layout = layoutDraft(
+      table,
+      'libraryView',
+      prefViewStore('libraryView'),
+      { cols: ['similarity'] },
+      {
+        sorts: [{ key: 'rating', dir: 'desc' }],
+      },
+    );
     layout.restore();
     table.setViewState({ sorts: [{ key: 'similarity', dir: 'desc' }] });
     assert.deepEqual(layout.changes(), []);
+  });
+});
+
+test('layoutDraft: a temporary range is no change, never saved, and dropped from a stored layout', () => {
+  withLocation('', () => {
+    const { setPref, getPref } = require('../public/prefs.ts');
+    // Saved before the range was temporary: it isn't restored.
+    setPref('libraryView', { pageSize: 25, rangeFilters: { tierPrice: { min: '', max: '12' } } });
+    const table = fakeTable();
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), { ranges: ['tierPrice'] });
+    layout.restore();
+    assert.deepEqual(table.getViewState().rangeFilters ?? {}, {});
+    table.setViewState({ ...table.getViewState(), rangeFilters: { tierPrice: { min: '', max: '5' } } });
+    assert.deepEqual(layout.changes(), []);
+    // Sorting on the same column is still layout.
+    table.setViewState({ ...table.getViewState(), sorts: [{ key: 'tierPrice', dir: 'asc' }] });
+    assert.notDeepEqual(layout.changes(), []);
+    // The tab's draft, which every bundle shares, doesn't carry it either.
+    layout.store.save(table.getViewState());
+    assert.deepEqual(layout.store.load().rangeFilters ?? {}, {});
+    layout.save();
+    assert.deepEqual(getPref('libraryView').rangeFilters ?? {}, {});
+    assert.deepEqual(getPref('libraryView').sorts, [{ key: 'tierPrice', dir: 'asc' }]);
   });
 });
 

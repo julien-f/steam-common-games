@@ -1598,15 +1598,17 @@
     text-align: center;
   }
 
-  /* A Steam package's rows: the rate, and what it covers under it. */
-  .tier-package {
-    display: inline-flex;
-    flex-direction: column;
-    line-height: 1.2;
+  /* Its own line under New to you's best-deals sum, which a phone's tile would otherwise clip. */
+  .bundle-tier-saving {
+    display: block;
   }
-  .tier-package small {
+
+  /* A bundle's Steam package, under its rows' names: what the one purchase covers. */
+  .name-package {
+    display: block;
     color: var(--muted);
     font-size: var(--fs-label);
+    font-weight: 400;
   }
 
   /* Last in the route and stuck to the view's bottom while rows are picked anywhere in the table;

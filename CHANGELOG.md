@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - For large lists, prices, bundle games and friend names are requested three batches at a time instead of one after another
 - The server clears expired cached data every hour instead of only when it restarts
 - Game lists load with less data and server work: the details stream is compressed in larger pieces
+- Bundles: the page names how a bundle is priced; a tiered one is grouped by tier and says what the tier for your new games saves; pick & mix ones list wishlisted games first, owned ones last and out of the saving
 
 ### Fixed
 
@@ -62,6 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bundles: a page request with an infinite offset or a fractional limit is read as the first page, or one bundle, instead of an empty or 20-bundle page
 - Bundles: the empty page past the end of the list no longer counts against the per-minute request limit
 - Expired sign-in sessions are cleared from the server hourly, not only when it restarts
+- Bundles: add-on tiers no longer count as part of the tiers, and a pressed tier is no longer saved into every bundle's layout
 
 ### Development
 

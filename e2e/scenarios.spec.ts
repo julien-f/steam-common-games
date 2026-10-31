@@ -3737,6 +3737,12 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await page.getByRole('cell', { name: BUNDLE.title }).click();
   await expect(rows(page)).toHaveCount(4);
   const hero = page.locator('.list-hero');
+  // The tile names the pricing model and its rule, readable without hovering.
+  await expect(hero).toContainText('each includes the cheaper ones');
+  // Grouped by tier, each header saying what it costs over the one below.
+  await expect(groupRows(page)).toHaveText([/€5\.00 tier\b/, /€12\.00 tier · \+€7\.00 over €5\.00/]);
+  // Alice's two new games (€7 + €10 at best deals) are both in the €12 tier.
+  await expect(hero.locator('.bundle-tier-saving')).toHaveText('saves €5.00 at €12.00');
   const five = hero.getByRole('button', { name: /5\.00.* tier$/ });
   await five.focus();
   await five.press('Enter');
@@ -3745,11 +3751,13 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(five).toHaveAttribute('aria-pressed', 'true');
   await expect(five).toBeFocused();
   await expect(hero).toContainText(/New at .*5\.00.*0 of 2/i);
+  await expect(hero.locator('.bundle-tier-saving')).toHaveCount(0); // nothing new to save on
   const twelve = hero.getByRole('button', { name: /12\.00.* tier$/ });
   await twelve.click();
   await expect(rows(page)).toHaveCount(4);
   await expect(five).toHaveAttribute('aria-pressed', 'false');
   await expect(hero).toContainText(/New at .*12\.00.*2 of 4\s*≈ .+ at best deals/i);
+  await expect(hero.locator('.bundle-tier-saving')).toHaveText('saves €5.00');
   await twelve.click();
   await expect(twelve).toHaveAttribute('aria-pressed', 'false');
   await expect(hero).toContainText(/New to you\s*2 of 4/i);
@@ -3768,9 +3776,37 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   await expect(hero.locator('.bundle-tier-chip')).toHaveCount(2);
   await expect(hero.locator('button.bundle-tier-chip')).toHaveCount(0);
+  await expect(hero).toContainText('Pick & mix');
+  await expect(hero).toContainText('the more you pick, the less each');
 });
 
-test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's tier filter", async ({ page }) => {
+test('B1 edge: an add-on tier is bought apart: grouped after the tiers, never in what a tier gets', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.route(`**/api/bundles/${BUNDLE.id}*`, (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    // Terraria (a game the mock resolves) as a €2 add-on, cheaper than every tier.
+    body.bundle.tiers.push({
+      price: { amount: 2, amountInt: 200, currency: 'EUR' },
+      addon: true,
+      games: [{ id: 'pnm-terraria', slug: 'pnm-terraria', title: 'Terraria', type: 'game', assets: {} }],
+    });
+    return route.fulfill({ json: body });
+  });
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(5);
+  await expect(groupRows(page)).toHaveText([/€5\.00 tier\b/, /€12\.00 tier/, /€2\.00 add-on/]);
+  await page
+    .locator('.list-hero')
+    .getByRole('button', { name: /5\.00.* tier$/ })
+    .click();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(row(page, 'Terraria')).toHaveCount(0);
+});
+
+test("B1 edge: a pressed tier is this bundle's view, not the layout every bundle shares", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
@@ -3779,17 +3815,10 @@ test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's t
     .getByRole('button', { name: /5\.00.* tier$/ })
     .click();
   await expect(rows(page)).toHaveCount(2);
-  // The draft the press left, made a range no tier would set: min 6, max 12.
-  await page.evaluate(() => {
-    for (const key of Object.keys(sessionStorage).filter((k) => k.includes(':layout-draft:'))) {
-      const view = JSON.parse(sessionStorage.getItem(key)!);
-      if (view.rangeFilters?.tierPrice) view.rangeFilters.tierPrice = { min: '6', max: '12' };
-      sessionStorage.setItem(key, JSON.stringify(view));
-    }
-  });
+  await expect(page.getByText(/Unsaved changes/)).toHaveCount(0);
+  // Not kept as a draft either: the next bundle, or this one again, opens whole.
   await page.reload();
-  await expect(rows(page)).toHaveCount(2);
-  await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
+  await expect(rows(page)).toHaveCount(4);
   await expect(page.locator('.list-hero button.bundle-tier-chip[aria-pressed="true"]')).toHaveCount(0);
 });
 
@@ -4105,9 +4134,9 @@ test("B1 edge: on a phone, every game's name stays in view while the table scrol
 
 test('B1 edge: figures line up: number columns align to the end, text to the start', async ({ page }) => {
   await asPlayer(page, ALICE);
-  await page.goto('/lists/bundle/90002');
-  await expect(rows(page)).toHaveCount(5);
-  for (const key of ['tierPrice', 'bestDealCut', 'steamdbRating'])
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  for (const key of ['bestDealPrice', 'bestDealCut', 'steamdbRating'])
     await expect(page.locator(`.dt-td[data-col-key="${key}"]`).first()).toHaveCSS('text-align', 'end');
   await expect(page.locator('.dt-td[data-col-key="name"]').first()).not.toHaveCSS('text-align', 'end');
 });
@@ -4133,23 +4162,29 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(rows(page)).toHaveCount(5);
   // USD-only on a EUR region, so each price carries its estimate, as in the bundle list.
   await expect(page.locator('.bundle-tier-chip')).toHaveText([/^1 for \$2\.00 \(≈ €[\d.]+\)$/, /^3 for \$3\.50 \(≈ €/]);
-  await expect(row(page, 'Hades')).toContainText('$2.00/game');
+  // Grouped by what to pick first, the rate (the same on every row) left to the hero and the selection.
+  await expect(page.locator('thead th').filter({ hasText: /^Per pick/ })).toHaveCount(0);
+  // Alice owns all but Don't Starve Together (Hades, owned and wishlisted, goes with the owned).
+  await expect(groupRows(page)).toHaveText([/Not Owned/, /Owned/]);
+  await expect(rows(page).first()).toContainText("Don't Starve Together");
 
   await row(page, 'Portal 2').getByRole('checkbox').check();
   await expect(page.locator('.selection-pick-total')).toHaveText(/^\$2\.00 \(≈ €[\d.]+\)$/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('1 pick · 1-game tier');
-  await expect(page.locator('.selection-pick-savings')).toHaveText(/^(saves .+|.+ more|same as best deals)$/);
+  // Alice owns Portal 2: a pick that saves nothing.
+  await expect(page.locator('.selection-pick-savings')).toHaveText(/^.+ more$/);
+  await expect(page.locator('.selection-pick-owned')).toHaveText('1 you own · not in the saving');
   // Two picks cost less at the 3-game tier than bought one at a time.
   await row(page, 'Hades').getByRole('checkbox').check();
   await expect(page.locator('.selection-pick-total')).toHaveText(/^\$3\.50 \(≈ €/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('2 picks · 3-game tier · 1 more free');
   await expect(page.locator('.bundle-tier-chip--active')).toHaveText(/^3 for \$3\.50/);
-  await expect(row(page, 'Hades')).toContainText('$1.17/game');
+  // The saving, in USD like the rate, carries its estimate too.
+  await expect(page.locator('.selection-pick-savings')).toHaveText(/\$[\d.]+ \(≈ €[\d.]+\)/);
 
   // A package's two rows are one pick, ticked and unticked together.
-  const pack = rows(page).filter({ has: page.locator('.tier-package') });
-  await expect(pack).toHaveText([/Hollow Knight/, /Don't Starve Together/]);
-  await expect(pack.filter({ hasText: 'included' })).toHaveCount(1);
+  const pack = rows(page).filter({ hasText: 'package · 2 games' });
+  await expect(pack).toHaveText([/Don't Starve Together/, /Hollow Knight/]);
   await pack.nth(0).getByRole('checkbox').check();
   await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();
   await expect(page.locator('.selection-pick-detail')).toHaveText('3 picks · 3-game tier');
@@ -4159,7 +4194,7 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   const buy = page.getByRole('link', { name: 'Buy 3 on Fanatical ↗' });
   const href = new URL((await buy.getAttribute('href')) ?? '');
   expect(href.origin + href.pathname).toBe('https://example.invalid/bundle');
-  expect(JSON.parse(href.searchParams.get('scg') ?? '')).toEqual(['Portal 2', 'Hades', 'Test Survival Pack']);
+  expect(JSON.parse(href.searchParams.get('scg') ?? '')).toEqual(['Test Survival Pack', 'Portal 2', 'Hades']); // in table order
   await expect(page.getByRole('link', { name: 'Add to Fanatical' })).toHaveAttribute('href', /^javascript:/);
   await row(page, 'Terraria').getByRole('checkbox').check();
   await expect(page.locator('.selection-fanatical-by-hand')).toHaveText('1 to pick by hand');
@@ -4365,8 +4400,7 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
   // The pricier tier lists no games, so any of them may sit in it.
-  const price = row(page, 'Overcooked! 2').getByTitle(/doesn't say which tier/);
-  await expect(price).toHaveText('€5.00–€12.00');
+  await expect(groupRows(page)).toHaveText([/€5\.00–€12\.00 · which tier isn't listed/]);
   // The side panel's Price card says the same.
   await row(page, 'Overcooked! 2').getByText('Overcooked! 2').click();
   await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');

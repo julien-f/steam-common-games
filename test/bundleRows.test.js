@@ -19,6 +19,7 @@ const {
   compareBundleAge,
   BUNDLE_AGE,
   bundleTierSummary,
+  bundlePricingModel,
   filterTiers,
   activeTierPrice,
   atTier,
@@ -26,7 +27,10 @@ const {
   pickRate,
   cheapestPicks,
   pickPlanDetail,
-  pickSavings,
+  savingsText,
+  tierGroupKey,
+  tierGroupLabel,
+  savingTier,
   bundlePackages,
   wholePackages,
 } = require('../public/bundleRows.ts');
@@ -219,6 +223,38 @@ test('bundleTierSummary: empty for a bundle with no tiers', () => {
   assert.deepEqual(bundleTierSummary(bundle({ tiers: undefined })), []);
 });
 
+test('bundleTierSummary: drops an empty unpriced tier and marks add-ons (bundle 14804)', () => {
+  const b = bundle({
+    tiers: [
+      { price: { amount: 22.07, currency: 'USD' }, games: [{}, {}, {}] },
+      { price: null, games: [], addon: true },
+      { price: { amount: 2, currency: 'USD' }, games: [{}], addon: true },
+    ],
+  });
+  assert.deepEqual(bundleTierSummary(b), [
+    { price: 22.07, currency: 'USD', gameCount: 3 },
+    { price: 2, currency: 'USD', gameCount: 1, addon: true },
+  ]);
+});
+
+// ── bundlePricingModel ───────────────────────────────────────────────────────────────────────
+
+test('bundlePricingModel: tiered, fixed or pick, from the base tiers only', () => {
+  const t = (price, extra = {}) => ({ price, currency: price == null ? null : 'USD', gameCount: 1, ...extra });
+  assert.equal(bundlePricingModel([t(5), t(12)]), 'tiered');
+  assert.equal(bundlePricingModel([t(5), t(10.55), t(18.99, { gameCount: 0 })]), 'tiered', 'empty priced tiers count');
+  // Bundle 16689: five base tiers and two add-ons, one priced like a base tier.
+  assert.equal(
+    bundlePricingModel([t(4), t(6), t(9), t(13), t(16), t(2, { addon: true }), t(4, { addon: true })]),
+    'tiered',
+  );
+  assert.equal(bundlePricingModel([t(22.07), t(2, { addon: true })]), 'fixed', 'one base tier beside an add-on');
+  assert.equal(bundlePricingModel([t(0)]), 'fixed', 'a free tier is a price');
+  assert.equal(bundlePricingModel([t(2, { quantity: 1 }), t(3.5, { quantity: 3 })]), 'pick');
+  assert.equal(bundlePricingModel([t(null, { gameCount: 15 })]), 'pick', 'Build your own with no known rates');
+  assert.equal(bundlePricingModel([]), 'fixed', 'no tiers: nothing to choose');
+});
+
 // ── filterTiers / activeTierPrice / atTier ───────────────────────────────────────────────────
 
 const usd = (price, gameCount = 1) => ({ price, currency: 'USD', gameCount });
@@ -227,6 +263,8 @@ test('filterTiers: two or more priced tiers filter; one tier, a Varies one or pi
   assert.deepEqual(filterTiers([usd(5), usd(12)]), [usd(5), usd(12)]);
   assert.deepEqual(filterTiers([usd(5)]), []);
   assert.deepEqual(filterTiers([usd(5), { price: null, currency: null, gameCount: 3 }]), []);
+  assert.deepEqual(filterTiers([usd(4), usd(6), { ...usd(2), addon: true }]), [usd(4), usd(6)], 'add-ons apart');
+  assert.deepEqual(filterTiers([usd(4), { ...usd(2), addon: true }]), [], 'one base tier');
   assert.deepEqual(
     filterTiers([
       { ...usd(2), quantity: 1 },
@@ -252,6 +290,7 @@ test("atTier: paying a tier gets its games and every cheaper tier's, never a Var
   assert.equal(atTier({ tierPrice: 15 }, 12), false);
   assert.equal(atTier({ tierPrice: 0 }, 12), true, 'a free tier');
   assert.equal(atTier({ tierPrice: null }, 12), false);
+  assert.equal(atTier({ tierPrice: 2, addon: true }, 12), false, 'an add-on is bought apart');
 });
 
 // ── shopHue ──────────────────────────────────────────────────────────────────────────────────
@@ -461,11 +500,12 @@ test('pickPlanDetail: the rate, or the tier filled with its spare picks', () => 
   assert.equal(pickPlanDetail(cheapestPicks(PICKS, 1), 1), '1 pick · 1-game tier');
 });
 
-test('pickSavings: saved, overpaid or even against the best deals', () => {
+test('savingsText: saved, overpaid or even against the best deals, estimated in the region currency', () => {
   const plan = cheapestPicks(PICKS, 5);
-  assert.deepEqual(pickSavings(plan, 23.4), { text: 'saves $16.41', overpays: false });
-  assert.deepEqual(pickSavings(plan, 5), { text: '$1.99 more', overpays: true });
-  assert.deepEqual(pickSavings(plan, 6.99), { text: 'same as best deals', overpays: false });
+  assert.deepEqual(savingsText(plan.cost, 23.4, 'USD', 'USD'), { text: 'saves $16.41', overpays: false });
+  assert.deepEqual(savingsText(plan.cost, 5, 'USD', 'USD'), { text: '$1.99 more', overpays: true });
+  assert.deepEqual(savingsText(plan.cost, 6.99, 'USD', 'USD'), { text: 'same as best deals', overpays: false });
+  assert.match(savingsText(plan.cost, 23.4, 'USD', 'EUR').text, /^saves \$16\.41 \(≈ €[\d.]+\)$/);
 });
 
 // ── Steam packages ───────────────────────────────────────────────────────────────────────────
@@ -536,4 +576,52 @@ test('bundleOwnership: a failed wishlist fetch leaves that count unknown, not ze
       wishlist: null,
     },
   );
+});
+
+// ── tierGroupKey / tierGroupLabel / savingTier ───────────────────────────────────────────────
+
+test('tierGroupKey: base tiers by price, then add-ons, then unpriced games', () => {
+  const keys = [{ tierPrice: 12 }, { tierPrice: 2, addon: true }, { tierPrice: null }, { tierPrice: 5 }].map(
+    tierGroupKey,
+  );
+  assert.deepEqual(
+    [...keys].sort((a, b) => a - b),
+    [keys[3], keys[0], keys[1], keys[2]],
+  );
+  assert.notEqual(tierGroupKey({ tierPrice: 4 }), tierGroupKey({ tierPrice: 4, addon: true }), "16689's two $4");
+});
+
+test("tierGroupLabel: a tier's price and its step over the one below; a range, an add-on, a fixed price", () => {
+  const tiers = [usd(5, 2), usd(12, 2), usd(18, 0), { ...usd(2), addon: true }];
+  const label = (row, model = 'tiered', rangeMax = new Map()) =>
+    tierGroupLabel(tierGroupKey(row), tiers, model, rangeMax, 'USD');
+  assert.equal(label({ tierPrice: 5 }), '$5.00 tier');
+  assert.equal(label({ tierPrice: 12 }), '$12.00 tier · +$7.00 over $5.00');
+  assert.equal(label({ tierPrice: 12 }, 'tiered', new Map([[12, 18]])), "$12.00–$18.00 · which tier isn't listed");
+  assert.equal(label({ tierPrice: 2, addon: true }), '$2.00 add-on');
+  assert.equal(label({ tierPrice: null }), 'Varies');
+  assert.equal(tierGroupLabel(12, [usd(12)], 'fixed', new Map(), 'USD'), '$12.00 · every game');
+  assert.match(tierGroupLabel(5, tiers, 'tiered', new Map(), 'EUR'), /^\$5\.00 \(≈ €[\d.]+\) tier$/);
+  // An unpriced base tier with games beside priced ones: no "every game", the step still from the priced ones.
+  const varies = { price: null, currency: null, gameCount: 3 };
+  assert.equal(tierGroupLabel(5, [usd(5), varies], 'fixed', new Map(), 'USD'), '$5.00 tier');
+  assert.equal(
+    tierGroupLabel(12, [usd(5), usd(12), varies], 'tiered', new Map(), 'USD'),
+    '$12.00 tier · +$7.00 over $5.00',
+  );
+});
+
+test('savingTier: the cheapest tier holding every new game, the pressed one, or none when unknown', () => {
+  const tiers = [usd(5), usd(12), { ...usd(2), addon: true }];
+  assert.deepEqual(
+    savingTier([{ tierPrice: 5 }, { tierPrice: 5 }], tiers, null),
+    usd(5),
+    'all new games in the cheapest',
+  );
+  assert.deepEqual(savingTier([{ tierPrice: 5 }, { tierPrice: 12 }], tiers, null), usd(12));
+  assert.deepEqual(savingTier([{ tierPrice: 5 }], tiers, 12), usd(12), 'the pressed tier');
+  assert.equal(savingTier([{ tierPrice: 5, tierPriceMax: 12 }], tiers, 5), null, 'may sit past the pressed tier');
+  assert.deepEqual(savingTier([{ tierPrice: 5, tierPriceMax: 12 }], tiers, null), usd(12));
+  assert.equal(savingTier([], tiers, null), null, 'nothing new');
+  assert.equal(savingTier([{ tierPrice: null }], tiers, null), null, 'an unpriced game');
 });

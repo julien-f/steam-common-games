@@ -8,6 +8,7 @@
 // own filter checklists/group keys are built from.
 
 import { compareByOrder, formatMoney, fmtLocalDate, pad2 } from './utils.ts';
+import { formatWithEstimate } from './currency.ts';
 import type { PriceAmount } from './types.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
@@ -110,11 +111,17 @@ export function pickPlanDetail(plan: PickPlan, picks: number): string {
   return `${picks} pick${picks === 1 ? '' : 's'} · ${how}${spare}`;
 }
 
-// What the plan saves over the same games at their best deals, or `overpays` when it doesn't.
-export function pickSavings(plan: PickPlan, bestDeals: number): { text: string; overpays: boolean } {
-  const diff = Math.round((bestDeals - plan.cost) * 100) / 100;
+// What paying `cost` saves over the same games at their best deals (`bestDeals`, in the same
+// `currency`), or `overpays` when it doesn't; with an estimate in `target` when it differs.
+export function savingsText(
+  cost: number,
+  bestDeals: number,
+  currency: string,
+  target: string,
+): { text: string; overpays: boolean } {
+  const diff = Math.round((bestDeals - cost) * 100) / 100;
   if (diff === 0) return { text: 'same as best deals', overpays: false };
-  const amount = formatMoney(Math.abs(diff), plan.currency);
+  const amount = formatWithEstimate(Math.abs(diff), currency, target);
   return diff > 0 ? { text: `saves ${amount}`, overpays: false } : { text: `${amount} more`, overpays: true };
 }
 
@@ -306,6 +313,8 @@ export interface BundleTierSummary {
   gameCount: number;
   // Set on a Fanatical pick-and-mix tier: how many of the `gameCount` games this price picks.
   quantity?: number;
+  // Bought on its own, beside the base tiers: not cumulative, and its games aren't in any base tier.
+  addon?: boolean;
 }
 
 // One entry per tier, cheapest first (ITAD's tiers are observed to always be price-ascending), for
@@ -317,14 +326,16 @@ export interface BundleTierSummary {
 // Fanatical's quantity tiers stand in for ITAD's lone null-price tier when `currency` is given and they're known.
 export function bundleTierSummary(
   bundle: {
-    tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null;
+    tiers?: { price?: PriceAmount | null; games?: unknown[] | null; addon?: boolean | null }[] | null;
     pickAndMix?: PickAndMixTier[] | null;
   },
   currency?: string,
 ): BundleTierSummary[] {
+  // An unpriced tier with no games (seen as an empty add-on) prices nothing.
+  const tiers = (bundle.tiers || []).filter((t) => t.price || (t.games || []).length);
   const picks = currency ? pickTiers(bundle.pickAndMix, currency) : [];
-  if (picks.length && (bundle.tiers || []).every((t) => !t.price)) {
-    const pool = Math.max(0, ...(bundle.tiers || []).map((t) => (t.games || []).length));
+  if (picks.length && tiers.every((t) => !t.price)) {
+    const pool = Math.max(0, ...tiers.map((t) => (t.games || []).length));
     return picks.map((t) => ({
       price: t.price.amount,
       currency: t.price.currency,
@@ -332,17 +343,31 @@ export function bundleTierSummary(
       quantity: t.quantity,
     }));
   }
-  return (bundle.tiers || []).map((tier) => ({
+  return tiers.map((tier) => ({
     price: tier.price ? tier.price.amount : null,
     currency: tier.price ? tier.price.currency : null,
     gameCount: (tier.games || []).length,
+    ...(tier.addon && { addon: true }),
   }));
 }
 
-// The tiers that filter the table: a classic bundle's priced ones, when it has two or more.
+// From the base tiers (add-ons are bought apart): `tiered` (several, cumulative), `fixed` (one), or
+// `pick` (Fanatical's pick any N by quantity, its rates unknown when Fanatical's feed lacks it).
+export type BundlePricingModel = 'tiered' | 'fixed' | 'pick';
+
+export function bundlePricingModel(tiers: readonly BundleTierSummary[]): BundlePricingModel {
+  const base = tiers.filter((t) => !t.addon);
+  if (base.some((t) => t.quantity)) return 'pick';
+  const priced = base.filter((t) => t.price != null).length;
+  if (base.length && !priced) return 'pick';
+  return priced > 1 ? 'tiered' : 'fixed';
+}
+
+// The tiers that filter the table: a classic bundle's priced base tiers, when it has two or more.
 export function filterTiers(tiers: readonly BundleTierSummary[]): BundleTierSummary[] {
-  const priced = tiers.filter((t) => t.price != null && !t.quantity);
-  return priced.length > 1 && priced.length === tiers.length ? priced : [];
+  const base = tiers.filter((t) => !t.addon);
+  const priced = base.filter((t) => t.price != null && !t.quantity);
+  return priced.length > 1 && priced.length === base.length ? priced : [];
 }
 
 // The tier price a Tier Price range selects: a max alone, equal to one of `tiers`' prices.
@@ -355,9 +380,9 @@ export function activeTierPrice(
   return filterTiers(tiers).some((t) => t.price === max) ? max : null;
 }
 
-// What paying `price` gets: a pricier tier includes every cheaper one's games.
-export function atTier(row: { tierPrice?: number | null }, price: number): boolean {
-  return row.tierPrice != null && row.tierPrice <= price;
+// What paying `price` gets: a pricier tier includes every cheaper one's games, not an add-on's.
+export function atTier(row: { tierPrice?: number | null; addon?: boolean | null }, price: number): boolean {
+  return !row.addon && row.tierPrice != null && row.tierPrice <= price;
 }
 
 interface BundleUrgency {
@@ -462,4 +487,60 @@ export function toBundleRow(bundle: BundleListItem, now: number = Date.now(), cu
     covers: bundleCovers(bundle),
     gids: [...new Set((bundle.tiers || []).flatMap((t) => (t.games || []).map((g) => g.id)))],
   };
+}
+
+// Numeric keys sorting base tiers by price, then add-ons, then unpriced games; the offsets sit far
+// above any tier price in any currency (a ₩ tier runs to tens of thousands).
+const ADDON_GROUP = 1e12;
+const VARIES_GROUP = 2e12;
+export function tierGroupKey(row: { tierPrice?: number | null; addon?: boolean | null }): number {
+  if (row.tierPrice == null) return VARIES_GROUP;
+  return row.addon ? ADDON_GROUP + row.tierPrice : row.tierPrice;
+}
+
+// A tier key's price, and whether it's an add-on's (tierGroupKey's inverse, unpriced aside).
+export function tierKeyPrice(key: number): { price: number; addon: boolean } {
+  return key >= ADDON_GROUP ? { price: key - ADDON_GROUP, addon: true } : { price: key, addon: false };
+}
+
+// A Tier Price group's header: the tier's price (its range when ITAD doesn't say which tier holds
+// its games, `rangeMax` by price), and what a tier costs over the one below it.
+export function tierGroupLabel(
+  key: number,
+  tiers: readonly BundleTierSummary[],
+  model: BundlePricingModel,
+  rangeMax: ReadonlyMap<number, number>,
+  target: string,
+): string {
+  if (key >= VARIES_GROUP) return 'Varies';
+  const { price, addon } = tierKeyPrice(key);
+  const tier = tiers.find((t) => !!t.addon === addon && t.price === price);
+  const currency = tier?.currency ?? target;
+  const max = rangeMax.get(price);
+  const money =
+    max != null
+      ? `${formatMoney(price, currency)}–${formatWithEstimate(max, currency, target)}`
+      : formatWithEstimate(price, currency, target);
+  if (addon) return `${money} add-on`;
+  if (max != null) return `${money} · which tier isn't listed`;
+  const base = tiers.filter((t) => !t.addon && !t.quantity);
+  if (model === 'fixed' && base.every((t) => t.price != null)) return `${money} · every game`;
+  const prev = base.filter((t) => t.price != null && t.price < price).at(-1);
+  return prev
+    ? `${money} tier · +${formatMoney(price - prev.price!, currency)} over ${formatMoney(prev.price!, currency)}`
+    : `${money} tier`;
+}
+
+// The pressed tier, else the cheapest holding every game in `fresh` (base games not owned); null when
+// unknown (a range past the pressed tier, an unpriced game) or nothing is new.
+export function savingTier(
+  fresh: readonly { tierPrice?: number | null; tierPriceMax?: number | null }[],
+  tiers: readonly BundleTierSummary[],
+  pressed: number | null,
+): BundleTierSummary | null {
+  const base = tiers.filter((t) => !t.addon && t.price != null && !t.quantity).sort((a, b) => a.price! - b.price!);
+  if (!fresh.length || fresh.some((r) => r.tierPrice == null)) return null;
+  const need = Math.max(...fresh.map((r) => r.tierPriceMax ?? r.tierPrice!));
+  if (pressed != null) return need <= pressed ? (base.find((t) => t.price === pressed) ?? null) : null;
+  return base.find((t) => t.price! >= need) ?? null;
 }

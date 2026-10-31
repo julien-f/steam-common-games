@@ -197,6 +197,14 @@ export function renderNameCell(v: unknown, row: Row): Node {
     b.textContent = '☆';
     wrap.appendChild(b);
   }
+  // A bundle's Steam package (a game and its DLC sold as one): its rows are bought together.
+  if (row.bundlePackage) {
+    const note = document.createElement('small');
+    note.className = 'name-package';
+    note.title = `Part of ${row.bundlePackage.title}: ${row.bundlePackage.size} games bought together`;
+    note.textContent = `package · ${row.bundlePackage.size} games`;
+    wrap.appendChild(note);
+  }
   return wrap;
 }
 
@@ -692,6 +700,16 @@ export const OWNERSHIP_STATUS_COLUMN: ColumnDef<Row> = {
   render: renderTierLabel(OWNERSHIP_STATUS_TIERS),
   compare: compareOwnershipStatus,
   defaultSortDir: 'desc',
+};
+// On a pick-and-mix bundle, what to pick first: wishlisted, then not owned, then owned (wishlisted or not).
+export const PICK_OWNERSHIP_COLUMN: ColumnDef<Row> = {
+  ...OWNERSHIP_STATUS_COLUMN,
+  value: (row) => {
+    const status = computeOwnershipStatus(row);
+    return status === 'Owned & Wishlisted' ? 'Owned' : status;
+  },
+  compare: compareMissingLast(compareByOrder(['Wishlisted', 'Not Owned', 'Owned'])),
+  defaultSortDir: 'asc',
 };
 
 // Inserts `newColumns` right after the column keyed `afterKey`, rather than always appending at

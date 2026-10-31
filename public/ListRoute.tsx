@@ -100,6 +100,7 @@ import {
   priceTierGroup,
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
+  PICK_OWNERSHIP_COLUMN,
   SOURCE_NAMES,
 } from './gameColumns.ts';
 import {
@@ -203,6 +204,7 @@ import {
 import {
   activeTierPrice,
   atTier,
+  bundlePricingModel,
   bundleTierSummary,
   bundleUrgency,
   filterTiers,
@@ -215,8 +217,13 @@ import {
   pickPlanDetail,
   bundlePackages,
   wholePackages,
-  pickSavings,
+  savingsText,
+  savingTier,
+  tierGroupKey,
+  tierGroupLabel,
+  tierKeyPrice,
   type BundlePackage,
+  type BundlePricingModel,
   type BundleTierSummary,
   type PickPlan,
   type PickTier,
@@ -576,26 +583,19 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
         : v === 0
           ? 'Free'
           : row.tierPriceMax != null
-            ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
-            : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
+            ? `${formatMoney(Number(v), row.tierCurrency)}–${formatWithEstimate(row.tierPriceMax, row.tierCurrency, regionCurrency())}`
+            : formatWithEstimate(Number(v), row.tierCurrency, regionCurrency(), row.tierPerGame ? '/game' : '');
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
-  const rangeTitle = row.tierPriceMax != null ? TIER_RANGE_TITLE : null;
-  if (!pkg) {
-    if (!rangeTitle) return document.createTextNode(price);
-    const span = document.createElement('span');
-    span.title = rangeTitle;
-    span.textContent = price;
-    return span;
-  }
   // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
-  const wrap = document.createElement('span');
-  wrap.className = 'tier-package';
-  wrap.title = `Part of ${pkg.title}: ${pkg.size} games bought together${row.tierPerGame ? ', as one pick' : ''}${rangeTitle ? `. ${rangeTitle}` : ''}`;
-  wrap.append(row.tierPerGame && !pkg.lead ? 'included' : price);
-  const note = document.createElement('small');
-  note.textContent = `package · ${pkg.size} games`;
-  wrap.append(note);
-  return wrap;
+  const included = pkg && row.tierPerGame && !pkg.lead;
+  const title = [included && `Included in the ${pkg.title} pick`, row.tierPriceMax != null && TIER_RANGE_TITLE].filter(
+    Boolean,
+  );
+  if (!title.length) return document.createTextNode(price);
+  const span = document.createElement('span');
+  span.title = title.join('. ');
+  span.textContent = included ? 'included' : price;
+  return span;
 }
 
 const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
@@ -610,6 +610,12 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   ...priceTierGroup((row) => row.tierCurrency, 'Varies'),
   keepVisibleWhenGrouped: true,
   category: 'Pricing',
+};
+// The hero tile naming how a bundle prices its games.
+const BUNDLE_MODEL_LABELS: Record<BundlePricingModel, string> = {
+  tiered: 'Tiers',
+  fixed: 'Price',
+  pick: 'Pick & mix',
 };
 // A bundle's games' Tier Price fields by appid; with `picks`, pick-and-mix starts at the entry rate (see the effect by pickPlan).
 function bundleTierFields(
@@ -662,6 +668,40 @@ const BUNDLE_DEFAULT_VISIBLE = [
 ];
 const BUNDLE_DEFAULT_SORT: SortEntry[] = [
   { key: 'tierPrice', dir: 'asc' },
+  { key: 'steamdbRating', dir: 'desc' },
+];
+// A pick-and-mix bundle: one rate for every game (in the hero and the selection bar), so no Per pick
+// column; grouped by what to pick first.
+const PICK_BUNDLE_COLUMNS = BUNDLE_COLUMNS.map((c) =>
+  c.key === 'ownershipStatus' ? PICK_OWNERSHIP_COLUMN : c.key === 'tierPrice' ? { ...c, label: 'Per pick' } : c,
+);
+// A tiered or fixed-price bundle: grouped by its exact tiers, each header saying what the tier costs over
+// the one below (static, from the bundle), its price then left out of the rows.
+function bundleColumns(
+  meta: { tiers: BundleTierSummary[]; model: BundlePricingModel },
+  games: readonly ResolvedGame[],
+): ColumnDef<Record<string, any>>[] {
+  const rangeMax = new Map(
+    games.flatMap((g) =>
+      !g.addon && g.tierPrice != null && g.tierPriceMax != null ? [[g.tierPrice, g.tierPriceMax]] : [],
+    ),
+  );
+  const target = regionCurrency();
+  // Keyed so an add-on sorts after the base tiers and a pressed tier's `<= price` range leaves it out.
+  const column: ColumnDef<Record<string, any>> = {
+    ...TIER_PRICE_COLUMN,
+    value: (row) => (row.tierPrice == null ? null : tierGroupKey(row)),
+    format: (v) => TIER_PRICE_COLUMN.format!(v == null ? v : tierKeyPrice(Number(v)).price),
+    render: (_v, row) => renderTierPrice(row.tierPrice, row),
+    groupValue: (_v, row) => tierGroupKey(row),
+    groupFormat: (key) => tierGroupLabel(Number(key), meta.tiers, meta.model, rangeMax, target),
+    keepVisibleWhenGrouped: false,
+  };
+  return BUNDLE_COLUMNS.map((c) => (c.key === 'tierPrice' ? column : c));
+}
+const PICK_BUNDLE_DEFAULT_VISIBLE = BUNDLE_DEFAULT_VISIBLE.filter((key) => key !== 'tierPrice');
+const PICK_BUNDLE_DEFAULT_SORT: SortEntry[] = [
+  { key: 'ownershipStatus', dir: 'asc' },
   { key: 'steamdbRating', dir: 'desc' },
 ];
 
@@ -902,6 +942,7 @@ export default function ListRoute() {
     note: string | null;
     itadCount: number | null;
     tiers: BundleTierSummary[];
+    model: BundlePricingModel;
     picks: PickTier[]; // Fanatical pick-and-mix tiers, when known
   } | null>(null);
   // The bundle's games that have no Steam listing at all (a course, an asset pack, a shop-exclusive
@@ -2104,7 +2145,8 @@ export default function ListRoute() {
     // own to hang a view on" reasoning above applies just as much here, and a link is one-off by
     // nature (a bookmark of *this* view specifically is what "🔗 Share view" is already for).
     if (kind === 'shared') return 'sharedListView';
-    if (kind === 'bundle') return 'bundleListView';
+    // Pick-and-mix bundles share their own layout: grouped and sorted for picking, not by tier.
+    if (kind === 'bundle') return untrack(bundleMeta)?.model === 'pick' ? 'pickBundleListView' : 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     if (kind === 'creator') return 'creatorListView';
     if (kind === 'game-pass') return 'gamePassListView';
@@ -2144,7 +2186,13 @@ export default function ListRoute() {
   function bindLayout(): void {
     unsyncView?.();
     const { id, store } = storedLayout();
-    const l = layoutDraft(viewTable, id, store, [SIMILARITY_KEY, TAG_MATCH_KEY], tableDefaults);
+    const l = layoutDraft(
+      viewTable,
+      id,
+      store,
+      { cols: [SIMILARITY_KEY, TAG_MATCH_KEY], ranges: kind === 'bundle' ? ['tierPrice'] : [] },
+      tableDefaults,
+    );
     setLayout(l);
     setSharedViewEdited(false);
     setViewingShared(l.restore());
@@ -2169,7 +2217,8 @@ export default function ListRoute() {
     if (saved) return saved.name;
     const list = userList();
     if (list) return `the layout of “${list.name}”`;
-    return exploringSomeoneElse() ? 'this table' : `your ${LAYOUT_NAMES[kind] ?? 'list'} layout`;
+    const name = kind === 'bundle' && bundleMeta()?.model === 'pick' ? 'pick & mix bundle' : LAYOUT_NAMES[kind];
+    return exploringSomeoneElse() ? 'this table' : `your ${name ?? 'list'} layout`;
   }
   function layoutNote(): string {
     return exploringSomeoneElse()
@@ -2657,13 +2706,15 @@ export default function ListRoute() {
         setBundleLinks({ details: bundle.details, url: bundle.url, fanaticalNames: bundle.pickAndMixNames ?? null });
         const regionCur = regionCurrency();
         const picks = pickTiers(bundle.pickAndMix, regionCur);
+        const tierSummary = bundleTierSummary(bundle, regionCur);
         setBundleMeta({
           shop: bundle.page?.name || null,
           publish: bundle.publish,
           expiry: bundle.expiry,
           note: bundle.note,
           itadCount: bundle.counts?.games ?? null,
-          tiers: bundleTierSummary(bundle, regionCur),
+          tiers: tierSummary,
+          model: bundlePricingModel(tierSummary),
           picks,
         });
         const { resolved, unresolved, failed } = await resolveBundleGames(bundle);
@@ -2790,6 +2841,7 @@ export default function ListRoute() {
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = (kind === 'shared' || kind === 'creator' || kind === 'game-pass') && pricesShown;
+      const pickBundle = kind === 'bundle' && untrack(bundleMeta)?.model === 'pick';
       const columns = insertColumnsAfter(
         isRanked
           ? priced
@@ -2800,7 +2852,9 @@ export default function ListRoute() {
               ? WISHLIST_COLUMNS
               : WISHLIST_NOPRICE_COLUMNS
             : kind === 'bundle'
-              ? BUNDLE_COLUMNS
+              ? pickBundle
+                ? PICK_BUNDLE_COLUMNS
+                : bundleColumns(untrack(bundleMeta)!, resolvedBundleGames ?? [])
               : kind === 'user'
                 ? priced
                   ? tiered
@@ -2842,7 +2896,9 @@ export default function ListRoute() {
         : kind === 'wishlist'
           ? WISHLIST_DEFAULT_VISIBLE.filter((key) => pricesShown || !PRICE_KEYS.has(key))
           : kind === 'bundle'
-            ? BUNDLE_DEFAULT_VISIBLE
+            ? pickBundle
+              ? PICK_BUNDLE_DEFAULT_VISIBLE
+              : BUNDLE_DEFAULT_VISIBLE
             : (kind === 'user' && priced) || sharedPriced
               ? [...RECENT_DEFAULT_VISIBLE, ...(tiered ? ['tierPrice'] : []), ...PRICED_DEFAULT_VISIBLE]
               : kind === 'recent'
@@ -2857,7 +2913,9 @@ export default function ListRoute() {
       const sort = isRanked
         ? RANKED_DEFAULT_SORT
         : kind === 'bundle'
-          ? BUNDLE_DEFAULT_SORT
+          ? pickBundle
+            ? PICK_BUNDLE_DEFAULT_SORT
+            : BUNDLE_DEFAULT_SORT
           : kind === 'recent'
             ? LOOKED_UP_DEFAULT_SORT
             : DEFAULT_SORT;
@@ -2876,7 +2934,11 @@ export default function ListRoute() {
           pageSize: 50,
           visibleCols: defaultVisible,
           sorts: sort,
-          ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : {}),
+          ...(groups
+            ? { groupBy: [MEMBERSHIP_KEY] }
+            : kind === 'bundle'
+              ? { groupBy: [pickBundle ? 'ownershipStatus' : 'tierPrice'] }
+              : {}),
         };
         const state = createTableState<Game>(tableData, allColumns, {
           initialViewState: tableDefaults,
@@ -3146,6 +3208,25 @@ export default function ListRoute() {
     );
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
   }
+  // The selected picks already owned (a package only when every row of it is): they cost a pick but
+  // add nothing, so the saving leaves them out.
+  const selectedOwnedGids = createMemo(() => {
+    const owned = new Map<string | number, boolean>();
+    for (const r of selectedRows()) {
+      const key = gidOf(r.appid) ?? r.appid;
+      owned.set(key, (owned.get(key) ?? true) && !!r.inLibrary);
+    }
+    return new Set([...owned].filter(([, all]) => all).map(([key]) => key));
+  });
+  // What the plan saves over the picks not owned at their best deals; an object, so a 0 sum still shows.
+  function pickSaving(plan: PickPlan): { amount: number; text: string; overpays: boolean } | null {
+    const owned = selectedOwnedGids();
+    const amount = sumBestDeals(
+      selectedRows().filter((r) => !owned.has(gidOf(r.appid) ?? r.appid)),
+      plan.currency,
+    );
+    return amount == null ? null : { amount, ...savingsText(plan.cost, amount, plan.currency, regionCurrency()) };
+  }
 
   // The pressed tier, read back from the filter so the table's own Clear filters unpresses it; a
   // memo, so another column's range doesn't rebuild the hero.
@@ -3168,16 +3249,27 @@ export default function ListRoute() {
         : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`;
     // Price first, then what it adds, then the deadline: a phone's swipeable row shows only the first few.
     if (meta.tiers.length > 0) {
+      const ratesUnknown = meta.model === 'pick' && !meta.picks.length;
       tiles.push({
-        label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
+        label: BUNDLE_MODEL_LABELS[meta.model],
+        sub:
+          meta.model === 'tiered'
+            ? 'each includes the cheaper ones'
+            : ratesUnknown
+              ? 'priced by how many you pick, on the shop'
+              : meta.model === 'pick'
+                ? 'the more you pick, the less each'
+                : undefined,
         chips: meta.tiers.map((tier) => {
-          const text = tierText(tier);
-          if (!toggles.length)
+          const text = tier.addon ? `${tierText(tier)} add-on` : tierText(tier);
+          if (tier.addon || !toggles.length)
             return {
               text,
-              title: tier.quantity
-                ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
-                : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`,
+              title: tier.addon
+                ? `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} bought on their own, apart from any tier`
+                : tier.quantity
+                  ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
+                  : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this price`,
               active: !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
             };
           const price = tier.price!;
@@ -3205,11 +3297,36 @@ export default function ListRoute() {
       const fresh = rows.filter((r) => !r.inLibrary);
       const target = regionCurrency();
       const total = sumBestDeals(fresh, target);
-      const tier = tierPrice == null ? null : meta.tiers.find((x) => x.price === tierPrice);
+      const tier = tierPrice == null ? null : (filterTiers(meta.tiers).find((x) => x.price === tierPrice) ?? null);
+      // What the tier that gets every new base game saves over buying them apart (pick & mix: the selection does).
+      const freshBase = fresh.filter((r) => !r.addon);
+      const payTier = meta.model === 'pick' ? null : savingTier(freshBase, meta.tiers, tierPrice);
+      const payDeals = payTier?.currency ? sumBestDeals(freshBase, payTier.currency) : null;
+      const saving =
+        payTier && payDeals != null ? savingsText(payTier.price!, payDeals, payTier.currency!, target) : null;
       tiles.push({
         label: tier ? `New at ${tierText(tier)}` : 'New to you',
         value: `${fresh.length} of ${rows.length}`,
-        sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
+        sub:
+          fresh.length && total != null ? (
+            <>
+              ≈ {formatMoney(total, target)} at best deals
+              <Show when={saving}>
+                {(s) => (
+                  <>
+                    <span
+                      class="bundle-tier-saving"
+                      style={{ color: s().overpays ? 'var(--bad)' : 'var(--good)' }}
+                      title="Against the Steam games' best deals; games not on Steam aren't counted"
+                    >
+                      {s().text}
+                      {meta.model === 'tiered' && tierPrice == null ? ` at ${tierText(payTier!)}` : ''}
+                    </span>
+                  </>
+                )}
+              </Show>
+            </>
+          ) : undefined,
         title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
       });
     }
@@ -4494,14 +4611,21 @@ export default function ListRoute() {
                   </output>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
-                <Show when={sumBestDeals(selectedRows(), plan().currency)}>
-                  {(deals) => (
+                <Show when={pickSaving(plan())}>
+                  {(saving) => (
                     <span
                       class="selection-pick-savings"
-                      style={{ color: pickSavings(plan(), deals()).overpays ? 'var(--bad)' : 'var(--good)' }}
-                      title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
+                      style={{ color: saving().overpays ? 'var(--bad)' : 'var(--good)' }}
+                      title={`vs ${formatMoney(saving().amount, plan().currency)} for the games you don't own at their best deals`}
                     >
-                      {pickSavings(plan(), deals()).text}
+                      {saving().text}
+                    </span>
+                  )}
+                </Show>
+                <Show when={selectedOwnedGids().size}>
+                  {(owned) => (
+                    <span class="selection-pick-owned" style={{ color: 'var(--owned)' }}>
+                      {owned()} you own · not in the saving
                     </span>
                   )}
                 </Show>

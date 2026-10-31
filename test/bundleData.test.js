@@ -84,6 +84,19 @@ test('flattenBundleGames: a trailing empty unpriced tier leaves the price exact'
   assert.equal(flattenBundleGames(bundle)[0].tierPriceMax, null);
 });
 
+test("flattenBundleGames: an add-on tier after empty priced tiers doesn't hide the range", () => {
+  const bundle = {
+    tiers: [
+      { price: { amount: 5, currency: 'USD' }, games: [game('a')], addon: false },
+      { price: { amount: 15, currency: 'USD' }, games: [], addon: false },
+      { price: { amount: 2, currency: 'USD' }, games: [game('x')], addon: true },
+    ],
+  };
+  const [a, x] = flattenBundleGames(bundle);
+  assert.equal(a.tierPriceMax, 15);
+  assert.equal(x.tierPriceMax, null);
+});
+
 test('flattenBundleGames: marks addon games from an addon tier', () => {
   const bundle = { tiers: [{ price: { amount: 100, currency: 'USD' }, games: [game('a')], addon: true }] };
   assert.equal(flattenBundleGames(bundle)[0].addon, true);
