@@ -986,7 +986,6 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
 // fetch mock that tallies how many times each upstream source is hit; `gate` holds every call until it resolves.
 function makeCountingDetailsFetch(counts, { gate } = {}) {
   return async (url) => {
-    counts.started = (counts.started ?? 0) + 1;
     await gate;
     if (url.includes('GetAppReviews')) {
       counts.rating++;
@@ -1097,7 +1096,8 @@ test('GET /api/game-details/:appid: ?refresh=1 alongside a normal request shares
 
   const hits = dedupHits('steam');
   const both = Promise.all([api.get('/api/game-details/503'), api.get('/api/game-details/503?refresh=1')]);
-  await until(() => dedupHits('steam') >= hits + 2, 'the forced rating and meta calls joining the normal ones');
+  // A lone request makes no 'steam' dedup hit; the forced one joins all five of its upstream calls.
+  await until(() => dedupHits('steam') === hits + 5, 'the forced calls joining the normal ones');
   release();
   const [normal, forced] = await both;
   assert.equal(normal.status, 200);
@@ -1208,29 +1208,26 @@ test('GET /api/game-meta/:appid: 400 for an invalid appid, 502 when the store fa
 // Question: when the client disconnects before setCache runs, does the server
 // still complete the upstream work and cache it (so the refresh is a cache hit),
 // or is the work stranded (forcing the refresh to re-fetch)?
-async function abortedGet(port, path, abortOnce) {
-  const req = http.get({ host: '127.0.0.1', port, path }, (res) => res.resume());
-  req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
-  await abortOnce();
-  req.destroy();
-}
-
 test('GET /api/game-details/:appid: a request aborted mid-flight still caches, so refresh does not re-fetch', async (t) => {
   _reset();
   _resetAuth();
   const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
   const { promise: gate, resolve: release } = Promise.withResolvers();
-  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { gate }));
+  const countingFetch = makeCountingDetailsFetch(counts, { gate });
+  let started = 0;
+  t.mock.method(globalThis, 'fetch', (url) => (started++, countingFetch(url)));
 
   const server = app.listen(0);
   t.after(() => new Promise((r) => server.close(r)));
   let sockets = 0;
   server.on('connection', (socket) => (sockets++, socket.once('close', () => sockets--)));
   await new Promise((r) => server.once('listening', r));
-  const port = server.address().port;
 
   // Killed once the handler has started its upstream fetches, held until the server sees the disconnect.
-  await abortedGet(port, '/api/game-details/600', () => until(() => counts.started, 'the first upstream fetch'));
+  const req = http.get({ host: '127.0.0.1', port: server.address().port, path: '/api/game-details/600' });
+  req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
+  await until(() => started, 'the first upstream fetch');
+  req.destroy();
   await until(() => sockets === 0, 'the server seeing the disconnect');
   release();
 
