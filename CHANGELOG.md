@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Faster, steadier tests: the e2e suite runs on a fake clock instead of real waits, the unit suite takes half the time, and `node scripts/e2e-flakes.js` measures each test's flake rate under load
 - Unit tests wait on the state they expect instead of sleeping
 - `node scripts/upstream-bugs.js` lists the workarounds waiting on a browser or library fix, and `session-end.js` flags those ready to remove
+- Drop the dotenv dependency: settings files now load with Node's built-in loader
 
 ## [0.12.0] - 2026-10-30
 
