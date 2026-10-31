@@ -56,12 +56,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: the close steps history back over the overlay's own entry (`overlayHistory.ts`) with an asynchronous `history.go`, and that traversal aborts the navigation already under way.
 - **Fix**: wait for the step's `popstate` before navigating (see the L4 Recently Looked Up test).
 
-## Exit 144, then `Port 58991 is already in use` (or 58993), after `pkill -f`
-
-- **Symptom**: `pkill -f vite` (or `node server.js`) ends the command with exit 144, and the next start fails on a busy port or gets connection refused.
-- **Cause**: the pattern matches the shell running the `pkill` command itself, so it kills that shell, and it can miss the server's actual process.
-- **Fix**: stop servers with `node scripts/mock-server.js down` / `node scripts/dev-server.js down`, never `pkill`.
-
 ## A new `/api` route answers `Cannot GET` (404) under `npm run dev`
 
 - **Symptom**: the page says a source "didn't answer"; `curl localhost:3000/api/<route>` returns Express's `Cannot GET /api/<route>` HTML; the `backend` log says `Error: cannot listen on <host>:3000: listen EADDRINUSE`.
