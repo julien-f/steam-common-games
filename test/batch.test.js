@@ -180,3 +180,43 @@ test("applyLaneChanges: replays a lane's closures and narrowings on main's backl
     '## A\n\n- **U2 · polish · S** — b, what is left.\n- **U9 · minor · S** — closed by another lane? no, still open.\n',
   );
 });
+
+// Runs the real script in a throwaway repo: `merge` must stage only what the lane changed.
+test("merge: leaves another session's uncommitted backlog edit unstaged", (t) => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { execFileSync } = require('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'batch-merge-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  // Hooks export GIT_DIR and GIT_INDEX_FILE: inherited, they'd point every git call here at the real repo.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env, encoding: 'utf8' });
+  const write = (file, text) => {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), text);
+  };
+  for (const file of ['batch.js', 'changelog-check.js'])
+    fs.cpSync(path.join(__dirname, '../scripts', file), path.join(dir, 'scripts', file));
+  write(
+    'docs/dev/code-backlog.md',
+    '# Code\n\n## Simplify\n\n- **C1 · minor · S** — a. Fix.\n- **C2 · minor · S** — b. Fix.\n',
+  );
+  write('docs/dev/improvements.md', '# UX\n\n## Lists\n\n- **U1 · minor · L1** — c. Fix.\n');
+  write('CHANGELOG.md', '# Changelog\n\n## [Unreleased]\n');
+  git('init', '-q', '-b', 'main');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '.');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base');
+  git('checkout', '-qb', 'lane');
+  write('docs/dev/code-backlog.md', '# Code\n\n## Simplify\n\n- **C2 · minor · S** — b. Fix.\n');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'Close C1');
+  git('checkout', '-q', 'main');
+  const otherEdit = '# UX\n\n## Lists\n\n- **U1 · minor · L1** — c. Fix.\n- **U2 · minor · L1** — new. Fix.\n';
+  write('docs/dev/improvements.md', otherEdit);
+
+  execFileSync('node', ['scripts/batch.js', 'merge', 'lane'], { cwd: dir, env, encoding: 'utf8' });
+
+  assert.deepEqual(git('diff', '--cached', '--name-only').trim().split('\n'), ['docs/dev/code-backlog.md']);
+  assert.equal(git('diff', '--name-only').trim(), 'docs/dev/improvements.md');
+  assert.equal(fs.readFileSync(path.join(dir, 'docs/dev/improvements.md'), 'utf8'), otherEdit);
+});

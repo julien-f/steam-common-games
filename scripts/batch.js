@@ -269,15 +269,18 @@ function merge(branch) {
   const edit = (file, fn) =>
     fs.writeFileSync(path.join(ROOT, file), fn(fs.readFileSync(path.join(ROOT, file), 'utf8')));
   if (conflicted.includes('CHANGELOG.md')) edit('CHANGELOG.md', unionConflicts);
+  // Only files the lane changed or that conflict: staging another one would sweep in another session's uncommitted edits.
+  const backlogs = Object.values(BACKLOGS)
+    .map((file, i) => [file, changes[i]])
+    .filter(([file, c]) => c.closed.length || c.narrowed.size || conflicted.includes(file));
   // A backlog conflict is lanes editing their own items side by side: keep main's side, then replay this lane's edits on it.
-  for (const file of Object.values(BACKLOGS).filter((f) => conflicted.includes(f)))
-    git('checkout', '--ours', '--', file);
-  Object.values(BACKLOGS).forEach((file, i) => edit(file, (t) => applyLaneChanges(t, changes[i])));
+  for (const [file] of backlogs.filter(([f]) => conflicted.includes(f))) git('checkout', '--ours', '--', file);
+  for (const [file, c] of backlogs) edit(file, (t) => applyLaneChanges(t, c));
   const closed = changes.flatMap((c) => c.closed);
   const narrowed = changes.flatMap((c) => [...c.narrowed.keys()]);
   console.log(`closed: ${closed.join(' ') || 'none'} · narrowed: ${narrowed.join(' ') || 'none'}`);
-  git('add', 'CHANGELOG.md', ...Object.values(BACKLOGS));
-  const resolved = ['CHANGELOG.md', ...Object.values(BACKLOGS)];
+  const resolved = [...(conflicted.includes('CHANGELOG.md') ? ['CHANGELOG.md'] : []), ...backlogs.map(([f]) => f)];
+  if (resolved.length) git('add', ...resolved);
   const left = conflicted.filter((f) => !resolved.includes(f));
   console.log(left.length ? `resolve by hand: ${left.join(' ')}` : 'merged, not committed: review, then commit');
   const hint = mergeHint(git('diff', '--cached', '--name-only').split('\n').filter(Boolean));

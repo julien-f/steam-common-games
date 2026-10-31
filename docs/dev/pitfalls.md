@@ -188,3 +188,15 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: `pre-commit` fails `format` on lines that look right in the working tree; the staged file (`git show :<file>`) has them inside another function.
 - **Cause**: a patch made with `git diff -U0` and staged with `git apply --cached --unidiff-zero` carries no context, so its line numbers count the hunks left out: it applies at the shifted line.
 - **Fix**: build the staged content from `HEAD` (`git show HEAD:<file>`, edit, then `git update-index --cacheinfo 100644,$(git hash-object -w <copy>),<file>`), or commit the hunks in the order they sit in the file.
+
+## A batch merge commits another session's backlog edits
+
+- **Symptom**: a `Merge lane …` commit carries `docs/dev/improvements.md` (or `code-backlog.md`) lines no lane wrote, and that file's uncommitted edits vanish from `git status` in the main checkout.
+- **Cause**: a merge that stages a whole backlog file sweeps in another session's uncommitted edits to it; `node scripts/batch.js merge` stages only the backlogs the lane changed or that conflict, so the edits came from a hand `git add`.
+- **Fix**: `git restore --source=HEAD^1 --staged <file>`, then `git commit --amend`: the swept-in edits leave the commit and stay in the working tree.
+
+## A test that runs `git` commits to the real repo from inside a hook
+
+- **Symptom**: after a commit, stray commits (from a test's throwaway repo) land on your branch or `main`, branches you never made appear, and other checkouts fail with `fatal: this operation must be run in a work tree` (`core.bare` turned `true`).
+- **Cause**: git exports `GIT_DIR` and `GIT_INDEX_FILE` to hooks; a test the hook runs that spawns `git` in a temp dir inherits them, so `git init`, `commit` and `checkout` act on the real repo instead.
+- **Fix**: spawn `git` (and any script that does) with every `GIT_*` variable removed from `env`, as `test/batch.test.js` does. To recover: `git config core.bare false`, then move the affected refs back with `git update-ref` (their reflogs show the previous commit).
