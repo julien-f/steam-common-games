@@ -179,6 +179,14 @@ html:root {
   .dt-btn {
     padding: 0 8px;
   }
+  /* Group's and Sort's ×: the active bar right under them clears each one, and a default grouping
+     (a bundle's tiers) would otherwise push Share view off Columns/Group/Sort's line. */
+  .dt-toolbar-actions .dt-btn-clear:is([aria-label='Clear groups'], [aria-label='Clear sorts']) {
+    display: none;
+  }
+  .dt-toolbar-actions .dt-btn--grouped:has(+ :is([aria-label='Clear groups'], [aria-label='Clear sorts'])) {
+    border-radius: var(--radius-3);
+  }
   /* Down from the library's 160px, so the search still fits beside the view actions at 320px. */
   .dt-search-wrap {
     min-width: 120px;

@@ -1598,6 +1598,11 @@
     text-align: center;
   }
 
+  /* Its own line under New to you's best-deals sum, which a phone's tile would otherwise clip. */
+  .bundle-tier-saving {
+    display: block;
+  }
+
   /* A bundle's Steam package, under its rows' names: what the one purchase covers. */
   .name-package {
     display: block;

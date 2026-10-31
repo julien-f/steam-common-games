@@ -3739,6 +3739,10 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   const hero = page.locator('.list-hero');
   // The tile names the pricing model and its rule, readable without hovering.
   await expect(hero).toContainText('each includes the cheaper ones');
+  // Grouped by tier, each header saying what it costs over the one below.
+  await expect(groupRows(page)).toHaveText([/€5\.00 tier\b/, /€12\.00 tier · \+€7\.00 over €5\.00/]);
+  // Alice's two new games (€7 + €10 at best deals) are both in the €12 tier.
+  await expect(hero.locator('.bundle-tier-saving')).toHaveText('saves €5.00 at €12.00');
   const five = hero.getByRole('button', { name: /5\.00.* tier$/ });
   await five.focus();
   await five.press('Enter');
@@ -3747,11 +3751,13 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(five).toHaveAttribute('aria-pressed', 'true');
   await expect(five).toBeFocused();
   await expect(hero).toContainText(/New at .*5\.00.*0 of 2/i);
+  await expect(hero.locator('.bundle-tier-saving')).toHaveCount(0); // nothing new to save on
   const twelve = hero.getByRole('button', { name: /12\.00.* tier$/ });
   await twelve.click();
   await expect(rows(page)).toHaveCount(4);
   await expect(five).toHaveAttribute('aria-pressed', 'false');
   await expect(hero).toContainText(/New at .*12\.00.*2 of 4\s*≈ .+ at best deals/i);
+  await expect(hero.locator('.bundle-tier-saving')).toHaveText('saves €5.00');
   await twelve.click();
   await expect(twelve).toHaveAttribute('aria-pressed', 'false');
   await expect(hero).toContainText(/New to you\s*2 of 4/i);
@@ -4104,7 +4110,7 @@ test('B1 edge: figures line up: number columns align to the end, text to the sta
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
-  for (const key of ['tierPrice', 'bestDealCut', 'steamdbRating'])
+  for (const key of ['bestDealPrice', 'bestDealCut', 'steamdbRating'])
     await expect(page.locator(`.dt-td[data-col-key="${key}"]`).first()).toHaveCSS('text-align', 'end');
   await expect(page.locator('.dt-td[data-col-key="name"]').first()).not.toHaveCSS('text-align', 'end');
 });
@@ -4368,8 +4374,7 @@ test('B1 edge: games ITAD lists under the first tier only show the tier range', 
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
   // The pricier tier lists no games, so any of them may sit in it.
-  const price = row(page, 'Overcooked! 2').getByTitle(/doesn't say which tier/);
-  await expect(price).toHaveText('€5.00–€12.00');
+  await expect(groupRows(page)).toHaveText([/€5\.00–€12\.00 · which tier isn't listed/]);
   // The side panel's Price card says the same.
   await row(page, 'Overcooked! 2').getByText('Overcooked! 2').click();
   await expect(page.locator('#panel-body').getByTitle(/doesn't say which tier/)).toHaveText('€5.00–€12.00 tier');

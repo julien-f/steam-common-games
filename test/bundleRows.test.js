@@ -28,6 +28,9 @@ const {
   cheapestPicks,
   pickPlanDetail,
   savingsText,
+  tierGroupKey,
+  tierGroupLabel,
+  savingTier,
   bundlePackages,
   wholePackages,
 } = require('../public/bundleRows.ts');
@@ -573,4 +576,45 @@ test('bundleOwnership: a failed wishlist fetch leaves that count unknown, not ze
       wishlist: null,
     },
   );
+});
+
+// ── tierGroupKey / tierGroupLabel / savingTier ───────────────────────────────────────────────
+
+test('tierGroupKey: base tiers by price, then add-ons, then unpriced games', () => {
+  const keys = [{ tierPrice: 12 }, { tierPrice: 2, addon: true }, { tierPrice: null }, { tierPrice: 5 }].map(
+    tierGroupKey,
+  );
+  assert.deepEqual(
+    [...keys].sort((a, b) => a - b),
+    [keys[3], keys[0], keys[1], keys[2]],
+  );
+  assert.notEqual(tierGroupKey({ tierPrice: 4 }), tierGroupKey({ tierPrice: 4, addon: true }), "16689's two $4");
+});
+
+test("tierGroupLabel: a tier's price and its step over the one below; a range, an add-on, a fixed price", () => {
+  const tiers = [usd(5, 2), usd(12, 2), usd(18, 0), { ...usd(2), addon: true }];
+  const label = (row, model = 'tiered', rangeMax = new Map()) =>
+    tierGroupLabel(tierGroupKey(row), tiers, model, rangeMax, 'USD');
+  assert.equal(label({ tierPrice: 5 }), '$5.00 tier');
+  assert.equal(label({ tierPrice: 12 }), '$12.00 tier · +$7.00 over $5.00');
+  assert.equal(label({ tierPrice: 12 }, 'tiered', new Map([[12, 18]])), "$12.00–$18.00 · which tier isn't listed");
+  assert.equal(label({ tierPrice: 2, addon: true }), '$2.00 add-on');
+  assert.equal(label({ tierPrice: null }), 'Varies');
+  assert.equal(tierGroupLabel(12, [usd(12)], 'fixed', new Map(), 'USD'), '$12.00 · every game');
+  assert.match(tierGroupLabel(5, tiers, 'tiered', new Map(), 'EUR'), /^\$5\.00 \(≈ €[\d.]+\) tier$/);
+});
+
+test('savingTier: the cheapest tier holding every new game, the pressed one, or none when unknown', () => {
+  const tiers = [usd(5), usd(12), { ...usd(2), addon: true }];
+  assert.deepEqual(
+    savingTier([{ tierPrice: 5 }, { tierPrice: 5 }], tiers, null),
+    usd(5),
+    'all new games in the cheapest',
+  );
+  assert.deepEqual(savingTier([{ tierPrice: 5 }, { tierPrice: 12 }], tiers, null), usd(12));
+  assert.deepEqual(savingTier([{ tierPrice: 5 }], tiers, 12), usd(12), 'the pressed tier');
+  assert.equal(savingTier([{ tierPrice: 5, tierPriceMax: 12 }], tiers, 5), null, 'may sit past the pressed tier');
+  assert.deepEqual(savingTier([{ tierPrice: 5, tierPriceMax: 12 }], tiers, null), usd(12));
+  assert.equal(savingTier([], tiers, null), null, 'nothing new');
+  assert.equal(savingTier([{ tierPrice: null }], tiers, null), null, 'an unpriced game');
 });

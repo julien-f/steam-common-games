@@ -488,3 +488,55 @@ export function toBundleRow(bundle: BundleListItem, now: number = Date.now(), cu
     gids: [...new Set((bundle.tiers || []).flatMap((t) => (t.games || []).map((g) => g.id)))],
   };
 }
+
+// A bundle's Tier Price groups, keyed by number so they sort as tiers: the base tiers at their
+// price, then add-ons (bought apart) after every base tier, then unpriced games.
+const ADDON_GROUP = 1e6;
+const VARIES_GROUP = 2e6;
+export function tierGroupKey(row: { tierPrice?: number | null; addon?: boolean | null }): number {
+  if (row.tierPrice == null) return VARIES_GROUP;
+  return row.addon ? ADDON_GROUP + row.tierPrice : row.tierPrice;
+}
+
+// A Tier Price group's header: the tier's price (its range when ITAD doesn't say which tier holds
+// its games, `rangeMax` by price), and what a tier costs over the one below it.
+export function tierGroupLabel(
+  key: number,
+  tiers: readonly BundleTierSummary[],
+  model: BundlePricingModel,
+  rangeMax: ReadonlyMap<number, number>,
+  target: string,
+): string {
+  if (key >= VARIES_GROUP) return 'Varies';
+  const addon = key >= ADDON_GROUP;
+  const price = addon ? key - ADDON_GROUP : key;
+  const tier = tiers.find((t) => !!t.addon === addon && t.price === price);
+  const currency = tier?.currency ?? target;
+  const max = rangeMax.get(price);
+  const money =
+    max != null
+      ? `${formatMoney(price, currency)}–${formatWithEstimate(max, currency, target)}`
+      : formatWithEstimate(price, currency, target);
+  if (addon) return `${money} add-on`;
+  if (max != null) return `${money} · which tier isn't listed`;
+  if (model === 'fixed') return `${money} · every game`;
+  const below = filterTiers(tiers).filter((t) => t.price! < price);
+  const prev = below.at(-1);
+  return prev
+    ? `${money} tier · +${formatMoney(price - prev.price!, currency)} over ${formatMoney(prev.price!, currency)}`
+    : `${money} tier`;
+}
+
+// The pressed tier, else the cheapest holding every game in `fresh` (base games not owned); null when
+// unknown (a range past the pressed tier, an unpriced game) or nothing is new.
+export function savingTier(
+  fresh: readonly { tierPrice?: number | null; tierPriceMax?: number | null }[],
+  tiers: readonly BundleTierSummary[],
+  pressed: number | null,
+): BundleTierSummary | null {
+  const base = tiers.filter((t) => !t.addon && t.price != null && !t.quantity).sort((a, b) => a.price! - b.price!);
+  if (!fresh.length || fresh.some((r) => r.tierPrice == null)) return null;
+  const need = Math.max(...fresh.map((r) => r.tierPriceMax ?? r.tierPrice!));
+  if (pressed != null) return need <= pressed ? (base.find((t) => t.price === pressed) ?? null) : null;
+  return base.find((t) => t.price! >= need) ?? null;
+}

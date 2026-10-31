@@ -218,6 +218,9 @@ import {
   bundlePackages,
   wholePackages,
   savingsText,
+  savingTier,
+  tierGroupKey,
+  tierGroupLabel,
   type BundlePackage,
   type BundlePricingModel,
   type BundleTierSummary,
@@ -671,6 +674,26 @@ const BUNDLE_DEFAULT_SORT: SortEntry[] = [
 const PICK_BUNDLE_COLUMNS = BUNDLE_COLUMNS.map((c) =>
   c.key === 'ownershipStatus' ? PICK_OWNERSHIP_COLUMN : c.key === 'tierPrice' ? { ...c, label: 'Per pick' } : c,
 );
+// A tiered or fixed-price bundle: grouped by its exact tiers, each header saying what the tier costs over
+// the one below (static, from the bundle), its price then left out of the rows.
+function bundleColumns(
+  meta: { tiers: BundleTierSummary[]; model: BundlePricingModel },
+  games: readonly ResolvedGame[],
+): ColumnDef<Record<string, any>>[] {
+  const rangeMax = new Map(
+    games.flatMap((g) =>
+      !g.addon && g.tierPrice != null && g.tierPriceMax != null ? [[g.tierPrice, g.tierPriceMax]] : [],
+    ),
+  );
+  const target = regionCurrency();
+  const column: ColumnDef<Record<string, any>> = {
+    ...TIER_PRICE_COLUMN,
+    groupValue: (_v, row) => tierGroupKey(row),
+    groupFormat: (key) => tierGroupLabel(Number(key), meta.tiers, meta.model, rangeMax, target),
+    keepVisibleWhenGrouped: false,
+  };
+  return BUNDLE_COLUMNS.map((c) => (c.key === 'tierPrice' ? column : c));
+}
 const PICK_BUNDLE_DEFAULT_VISIBLE = BUNDLE_DEFAULT_VISIBLE.filter((key) => key !== 'tierPrice');
 const PICK_BUNDLE_DEFAULT_SORT: SortEntry[] = [
   { key: 'ownershipStatus', dir: 'asc' },
@@ -2826,7 +2849,7 @@ export default function ListRoute() {
             : kind === 'bundle'
               ? pickBundle
                 ? PICK_BUNDLE_COLUMNS
-                : BUNDLE_COLUMNS
+                : bundleColumns(untrack(bundleMeta)!, resolvedBundleGames ?? [])
               : kind === 'user'
                 ? priced
                   ? tiered
@@ -2906,7 +2929,11 @@ export default function ListRoute() {
           pageSize: 50,
           visibleCols: defaultVisible,
           sorts: sort,
-          ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : pickBundle ? { groupBy: ['ownershipStatus'] } : {}),
+          ...(groups
+            ? { groupBy: [MEMBERSHIP_KEY] }
+            : kind === 'bundle'
+              ? { groupBy: [pickBundle ? 'ownershipStatus' : 'tierPrice'] }
+              : {}),
         };
         const state = createTableState<Game>(tableData, allColumns, {
           initialViewState: tableDefaults,
@@ -3265,11 +3292,36 @@ export default function ListRoute() {
       const fresh = rows.filter((r) => !r.inLibrary);
       const target = regionCurrency();
       const total = sumBestDeals(fresh, target);
-      const tier = tierPrice == null ? null : meta.tiers.find((x) => x.price === tierPrice);
+      const tier = tierPrice == null ? null : (filterTiers(meta.tiers).find((x) => x.price === tierPrice) ?? null);
+      // What the tier that gets every new base game saves over buying them apart (pick & mix: the selection does).
+      const freshBase = fresh.filter((r) => !r.addon);
+      const payTier = meta.model === 'pick' ? null : savingTier(freshBase, meta.tiers, tierPrice);
+      const payDeals = payTier?.currency ? sumBestDeals(freshBase, payTier.currency) : null;
+      const saving =
+        payTier && payDeals != null ? savingsText(payTier.price!, payDeals, payTier.currency!, target) : null;
       tiles.push({
         label: tier ? `New at ${tierText(tier)}` : 'New to you',
         value: `${fresh.length} of ${rows.length}`,
-        sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
+        sub:
+          fresh.length && total != null ? (
+            <>
+              ≈ {formatMoney(total, target)} at best deals
+              <Show when={saving}>
+                {(s) => (
+                  <>
+                    <span
+                      class="bundle-tier-saving"
+                      style={{ color: s().overpays ? 'var(--bad)' : 'var(--good)' }}
+                      title="Against the Steam games' best deals; games not on Steam aren't counted"
+                    >
+                      {s().text}
+                      {meta.model === 'tiered' && tierPrice == null ? ` at ${tierText(payTier!)}` : ''}
+                    </span>
+                  </>
+                )}
+              </Show>
+            </>
+          ) : undefined,
         title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
       });
     }
