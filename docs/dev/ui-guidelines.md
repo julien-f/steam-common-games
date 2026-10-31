@@ -9,6 +9,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - No hidden affordances: every keyboard shortcut, swipe and drag has a visible equivalent. The lightbox is the exception, for the media's sake: its controls show for a mouse or a touch and stay off for the keyboard, the `?` dialog lists its keys, and its first open shows a one-time hint.
 - Defaults that work without settings; a new preference is the last resort, not a way to avoid deciding.
 - The user's own setup is never changed behind their back: a shared link or another account shows its view without overwriting theirs, until they choose to keep it.
+- A setting (a table layout) changes only on an explicit **Save**: until then the change is a draft, named with **Save** / **Discard**. Data (lists, rankings, statuses) saves and syncs as it changes. A one-pick preference (region) is its own Save.
 
 ## Data and freshness
 
