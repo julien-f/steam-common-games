@@ -13,6 +13,7 @@ process.env.DB_FILE = '';
 const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { until } = require('./until');
+const { freshNonce } = require('./openidNonce');
 const http = require('node:http');
 const zlib = require('node:zlib');
 const fs = require('node:fs');
@@ -2839,7 +2840,6 @@ async function loginAs(t, steamid) {
 
 // The openid.* params Steam appends to return_to after signing `steamid` in, each with its own
 // nonce: the callback rejects a reused one.
-let nonceCount = 0;
 function steamAssertion(steamid, returnTo) {
   const claimedId = `https://steamcommunity.com/openid/id/${steamid}`;
   return {
@@ -2849,7 +2849,7 @@ function steamAssertion(steamid, returnTo) {
     'openid.claimed_id': claimedId,
     'openid.identity': claimedId,
     'openid.return_to': returnTo,
-    'openid.response_nonce': `${new Date().toISOString().slice(0, 19)}Z${nonceCount++}`,
+    'openid.response_nonce': freshNonce(),
     'openid.assoc_handle': '1234567890',
     'openid.signed': 'signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle',
     'openid.sig': 'abc',
@@ -2933,6 +2933,7 @@ test("GET /auth/steam/callback: 400 for another site's assertion replayed with t
 test('request log: the Steam callback is logged without its query, which carries the signed assertion', () => {
   const logUrl = (originalUrl) => morgan.url({ originalUrl, url: originalUrl }, {});
   assert.equal(logUrl('/auth/steam/callback?state=s&openid.sig=abc'), '/auth/steam/callback');
+  assert.equal(logUrl('/AUTH/Steam/callback/?state=s&openid.sig=abc'), '/AUTH/Steam/callback/');
   assert.equal(logUrl('/api/library?steamid=1'), '/api/library?steamid=1');
 });
 

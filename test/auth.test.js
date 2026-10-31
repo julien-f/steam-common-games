@@ -8,6 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { db } = require('../lib/db');
+const { freshNonce } = require('./openidNonce');
 const {
   parseCookies,
   serializeCookie,
@@ -71,10 +72,6 @@ test('buildLoginUrl: points at Steam with the realm, return_to and state set', (
 
 const ORIGIN = 'https://example.com';
 const STATE = 'the-state';
-
-// A fresh OpenID response_nonce, as Steam mints one: its UTC timestamp, then a unique suffix.
-let nonceCount = 0;
-const freshNonce = (at = Date.now()) => `${new Date(at).toISOString().slice(0, 19)}Z${nonceCount++}`;
 
 // A positive assertion as Steam returns it for a login this app started with ORIGIN and STATE.
 function assertion(overrides = {}) {
@@ -159,6 +156,39 @@ test('verifySteamAssertion: a nonce stays used for as long as its age lets it pa
   t.mock.timers.tick(4 * 60 * 1000);
   assert.equal(await verify(query), null);
   assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('verifySteamAssertion: a nonce Steam did not confirm stays usable', async (t) => {
+  const query = assertion();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  assert.equal(await verify(query), null);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
+  assert.equal(await verify(query), null);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  assert.equal(await verify(query), '76561198000000001');
+});
+
+test('verifySteamAssertion: of two concurrent replays, only one signs in', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  const results = await Promise.all([verify(query), verify(query)]);
+  assert.deepEqual(results.sort(), ['76561198000000001', null]);
+});
+
+// A nonce is remembered for twice its window, so one dated as far ahead as allowed is still
+// remembered, or already stale, at any later replay.
+test('verifySteamAssertion: a nonce dated ahead of this clock is never accepted twice', async (t) => {
+  // Past every nonce the other tests left, so the sweep reaches this one; whole seconds, as nonces.
+  const now = Math.floor(Date.now() / 1000) * 1000 + 24 * 60 * 60 * 1000;
+  t.mock.timers.enable({ apis: ['Date'], now });
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  assert.equal(await verify(assertion({ 'openid.response_nonce': freshNonce(now + 5 * 60 * 1000) })), null);
+  const query = assertion({ 'openid.response_nonce': freshNonce(now + 5 * 60 * 1000 - 1000) });
+  assert.equal(await verify(query), '76561198000000001');
+  for (const step of [9 * 60 * 1000, 59 * 1000, 1000]) {
+    t.mock.timers.tick(step);
+    assert.equal(await verify(query), null);
+  }
 });
 
 // ── users & sessions ──────────────────────────────────────────────────────────
