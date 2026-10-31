@@ -29,6 +29,7 @@ const { _resetTagNameMap } = require('../lib/steam');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
 const { getMetrics } = require('../lib/metrics');
+const { getSemaphoreStats } = require('../lib/upstream');
 
 // The tag-name map's failure hold-off outlives _reset(), which only empties the cache.
 beforeEach(_resetTagNameMap);
@@ -2942,9 +2943,13 @@ test('POST /api/wishlist: fetchedAt comes from the wishlist entries', async (t) 
 
 test('POST /api/game-details/stream: caps in-flight appids and stops fetching once the client disconnects', async (t) => {
   _reset();
-  let inFlight = 0,
-    maxInFlight = 0,
-    started = 0;
+  const concurrency = Number(process.env.STREAM_CONCURRENCY);
+  // Every appid queues one reviews call on its semaphore (3 at a time): active + queued counts the appids in flight.
+  const reviewsPending = () => {
+    const { active, queued } = getSemaphoreStats().reviews;
+    return active + queued;
+  };
+  let started = 0;
   let release;
   const gate = new Promise((r) => {
     release = r;
@@ -2952,10 +2957,7 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (!String(url).includes('GetAppReviews')) return { ok: true, json: async () => ({}) };
     started++;
-    inFlight++;
-    maxInFlight = Math.max(maxInFlight, inFlight);
     await gate;
-    inFlight--;
     return {
       ok: true,
       json: async () => ({
@@ -2965,6 +2967,12 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   });
 
   const server = http.createServer(app).listen(0);
+  // On a failure too: a held game or an open connection would keep the file from exiting.
+  t.after(() => {
+    release();
+    server.closeAllConnections();
+    server.close();
+  });
   let sockets = 0;
   server.on('connection', (socket) => (sockets++, socket.once('close', () => sockets--)));
   await new Promise((r) => server.once('listening', r));
@@ -2981,23 +2989,21 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   req.end();
   await new Promise((r) => req.once('response', r));
 
-  // Far fewer than the 200 requested are ever in flight at once — the whole list used to be
+  // Only STREAM_CONCURRENCY of the 200 are ever in flight — the whole list used to be
   // dispatched synchronously, straight onto lib/steam.js's shared semaphore queues.
-  assert.ok(maxInFlight <= Number(process.env.STREAM_CONCURRENCY || 16), `maxInFlight=${maxInFlight}`);
+  await until(() => reviewsPending() >= concurrency, 'every worker queuing its first game');
+  await new Promise((r) => setImmediate(r)); // a pool past its cap queues more games here
+  assert.equal(reviewsPending(), concurrency);
 
   req.destroy();
   await until(() => sockets === 0, 'the server seeing the disconnect');
   const startedAtDisconnect = started;
   release();
-  await until(() => inFlight === 0, 'the held reviews answered');
+  await until(() => reviewsPending() === 0, 'the held games answered');
   await new Promise((r) => setImmediate(r)); // a pool that kept going starts its next games here
-  // A disconnect stops the pool within roughly one appid per worker, rather than working
-  // through the remaining 190-odd games for a client that has gone.
-  assert.ok(
-    started - startedAtDisconnect <= Number(process.env.STREAM_CONCURRENCY || 16),
-    `kept going: ${started - startedAtDisconnect}`,
-  );
-  server.close();
+  // A disconnect stops the pool within one appid per worker, rather than working
+  // through the remaining 180-odd games for a client that has gone.
+  assert.ok(started - startedAtDisconnect <= concurrency, `kept going: ${started - startedAtDisconnect}`);
 });
 
 test('POST /api/game-details/stream: fully cached games come first, ahead of uncached ones listed before them', async (t) => {
