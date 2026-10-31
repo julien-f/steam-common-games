@@ -58,6 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Reopening a bundle after IsThereAnyDeal failed part of its games no longer looks the others up again
 - A malformed price reply from IsThereAnyDeal no longer fails a whole price lookup: the games it garbled show no price
 - When How Long To Beat answers a search with an unexpected reply, the game is looked up again later instead of being stored as having no HLTB data
+- A steamcommunity.com profile link opened in Compare or shared as a link now loads that account instead of failing to find it
 
 ### Development
 
