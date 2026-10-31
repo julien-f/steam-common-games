@@ -83,7 +83,6 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 - **C242 · major · S** — a lasting HLTB search 401 (`getHLTB`, `lib/hltb.js`) clears the token without setting `_hltbAuthFailedAt` and resets the breaker's 403 streak, so every game re-runs `init` (outside `hltbLimit`'s pacing) plus a failing search: ~2× HLTB's paced rate on every load, indefinitely, the breaker never opening — on the upstream that blocks aggressive scrapers. Treat a 401 on a fresh token as a block (30 s hold, counted by the breaker); record the rule in integrations.md.
 - **C243 · minor · M** — key-less Steam calls (`fetchStoreBrowseItems`, GetWishlist, GetNewsForApp, GetGlobalAchievementPercentagesForApp) and ProtonDB ignore 429/Retry-After; only GetAppReviews pauses. On a cold load `tagLimit` keeps sending GetItems into a 429 (~1200 refused calls over 1196 games) while reviews on the same host back off. Route them through a pause, one shared by key-less `api.steampowered.com` calls if they share the quota (inferred: confirm and record in integrations.md).
 - **C244 · minor · S** — `gamePassLimit` (`server.js`) skips whenever the catalog is cached, but the route still resolves errored gids (`resolveSteamAppIds`, uncached by design) and fetches uncached titles (`getProductTitles`, failures uncached): while the store breaker is open or displaycatalog fails, each reload repeats that work with no per-client limit. Skip only when the follow-up keys are cached too, or cache those failures briefly.
-- **C245 · cleanup · S** — integrations.md's tier lists miss endpoints in use: `ajaxgetstoretags` (untrusted), key-less GetNewsForApp and GetGlobalAchievementPercentagesForApp (sanctioned); observability.md calls `steam-api` "the keyed calls" though it also carries key-less ones. List each endpoint in its tier.
 
 ## Tests
 
@@ -97,7 +96,4 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 
 ## Docs
 
-- **C262 · minor · S** — `docs/user/configuration.md` and integrations.md still cost a cold game at ~2 `steam-store` calls (≈1,250 games/h, ~4% for a creator list); since the rating moved to `steam-reviews` it's one per game per service. Say so and drop the derived figures, which restate `default.env`.
-- **C263 · minor · S** — observability.md says `blockedUntil` 0 = closed; `lib/circuitBreaker.js` never resets it, so a past timestamp means closed and 0 means never tripped. Say that.
-- **C264 · minor · S** — architecture.md's request flow gives `/api/common-games`' reply without `recentPlaytime` (and `players[].gameCount`). Add them.
-- **C265 · cleanup · S** — data.md's `db.sqlite` contents omit `metrics_daily`, and `default.env`'s comment says it holds only cache tables; `default.env`'s budget-group list misses five groups (point to observability.md instead); configuration.md and pitfalls.md restate `STORE_MIN_INTERVAL_MS`/`UPSTREAM_MIN_INTERVAL_MS` values. Fix the lists, drop the copied numbers.
+None open.

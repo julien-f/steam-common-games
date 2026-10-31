@@ -6,7 +6,7 @@ The application database, the cache tiers over it, and the refresh paths that by
 
 - Opened with `node:sqlite` (`DatabaseSync`) in `lib/db.js`, WAL mode. `DB_FILE=` (empty) runs in memory.
 - A write waits up to `DB_BUSY_TIMEOUT_MS` ([config.js](../../lib/config.js)) for another connection's lock (`cache:clear`, a second server) before throwing `database is locked`; `DatabaseSync` is synchronous, so the wait blocks the event loop.
-- Holds the cache tables plus signed-in users: `users`, `sessions` (swept of expired rows at startup) and `user_prefs` (one row per `(steamid, key)` with its `updated_at`, what lets devices merge prefs per key — [lists-and-accounts.md](lists-and-accounts.md#sync)).
+- Holds the cache tables, `metrics_daily` (outbound status counts per day, [observability.md](observability.md#daily--daily)), plus signed-in users: `users`, `sessions` (swept of expired rows at startup) and `user_prefs` (one row per `(steamid, key)` with its `updated_at`, what lets devices merge prefs per key — [lists-and-accounts.md](lists-and-accounts.md#sync)).
 - **Migrations**: `lib/db.js`'s `MIGRATIONS` is an ordered, append-only list of `{ version, up(db) }` applied against `PRAGMA user_version`. A migration only adds — never drops or rewrites a table — and is never edited once shipped; fix forward. Version 7 is the baseline; `users.prefs` (v8's blob, replaced by `user_prefs` in v9) stays unused for that reason.
 - `node scripts/db-query.js "<sql>"` opens it read-only and prints rows as JSON lines; `npm run cache:clear` empties the cache tables only.
 
