@@ -712,6 +712,16 @@ test('getPlayerSummaries: a failed call warns [steam] and yields placeholders in
   assert.match(warn.mock.calls[0].arguments[0], /^\[steam\]/);
 });
 
+test('getPlayerSummaries: a forced call that fails falls back to the cached player, not a placeholder', async (t) => {
+  _reset();
+  t.mock.method(console, 'warn', () => {});
+  const cached = { steamid: '76561198000000010', personaname: 'User10', profileurl: 'u', avatar: 'a.jpg' };
+  setCache('player:76561198000000010', cached);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 503 }));
+
+  assert.deepEqual(await getPlayerSummaries(['76561198000000010'], { force: true }), [cached]);
+});
+
 test('getPlayerSummaries: cache key is order-independent', async (t) => {
   _reset();
   let fetchCount = 0;

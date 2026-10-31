@@ -36,7 +36,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C222 · minor · S** — `trackedFetch` (`lib/metrics.js`) counts a call in the lifetime `requests` when it starts but adds its latency and status when it ends, so `sinceRestart`'s `avgLatencyMs` reads low during a burst of slow calls (HLTB), and `requests` exceeds its status counts plus network errors, unlike `lastHour`, which counts on completion. Count completed calls the same way in both.
 - **C201 · minor · S** — the Demo column's filter list labels both values "Demo": the checklist formats the stringified raw value, and `format` (`public/gameColumns.ts:1145`) treats the truthy string `'false'` as a demo. Compare against `'true'` there, or give the column a `value` getter returning its label.
 - **C236 · minor · S** — the tag-name map (`fetchTagNameMap`, `lib/steam.js`) is kept for the meta TTL (365 days), so tags Steam adds meanwhile are dropped by `resolveSteamTags` for up to a year. Refetch on a cooldown when a browse item has an unknown tagid.
-- **C237 · minor · S** — a forced `getPlayerSummaries` (`lib/steam.js`; ↻ on an account) that `GetPlayerSummaries` fails returns placeholders (steamid as name, no avatar) though `player:<id>` still holds the real entry. Fall back to the cached row before the placeholder.
 
 ## Security
 
