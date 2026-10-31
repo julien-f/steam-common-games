@@ -416,7 +416,7 @@ export function setListTableView(id: string, tableView: object): void {
   const lists = readLists();
   const list = lists.find((l) => l.id === id);
   const view = stripTransientViewFields(tableView);
-  if (!list || JSON.stringify(view) === JSON.stringify(list.tableView)) return;
+  if (!list) return;
   list.tableView = view;
   writeLists(lists);
 }

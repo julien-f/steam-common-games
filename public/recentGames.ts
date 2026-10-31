@@ -30,12 +30,6 @@ export function loadRecentGames(): RecentGame[] {
   return getPref<RecentGame[]>(RECENT_GAMES_PREF_KEY, []);
 }
 
-function saveRecentGames(list: RecentGame[], stored: RecentGame[]): void {
-  // A lookup writes its entry again once its details land; most of those change nothing.
-  if (JSON.stringify(list) === JSON.stringify(stored)) return;
-  setPref(RECENT_GAMES_PREF_KEY, list);
-}
-
 // Moves this game to the front, refreshing its cached name/thumbnail, rather than appending a
 // duplicate. An empty `name`/`tinyImage` never overwrites one already stored: a lookup by bare
 // appid or store URL knows no name at all (gameSearch.ts's `pick({ appid, name: '' })`), and
@@ -46,7 +40,7 @@ export function addRecentGame(appid: number, name: string, tinyImage?: string | 
   const existing = list.find((g) => g.appid === appid);
   const rest = list.filter((g) => g.appid !== appid);
   rest.unshift({ appid, name: name || existing?.name || '', tinyImage: tinyImage || existing?.tinyImage || null });
-  saveRecentGames(rest.slice(0, MAX_RECENT_GAMES), list);
+  setPref(RECENT_GAMES_PREF_KEY, rest.slice(0, MAX_RECENT_GAMES));
 }
 
 // Fills in a stored entry's name/thumbnail *without* moving it to the front — for a game whose
@@ -59,5 +53,5 @@ export function renameRecentGame(appid: number, name: string, tinyImage?: string
   if (idx === -1) return;
   const next = list.slice();
   next[idx] = { appid, name: name || list[idx].name, tinyImage: tinyImage || list[idx].tinyImage };
-  saveRecentGames(next, list);
+  setPref(RECENT_GAMES_PREF_KEY, next);
 }

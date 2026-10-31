@@ -117,6 +117,9 @@ export function getPref<T = unknown>(key: string, fallback?: T): T | undefined {
 }
 
 export function setPref(key: string, value: unknown): void {
+  // Unchanged: no write, push or restarted debounce. Retried after a refusal, so a success clears the banner.
+  const c = readCache();
+  if (!writeFailing() && key in c.entries && storedJson(c, key) === JSON.stringify(value)) return;
   const entries = readEntries();
   const updatedAt = Date.now();
   entries[key] = { value, updatedAt };

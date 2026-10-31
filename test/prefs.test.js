@@ -456,3 +456,51 @@ test('getPref: a refused write leaves the stored value readable, not the edit', 
   setPref('region', 'GB');
   assert.equal(getPref('region'), 'DE');
 });
+
+// ── unchanged writes (C223) ─────────────────────────────────────────────────────────────────────
+
+test('setPref: an unchanged value is neither written nor pushed, and keeps a pending push on time', async (t) => {
+  const restore = globalThis.fetch;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => {
+    seen.push([url, JSON.parse(opts.body).value]);
+    return { ok: true, json: async () => ({}) };
+  };
+  t.after(() => {
+    globalThis.fetch = restore;
+  });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { setPref, setSignedInSteamid } = require('../public/prefs.ts');
+  setSignedInSteamid('76561198000000001');
+  setPref('region', 'DE');
+  setPref('lists', [1]);
+  const setItem = t.mock.method(global.localStorage, 'setItem');
+  t.mock.timers.tick(2000);
+  setPref('region', 'DE');
+  setPref('lists', [1]);
+  assert.equal(setItem.mock.callCount(), 0);
+  t.mock.timers.tick(1000);
+  assert.deepEqual(seen, [
+    ['/api/me/prefs/region', 'DE'],
+    ['/api/me/prefs/lists', [1]],
+  ]);
+});
+
+test('setPref: a key not stored yet is written even when its value is undefined', () => {
+  const { getAllPrefEntries, setPref } = require('../public/prefs.ts');
+  setPref('region', undefined);
+  assert.ok('region' in getAllPrefEntries());
+});
+
+test('setPref: after a refused write, going back to the stored value still writes and clears the failure', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { setPref, prefsWriteFailed } = require('../public/prefs.ts');
+  setPref('region', 'DE');
+  const { setItem } = global.localStorage;
+  refuseWrites();
+  setPref('region', 'GB');
+  assert.equal(prefsWriteFailed(), true);
+  global.localStorage.setItem = setItem;
+  setPref('region', 'DE');
+  assert.equal(prefsWriteFailed(), false);
+});
