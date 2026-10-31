@@ -27,11 +27,11 @@ One `Agent` per lane, all in one message, `isolation: "worktree"`, with the lane
 
 ```
 You fix <items> from <backlog file> in this repo, in your own git worktree (your working directory); commit on its branch, never touch main or push. The user approved the plan, which covers one commit per item.
-- First run `git merge --ff-only main`: worktrees branch from origin/main, which lags local main (pitfalls.md). Then `npm ci`: an agent worktree has no `node_modules` of its own, and the main checkout's fail the hook ("node_modules is behind package-lock.json").
+- First run `git merge --ff-only main`: worktrees branch from origin/main, which lags local main. Then `npm ci`: an agent worktree has no `node_modules` of its own, and the main checkout's fail the hook ("node_modules is behind package-lock.json").
 - Follow .claude/skills/<code-fix|ux-fix>/SKILL.md steps 0–<last step before the look>, one commit per item, skip the dev:mock look. Each fix commit deletes its own item's line from <backlog file> and touches no other item; a narrowed item's line is rewritten to what's left, never deleted.
 - Blocked by something outside your items (a check red on main, a hook): SendMessage the lead with the cause and keep going on what you can; don't end the run.
 - A real fork (fix widens past the item, a dependency, more upstream traffic): skip the item and report it.
-- Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs.
+- Stay in your worktree: no `git -C <main checkout>`, `--prefix` or `cwd` parameter; one plain command per Bash call, no `&&`/`;` chains or heredocs (you can't answer a permission prompt, and a chain is judged whole, so it's refused).
 - Commit messages: write them to <scratchpad>/msg-<lane>.txt (the scratchpad is shared, a generic name gets overwritten), then `E2E_DEFER=1 git commit -F <file>`.
 - Before each commit, run only your item's test file: the commit hook runs the unit suite, typecheck and lint, so don't run them by hand.
 - Before reporting, run `npm run test:e2e -- --since=main` once (both widths; skipped when your commits touch no UI file) and fix what fails: re-run only the failures (`-- --last-failed`) until green, then the full suite once.

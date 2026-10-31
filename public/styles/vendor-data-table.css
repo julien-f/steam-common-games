@@ -1,5 +1,5 @@
 /* Unlayered, and imported last: @vates/data-table-solid injects an unlayered <style>, which beats
-   any layered rule (pitfalls.md). */
+   any layered rule. */
 
 /* Themes @vates/data-table-solid's own internals on html:root: its column/filter/group submenus
    are portaled onto <body>, outside .table-container, so only an actual ancestor reaches them. */

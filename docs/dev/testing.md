@@ -4,7 +4,7 @@
 
 - `node:test` + `supertest`, flat in `test/*.test.{js,ts}`.
 - `npm test` (~6 s) runs with `DB_FILE=`, so no real database is touched.
-- Single file: `npm run test:one test/<name>.test.js` — same env as `npm test`, which hardcodes its glob.
+- Single file: `npm run test:one test/<name>.test.js` — same env as `npm test` (upstream pacing at 0, unlike a bare `node --test`), which hardcodes its glob.
 - Both preload `test/gitEnv.js`, which strips `GIT_*` from the environment: hooks and `git rebase -x` export `GIT_DIR`/`GIT_INDEX_FILE`, which would point a test's git calls at the real repo.
 - `--conditions=browser` loads solid-js's browser build: under Node's default (server build) effects and memos never re-run and `createResource` throws, so reactivity couldn't be tested.
 
@@ -14,6 +14,7 @@
 - `node scripts/journey-coverage.js` shows which journey steps they lock.
 - After an `npm install` that updates Playwright, run `npx playwright install chromium-headless-shell`: otherwise every test fails with `Executable doesn't exist at …/chrome-headless-shell`, buried under a follow-on `uncaught page errors` failure.
 - The browser renders with the committed DejaVu fonts (`e2e/fonts/`, through `FONTCONFIG_FILE`), not the machine's: layout checks measure the same locally and in CI. DejaVu is also Ubuntu's and Debian's default and wider than most, so an overflow shows up locally. Linux only (fontconfig).
+  - A layout check that still fails in CI only, by a few pixels: something else drives the layout there (a glyph DejaVu lacks falling back to a system font, a Chromium version gap). Fix the CSS (size to content, set a line height), not the threshold; to find the breaking change, diff against the last green run's commit (`gh run view <id> --json headSha`), since one push can carry many.
 - Every `/api` call is mocked in the browser (`e2e/mockApi.ts`): no backend, no upstream traffic. Fixtures use made-up accounts only.
 - The presentation window (a popup) gets its stubs from `e2e/presentationHooks.ts`, injected into its HTML by a context route: init scripts, `page.clock` included, miss a popup's first document about one run in four. Fake time on the main page only.
 - The pre-commit hook runs the desktop half when `public/`, `e2e/` or a frontend config is staged; the pre-push hook runs all of it. Both skip it when the build (sourcemaps aside), `e2e/` and the test config match the last full passing run (`scripts/e2e.js`). `E2E_DEFER=1` skips the pre-commit e2e, for fix-batch lanes only ([BATCH.md](../../.claude/skills/code-fix/BATCH.md)), which run the suite once before reporting.
@@ -30,6 +31,8 @@ Each rule comes from a flake it fixed; add one when a fix teaches something new.
   - `page.clock` is the whole context's: install it after `startPresenting`, not before (the popup's first document misses it about one run in four). Timers armed before the install keep real time.
   - A window between two inputs (double-tap, a wheel gesture's end, a burst's settle): `pauseAt`, then `runFor` past it.
   - Paused, `requestAnimationFrame` and debounced writes (the lightbox's status line) wait too: assert on what changes at once (its counter).
+- After an overlay's ×/Esc close, wait for its `popstate` before a `page.goto`: the close steps history back asynchronously (`overlayHistory.ts`), and that traversal aborts the navigation with `net::ERR_ABORTED`.
+- A `page.route` glob matches the whole URL, query included: end it with `**` (`**/api/prices**`), or the handler is silently skipped for `/api/prices?country=…`.
 - Wait for the state the next step needs, not a proxy: `not lb--loading` holds before the lightbox opens and before its media arrive (`stillShown`); `waitForResponse` resolves before the app's handlers run.
 - A "nothing after" check advances the fake clock past the window, then asserts; break the app once to see it fail.
 - Mocked "fetched" stamps take the answer's time: a module-level `Date.now()` ages with the worker.
@@ -41,6 +44,9 @@ Each rule comes from a flake it fixed; add one when a fix teaches something new.
 - **Mocked** (the default): `npm run dev:mock` (`:58993`; a worktree its own, `node scripts/ports.js mock`) serves the app against the e2e fixtures — no backend or upstream traffic, and its own localStorage, so no demo-prefs seed/restore. The `mock` cookie switches on error and slow states (`e2e/mockApi.ts`).
   - From an agent session, `node scripts/mock-server.js up|down` starts or reuses it in the background.
   - `node scripts/ux-measure.js [--fresh] [--state=…] /route…` writes a Playwright file measuring those routes at both widths.
+  - A resized desktop browser keeps its mouse, so `(hover: hover)` and `(any-pointer: fine)` still match at 390 px: check touch-only rules in the e2e `phone` project (`hasTouch: true`).
+- **Playwright MCP**: `browser_run_code_unsafe` runs in Playwright's sandbox with `page`, not in the page (`ReferenceError: document is not defined`, or `localStorage`, `setTimeout`, `require`): DOM and storage go inside `page.evaluate(() => …)`, waits through `page.waitForTimeout(ms)`, a script file through `filename`.
+  - It reads and writes only under the repo's `.playwright-mcp/` (gitignored; else `File access denied … is outside allowed roots`) — from a worktree, the **main checkout's**: a screenshot reported as written isn't in the worktree's.
 - **Real dev server**: only for real data or real loading times; `node scripts/dev-server.js up|down` runs it the same way. Its pages write the user's real prefs (every route but `/about`, `/game/:appid` included), so:
   1. before the first load, run `node scripts/demo-prefs.js seed --file` (or `empty`, for a first visit) and its `.playwright-mcp/demo-seed.js` with `browser_run_code_unsafe`'s `filename`;
   2. afterwards, `restore --file` and `demo-restore.js`, then confirm `steam.isonoe.net:prefs.backup` is gone.

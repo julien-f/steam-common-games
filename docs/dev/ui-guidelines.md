@@ -66,6 +66,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 ## Icons
 
 - Drawn with Lucide (`lucide-solid`), one import per icon: `import X from 'lucide-solid/icons/x'`. `npm run lint` bans the `lucide-solid` and `lucide-solid/icons` barrels, which would make the dev server transform every icon.
+- Import an icon by its canonical name: an alias kept for a renamed icon ships as a source re-export with no `.d.ts`, so it renders but fails the typecheck with `TS2307: Cannot find module 'lucide-solid/icons/<alias>'`. The alias file names the canonical one (`history.jsx` imports `./rotate-ccw-clock`).
 - `.lucide` in `styles/base.css` sizes an icon at `1em` in `currentColor` (stroke 1.75): set its size and colour on the element around it.
 - Decorative: an icon gets no `aria-*`, `role` or `title`, so Lucide marks it `aria-hidden`; an icon-only control keeps its `aria-label`.
 - An icon is markup, so it can't go in an `<option>` or a `title`: an option's label drops it, and a tooltip names the control in words.
