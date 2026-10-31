@@ -59,6 +59,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A malformed price reply from IsThereAnyDeal no longer fails a whole price lookup: the games it garbled show no price
 - When How Long To Beat answers a search with an unexpected reply, the game is looked up again later instead of being stored as having no HLTB data
 - A steamcommunity.com profile link opened in Compare or shared as a link now loads that account instead of failing to find it
+- Bundles: a page request with an infinite offset or a fractional limit is read as the first page, or one bundle, instead of an empty or 20-bundle page
+- Bundles: the empty page past the end of the list no longer counts against the per-minute request limit
+- Expired sign-in sessions are cleared from the server hourly, not only when it restarts
 
 ### Development
 
