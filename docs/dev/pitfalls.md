@@ -64,8 +64,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 ### Another agent's commit shows a branch as merged without its changes
 
 - **Symptom**: `git log --graph` shows someone else's commit with a branch as second parent, but its tree lacks that branch's changes, which are still staged.
-- **Cause**: a merge left pending in the main checkout (`--no-commit`, or a hook that blocked the merge commit) keeps `MERGE_HEAD`; the next `git commit` there, by any agent, becomes the merge and takes only what that agent staged.
-- **Fix**: never leave a merge pending in the main checkout: on a blocked merge commit, retry at once or `git merge --abort`. Once absorbed, commit the staged changes on top, naming the absorbing commit in the message.
+- **Cause**: a merge left pending in the main checkout (`--no-commit`, conflicts, or a hook that blocked the merge commit) keeps `MERGE_HEAD`; the next `git commit` there, by any agent, becomes the merge and takes only what that agent staged. Another session may instead abort it (`reset: moving to HEAD` in the reflog, the merge's new files left untracked), even while its own commit runs the hook.
+- **Fix**: merge where nobody else commits, as CLAUDE.md's Git workflow says (a temp branch in the worktree, then `--ff-only`); `git merge --abort` one left pending. Once absorbed, commit the staged changes on top, naming the absorbing commit in the message.
 
 ### `fatal: this operation must be run in a work tree` after a commit
 
