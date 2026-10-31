@@ -434,7 +434,8 @@ export default function BundlesBrowseRoute() {
     if (fresh > 0 || newOnly()) {
       tiles.push({
         label: 'New',
-        value: <span style={{ color: scoreColor(80) }}>{fresh}</span>,
+        value: fresh,
+        valueColor: scoreColor(80),
         sub: newOnly() ? 'in the last 7 days · only these' : 'in the last 7 days',
         title: newOnly() ? 'Showing only these — click to clear' : 'Show only the bundles published in the last 7 days',
         active: newOnly(),
@@ -454,7 +455,8 @@ export default function BundlesBrowseRoute() {
     if (endingSoon > 0 || endingSoonOnly()) {
       tiles.push({
         label: 'Ending soon',
-        value: <span style={{ color: scoreColor(20) }}>{endingSoon}</span>,
+        value: endingSoon,
+        valueColor: scoreColor(20),
         sub: endingSoonOnly() ? 'within 48h · only these' : 'within 48h',
         title: endingSoonOnly() ? 'Showing only these — click to clear' : 'Show only the bundles ending within 48h',
         active: endingSoonOnly(),

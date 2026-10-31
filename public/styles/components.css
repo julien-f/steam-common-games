@@ -623,6 +623,10 @@
     cursor: pointer;
   }
   /* Tables' figures line up; a value can't be told numeric from CSS, so the text face with tabular figures. */
+  /* A count's drawn steps (ListHero.tsx): the final value beside it is what a copy takes. */
+  .list-stat-count {
+    user-select: none;
+  }
   .list-stat-value {
     color: var(--text);
     font-size: var(--fs-body);

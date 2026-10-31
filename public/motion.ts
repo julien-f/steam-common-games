@@ -1,4 +1,4 @@
-import { createEffect, on, onCleanup } from 'solid-js';
+import { createEffect, createSignal, on, onCleanup } from 'solid-js';
 
 // JS-driven motion. CSS animations and transitions are already cut by base.css's reduced-motion
 // rule; the Web Animations API isn't, so every JS animation goes through `animate` here.
@@ -102,4 +102,41 @@ export function slideRowsOnViewChange(table: ViewState, container: () => HTMLEle
       { defer: true },
     ),
   );
+}
+
+const COUNT_UP_MS = 400;
+
+// The number shown `t` ms into a count from `from` to `to`: easing out, whole at every step.
+export function countUpValue(from: number, to: number, t: number, duration: number): number {
+  if (t >= duration) return to;
+  const k = 1 - (1 - Math.max(0, t) / duration) ** 3;
+  return Math.round(from + (to - from) * k);
+}
+
+// The number to draw while a numeric value counts to a change, else null. From the last non-zero
+// value of the same `key`: lists empty out before each reload, which a count would only replay.
+export function createCountUp(value: () => unknown, key: () => string): () => number | null {
+  const [shown, setShown] = createSignal<number | null>(null);
+  let last: { key: string; n: number } | null = null;
+  let frame = 0;
+  createEffect(
+    on([value, key], ([v, k]) => {
+      cancelAnimationFrame(frame);
+      setShown(null);
+      if (typeof v !== 'number') return void (last = null);
+      const from = last?.key === k ? last.n : null;
+      if (v !== 0) last = { key: k, n: v };
+      if (from == null || v === 0 || from === v || prefersReducedMotion()) return;
+      const start = performance.now();
+      const step = (now: number) => {
+        const t = now - start;
+        setShown(t >= COUNT_UP_MS ? null : countUpValue(from, v, t, COUNT_UP_MS));
+        if (t < COUNT_UP_MS) frame = requestAnimationFrame(step);
+      };
+      setShown(from);
+      frame = requestAnimationFrame(step);
+    }),
+  );
+  onCleanup(() => cancelAnimationFrame(frame));
+  return shown;
 }

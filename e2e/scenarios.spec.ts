@@ -7248,6 +7248,26 @@ test.describe('with motion on', () => {
     expect(await card.evaluate((c) => c.matches(':hover'))).toBe(true);
   });
 
+  test('B1 edge: a hero count counts to its new value, the final value what is read out throughout', async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/bundles');
+    const fresh = page.getByRole('button', { name: /^New \d/ });
+    await expect(fresh).toHaveAccessibleName(/^New 2\b/);
+    // Showing only the bundle ending soon leaves one of the two new ones. Read in the click's own
+    // task: the count is over 400 ms later.
+    const mid = await page.getByRole('button', { name: /^Ending soon \d/ }).evaluate((b: HTMLElement) => {
+      b.click();
+      const drawn = document.querySelector('.list-stat-count');
+      return { drawn: drawn?.textContent, hidden: drawn?.ariaHidden, read: drawn?.nextElementSibling?.textContent };
+    });
+    expect(mid).toEqual({ drawn: '2', hidden: 'true', read: '1' });
+    await expect(page.locator('.list-stat-count')).toHaveCount(0);
+    await expect(fresh).toHaveAccessibleName(/^New 1\b/);
+    await expect(fresh.locator('.list-stat-value')).toHaveText('1');
+  });
+
   test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
     page,
   }) => {

@@ -2,7 +2,7 @@
 
 const { test, mock, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { animate, prefersReducedMotion } = require('../public/motion.ts');
+const { animate, countUpValue, prefersReducedMotion } = require('../public/motion.ts');
 
 const setReduced = (reduced) => {
   globalThis.matchMedia = () => ({ matches: reduced });
@@ -39,4 +39,18 @@ test('animate: a cancelled animation still resolves', async () => {
   setReduced(false);
   const finished = Promise.reject(new DOMException('cancelled', 'AbortError'));
   await animate(fakeEl(finished), [], {});
+});
+
+test('countUpValue: whole numbers that only move toward the target, ending exactly on it', () => {
+  for (const [from, to] of [
+    [3, 12],
+    [124, 37],
+  ]) {
+    const steps = [0, 50, 100, 200, 300, 399].map((t) => countUpValue(from, to, t, 400));
+    assert.equal(steps[0], from);
+    for (const n of steps) assert.ok(Number.isInteger(n));
+    for (let i = 1; i < steps.length; i++) assert.ok(Math.sign(to - from) * (steps[i] - steps[i - 1]) >= 0);
+    assert.equal(countUpValue(from, to, 400, 400), to);
+    assert.equal(countUpValue(from, to, 1000, 400), to);
+  }
 });
