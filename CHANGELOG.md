@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Sessions are stored hashed on the server, so everyone is signed out once and needs to sign in with Steam again
 - Prices, bundle games and friend names load faster for large lists
 - The server clears expired cached data every hour instead of only when it restarts
+- Game lists load with less data and server work: the details stream is compressed in larger pieces
 
 ### Fixed
 
@@ -53,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An unexpected reply from Steam or IsThereAnyDeal no longer breaks bundles for hours or shows a cryptic error: it fails that once and is retried
 - When Steam or ProtonDB asks the app to slow down, tags, wishlists, news, achievement rarity and Linux ratings wait instead of failing game after game
 - The server no longer fills its cache with malformed account names, game ids or regions: it rejects them, and an unknown region gets US prices
+- A game whose store name is only a trademark sign no longer counts against the details budget on every load
 
 ### Development
 

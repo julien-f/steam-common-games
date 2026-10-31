@@ -13,7 +13,7 @@ const { execFileSync } = require('node:child_process');
 const zlib = require('node:zlib');
 const rateLimit = require('express-rate-limit');
 
-const { getCached, getCachedAt, isCached, setCache, capExpiry, getCacheEntryCounts } = require('./lib/cache');
+const { getCached, getCachedAt, isCached, capExpiry, getCacheEntryCounts } = require('./lib/cache');
 const { createDedup } = require('./lib/dedup');
 const { getMetrics, recordLimiterTrip, runAsClient, startedAt } = require('./lib/metrics');
 const { getCircuitBreakers } = require('./lib/circuitBreaker');
@@ -36,17 +36,34 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
+  ownedGamesCacheKey,
+  wishlistCacheKey,
+  friendsCacheKey,
+  playerCacheKey,
+  ratingCacheKey,
+  appDetailsCacheKey,
+  storeSearchCacheKey,
+  creatorGamesCacheKey,
+  storeBrowseCacheKey,
+  protonDbCacheKey,
+  schemaCacheKey,
+  playerAchievementsCacheKey,
+  achievementRarityCacheKey,
+  newsCacheKey,
 } = require('./lib/steam');
 const { getSemaphoreStats } = require('./lib/upstream');
-const { getHLTB } = require('./lib/hltb');
+const { getHLTB, hltbCacheKey } = require('./lib/hltb');
 const {
   getBundles,
   bundlesCacheKey,
   findBundleById,
   resolveSteamAppIds,
+  steamAppIdCacheKey,
   resolveItadIds,
+  itadIdCacheKey,
   getSteamShopId,
   getPrices,
+  priceCacheKey,
   extractPriceInfo,
   getGameBundles,
   gameBundlesCacheKey,
@@ -141,7 +158,7 @@ function cachedSteamIds(members) {
   if (!isMemberList(members)) return null;
   const ids = new Set();
   for (const raw of members) {
-    const hit = peekSteamId(raw, { record: false });
+    const hit = peekSteamId(raw);
     if (hit === undefined) return null;
     ids.add(hit);
   }
@@ -171,15 +188,6 @@ function namedRateLimit(name, { skip, ...opts }) {
   });
 }
 
-// Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
-// errors — anything else (including a genuine bug: a TypeError,
-// etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
-// one of lib/steam.js's deliberately-thrown, expected client-facing errors (bad Steam id,
-// private profile — see clientError() there). Those are still skipped here since they're
-// normal and frequent, not worth a log line, but now that they're explicitly marked
-// (isClientError), everything unmarked is logged too, on the assumption that an error
-// nobody bothered to mark expected is probably a bug worth being able to find later. Logs
-// the full stack, not just the message, since a bug needs its source line to be traceable.
 // The oldest write time across a set of cache keys, or null if any of them isn't cached (a
 // fresh fetch this request just made writes its own entry, so that case is rare) — what the
 // `fetchedAt` field on /api/common-games and /api/wishlist reports. Oldest, not newest, so the
@@ -198,6 +206,15 @@ function oldestOf(timestamps) {
   return oldest;
 }
 
+// Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
+// errors — anything else (including a genuine bug: a TypeError,
+// etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
+// one of lib/steam.js's deliberately-thrown, expected client-facing errors (bad Steam id,
+// private profile — see clientError() there). Those are still skipped here since they're
+// normal and frequent, not worth a log line, but now that they're explicitly marked
+// (isClientError), everything unmarked is logged too, on the assumption that an error
+// nobody bothered to mark expected is probably a bug worth being able to find later. Logs
+// the full stack, not just the message, since a bug needs its source line to be traceable.
 function routeErrorStatus(route, err) {
   if (err.isClientError) return 400;
   // Circuit-open errors (lib/steam.js's fetchStoreApi, while steam-store is blocked) are an
@@ -349,9 +366,9 @@ const searchLimit = namedRateLimit('search', {
     const ids = cachedSteamIds(req.body.members);
     if (!ids) return false;
     // The route's remaining upstream work is getPlayerSummaries + getOwnedGames (common-games) or
-    // getWishlist (wishlist) per id, mirroring their own cache keys.
-    const listPrefix = req.path === '/api/wishlist' ? 'wishlist' : 'games';
-    return [...ids].every((id) => isCached(`player:${id}`) && isCached(`${listPrefix}:${id}`));
+    // getWishlist (wishlist) per id.
+    const listCacheKey = req.path === '/api/wishlist' ? wishlistCacheKey : ownedGamesCacheKey;
+    return [...ids].every((id) => isCached(playerCacheKey(id)) && isCached(listCacheKey(id)));
   },
 });
 
@@ -364,18 +381,24 @@ const friendsLimit = namedRateLimit('friends', {
   skip: (req) => {
     if (isBodyRefresh(req)) return false;
     const ids = cachedSteamIds(req.body.members);
-    return !!ids && [...ids].every((id) => isCached(`friends:${id}`));
+    return !!ids && [...ids].every((id) => isCached(friendsCacheKey(id)));
   },
 });
 
-// fetchGameDetails' cached sources: response field -> cache key prefix.
-const DETAILS_SOURCES = { rating: 'rating', hltb: 'hltb', meta: 'meta', tags: 'browse', protondb: 'protondb' };
+// fetchGameDetails' cached sources: response field -> cache key.
+const DETAILS_SOURCES = {
+  rating: ratingCacheKey,
+  hltb: hltbCacheKey,
+  meta: appDetailsCacheKey,
+  tags: storeBrowseCacheKey,
+  protondb: protonDbCacheKey,
+};
 
 // The details limit exists to throttle upstream Steam/HLTB calls. Cache hits make
 // no upstream calls, so they must not count — otherwise a refresh of an already
 // loaded comparison (all cache hits) burns the budget and 429s itself.
 
-const allDetailsCached = (appid) => Object.values(DETAILS_SOURCES).every((prefix) => isCached(`${prefix}:${appid}`));
+const allDetailsCached = (appid) => Object.values(DETAILS_SOURCES).every((cacheKey) => isCached(cacheKey(appid)));
 
 const detailsLimit = namedRateLimit('details', {
   max: DETAILS_RATE_LIMIT_MAX,
@@ -392,7 +415,7 @@ const detailsLimit = namedRateLimit('details', {
 const metaLimit = namedRateLimit('meta', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
-    return isCached(`meta:${req.appid}`);
+    return isCached(appDetailsCacheKey(req.appid));
   },
 });
 
@@ -407,7 +430,7 @@ const newsLimit = namedRateLimit('news', {
   max: DETAILS_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false;
-    return isCached(`news:${req.appid}`);
+    return isCached(newsCacheKey(req.appid));
   },
 });
 
@@ -424,7 +447,7 @@ const gameSearchLimit = namedRateLimit('gameSearch', {
   skip: (req) => {
     const term = normalizeSearchTerm(req.query.q);
     if (term.length < 2) return true; // no upstream call happens below this length
-    return isCached(`search:${term}`);
+    return isCached(storeSearchCacheKey(term));
   },
 });
 
@@ -444,7 +467,7 @@ const creatorGamesLimit = namedRateLimit('creatorGames', {
     const { role, name } = parseCreatorQuery(req);
     if (!role || !name) return true; // rejected below without an upstream call
     if (isForceRefresh(req)) return false;
-    return isCached(`creator:${role}:${name}`);
+    return isCached(creatorGamesCacheKey(role, name));
   },
 });
 
@@ -463,15 +486,15 @@ const achievementsLimit = namedRateLimit('achievements', {
   skip: (req) => {
     if (isForceRefresh(req)) return false;
     const { appid } = req;
-    if (!isCached(`schema:${appid}`)) return false;
-    if (!isCached(`achrarity:${appid}`)) return false;
+    if (!isCached(schemaCacheKey(appid))) return false;
+    if (!isCached(achievementRarityCacheKey(appid))) return false;
     const ids = parseSteamIdsQuery(req);
     // No steamids at all (a standalone lookup with no player loaded) only ever needed
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
     return ids.every((raw) => {
-      const id = peekSteamId(raw, { record: false });
-      return id && isCached(`playerach:${id}:${appid}`);
+      const id = peekSteamId(raw);
+      return id && isCached(playerAchievementsCacheKey(id, appid));
     });
   },
 });
@@ -564,8 +587,7 @@ const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
   skip: (req) => {
     const gids = req.body.gids;
     if (!Array.isArray(gids) || gids.length === 0) return false; // let the route's own validation reject it
-    // Mirrors resolveSteamAppIds' own per-gid cache key (lib/itad.js).
-    return gids.every((gid) => typeof gid === 'string' && isCached(`itad-appid:${gid}`));
+    return gids.every((gid) => typeof gid === 'string' && isCached(steamAppIdCacheKey(gid)));
   },
 });
 
@@ -581,15 +603,15 @@ const pricesLimit = namedRateLimit('prices', {
     const { gids, appids } = req.body;
     const country = parseCountry(req);
     if (Array.isArray(gids) && gids.length > 0) {
-      return gids.every((gid) => typeof gid === 'string' && isCached(`itad-price:${country}:${gid}`));
+      return gids.every((gid) => typeof gid === 'string' && isCached(priceCacheKey(gid, country)));
     }
     if (Array.isArray(appids) && appids.length > 0) {
       return appids.every((appid) => {
         if (!Number.isInteger(appid)) return false;
-        const gid = getCached(`itad-gid:${appid}`, { record: false });
+        const gid = getCached(itadIdCacheKey(appid), { record: false });
         if (gid === undefined) return false; // resolution itself not cached yet
         if (gid === null) return true; // confirmed no ITAD listing — nothing left to price
-        return isCached(`itad-price:${country}:${gid}`);
+        return isCached(priceCacheKey(gid, country));
       });
     }
     return false; // let the route's own validation reject it
@@ -602,7 +624,7 @@ const gameBundlesLimit = namedRateLimit('gameBundles', {
   max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
     if (isForceRefresh(req)) return false;
-    const gid = getCached(`itad-gid:${req.appid}`, { record: false });
+    const gid = getCached(itadIdCacheKey(req.appid), { record: false });
     if (gid === undefined) return false;
     return gid === null || isCached(gameBundlesCacheKey(gid, parseCountry(req)));
   },
@@ -658,7 +680,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
     // Steam's own two-week window, which says nothing of now once the cached library is older than that.
     const recentPlaytime = {};
     ids.forEach((steamId, i) => {
-      if (Date.now() - (getCachedAt(`games:${steamId}`) ?? Date.now()) > RECENT_PLAYTIME_MS) return;
+      if (Date.now() - (getCachedAt(ownedGamesCacheKey(steamId)) ?? Date.now()) > RECENT_PLAYTIME_MS) return;
       for (const game of libraries[i]) {
         if (game.playtime_2weeks) (recentPlaytime[game.appid] ??= {})[steamId] = game.playtime_2weeks;
       }
@@ -670,7 +692,7 @@ app.post('/api/common-games', searchLimit, async (req, res) => {
       playtime,
       lastPlayed,
       recentPlaytime,
-      fetchedAt: oldestCachedAt(ids.map((id) => `games:${id}`)),
+      fetchedAt: oldestCachedAt(ids.map(ownedGamesCacheKey)),
     });
   } catch (err) {
     sendRouteError(res, 'common-games', err);
@@ -714,7 +736,7 @@ app.post('/api/wishlist', searchLimit, async (req, res) => {
       itemCount: lists[i].length,
     }));
 
-    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map((id) => `wishlist:${id}`)) });
+    res.json({ items, players, fetchedAt: oldestCachedAt(ids.map(wishlistCacheKey)) });
   } catch (err) {
     sendRouteError(res, 'wishlist', err);
   }
@@ -748,7 +770,7 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
       realname: p.realname,
     }));
 
-    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map((id) => `friends:${id}`)) });
+    res.json({ friends, unavailable, fetchedAt: oldestCachedAt(ids.map(friendsCacheKey)) });
   } catch (err) {
     sendRouteError(res, 'friends', err);
   }
@@ -756,9 +778,6 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 
 // A result that one client's spent share left short (`limited`) is fetched again for another client.
 const dedupDetails = createDedup('details', { isRefused: (details) => !!details.limited });
-// Steam app types HLTB doesn't time, so searching for them would only spend requests on a miss.
-// `dlc` and `mod` stay: HLTB lists some.
-const NOT_PLAYED_TYPES = new Set(['music', 'video', 'series', 'episode', 'hardware', 'demo', 'advertising']);
 
 function fetchGameDetails(appid, { force = false } = {}) {
   // Force-refresh gets its own lane here, so it's never handed a normal request's result, which
@@ -773,12 +792,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
     // versus searching HLTB in parallel with an already-known, trusted name (e.g. an owned
     // game's name from Steam's library API) — that's the trade for not trusting the client.
     // A meta failure fails HLTB too, so it reads as failed, not as "no data".
-    const hltbPromise = metaPromise.then((meta) => {
-      if (meta?.name && !NOT_PLAYED_TYPES.has(meta.type)) return getHLTB(appid, meta.name, { force });
-      // Skipped by design, cached as a miss so the source has an age and counts as cached
-      if (force || !isCached(`hltb:${appid}`)) setCache(`hltb:${appid}`, [], { ttlMs: MISS_CACHE_TTL_MS });
-      return null;
-    });
+    const hltbPromise = metaPromise.then((meta) => getHLTB(appid, meta?.name, { type: meta?.type, force }));
     // Tags and the demo link both come from this one store browse item.
     const browsePromise = getStoreBrowseItem(appid, { force });
 
@@ -828,12 +842,12 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // A game that isn't out yet has no reviews, ProtonDB reports or HLTB times; those misses
       // expire like any other miss, so they fill in after release instead of a year later.
       if (metaRes.value?.comingSoon) {
-        for (const [source, res] of [
-          ['rating', ratingRes],
-          ['protondb', protondbRes],
-          ['hltb', hltbRes],
+        for (const [cacheKey, res] of [
+          [ratingCacheKey, ratingRes],
+          [protonDbCacheKey, protondbRes],
+          [hltbCacheKey, hltbRes],
         ]) {
-          if (res.status === 'fulfilled' && res.value == null) capExpiry(`${source}:${appid}`, MISS_CACHE_TTL_MS);
+          if (res.status === 'fulfilled' && res.value == null) capExpiry(cacheKey(appid), MISS_CACHE_TTL_MS);
         }
       }
       // Age of the oldest of this game's cached sources, which is what the panel's ↻ shows — plus
@@ -842,7 +856,7 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // and "5 months ago" says nothing about the rating fetched yesterday. The panel puts the
       // breakdown in the button's tooltip so the visible figure stays one number.
       const fetchedAts = Object.fromEntries(
-        Object.entries(DETAILS_SOURCES).map(([source, prefix]) => [source, getCachedAt(`${prefix}:${appid}`) ?? null]),
+        Object.entries(DETAILS_SOURCES).map(([source, cacheKey]) => [source, getCachedAt(cacheKey(appid)) ?? null]),
       );
       return {
         fetchedAt: oldestOf(Object.values(fetchedAts)),
@@ -883,7 +897,7 @@ app.get('/api/creator-games', creatorGamesLimit, async (req, res) => {
   if (!name) return res.status(400).json({ error: 'Missing name' });
   try {
     const { appids, total, capped } = await searchCreatorGames(role, name, { force: isForceRefresh(req) });
-    res.json({ appids, total, capped, fetchedAt: getCachedAt(`creator:${role}:${name}`) ?? null });
+    res.json({ appids, total, capped, fetchedAt: getCachedAt(creatorGamesCacheKey(role, name)) ?? null });
   } catch (err) {
     sendRouteError(res, 'creator-games', err);
   }
@@ -1029,7 +1043,7 @@ app.post('/api/prices', pricesLimit, requireItad, async (req, res) => {
     // "↻ Refresh prices". Prices are the shortest-lived data the app shows and the most
     // consequential to act on (someone clicks through to a shop from these), so how old they are
     // is worth stating rather than implying.
-    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map((gid) => `itad-price:${country}:${gid}`)) });
+    res.json({ prices: out, fetchedAt: oldestCachedAt(gidsToPrice.map((gid) => priceCacheKey(gid, country))) });
   } catch (err) {
     sendRouteError(res, 'prices', err);
   }
@@ -1099,6 +1113,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   const force = isForceRefresh(req);
   try {
     const steamIds = await resolveSteamIds(rawIds);
+    const none = { achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length };
 
     // Cheap short-circuit: appdetails (already fetched/cached for this game via
     // fetchGameDetails, well before any panel opens) already tells us — for free — whether
@@ -1110,7 +1125,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     // the optimization, never breaks the route — by falling through to the schema fetch below.
     const meta = await getAppDetails(appid, { force: false }).catch(() => null);
     if (meta && meta.achievementCount === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+      return res.json(none);
     }
 
     // Sequenced rather than batched with the calls below: even when appdetails didn't confirm
@@ -1118,7 +1133,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     // calls until schema itself confirms there's something to annotate.
     const schema = await getGameSchema(appid, { force });
     if (!schema || schema.length === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+      return res.json(none);
     }
 
     let rarityFailed = false;
@@ -1233,8 +1248,8 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Vary', 'Accept-Encoding');
   // Gzipped (its size: docs/dev/architecture.md), as no reverse proxy is assumed to compress
-  // text/event-stream (nginx doesn't by default). Flushed per event, so each row still arrives as
-  // soon as it resolves.
+  // text/event-stream (nginx doesn't by default). Flushed once per event-loop turn (`send` below), so each row
+  // still arrives as soon as it resolves.
   const gzip = /\bgzip\b/.test(req.get('accept-encoding') ?? '');
   let out = res;
   if (gzip) {
@@ -1249,10 +1264,19 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
     closed = true;
   });
 
+  // One flush per event-loop turn: a flush per event costs bytes and CPU while cached games resolve in a burst.
+  let flushQueued = false;
+  const flush = () => {
+    flushQueued = false;
+    if (!out.writableEnded) out.flush(zlib.constants.Z_SYNC_FLUSH);
+  };
   const send = (data) => {
     if (closed || res.writableEnded) return;
     out.write(`data: ${JSON.stringify(data)}\n\n`);
-    if (gzip) out.flush(zlib.constants.Z_SYNC_FLUSH);
+    if (gzip && !flushQueued) {
+      flushQueued = true;
+      setImmediate(flush);
+    }
   };
 
   // A bounded worker pool, not `validated.map(...)`. Mapping dispatched every appid
@@ -1436,7 +1460,7 @@ app.get(/^\/(?!api\/)(?!.*\.[a-zA-Z0-9]+$).*/, async (req, res) => {
   const appid = /^\/game\/(\d+)\/?$/.exec(req.path)?.[1];
   // Cache only: a link preview mustn't cost an upstream request (integrations.md's trust tiers).
   // Not recorded: a page load isn't a meta-tier lookup the cache metrics should count.
-  const game = appid && getCached(`meta:${appid}`, { record: false });
+  const game = appid && getCached(appDetailsCacheKey(appid), { record: false });
   // `||`: Steam's raw details can hold null, which defaults don't replace.
   await sendAppShell(req, res, {
     title: game?.name || undefined,
