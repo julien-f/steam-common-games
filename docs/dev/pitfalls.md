@@ -79,6 +79,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Symptom**: a screenshot path or `filename` in the scratchpad or `/tmp` is refused.
 - **Cause**: the Playwright MCP server reads and writes only under the repo's `.playwright-mcp/`.
 - **Fix**: keep MCP inputs and outputs under `.playwright-mcp/` (gitignored).
+- From a worktree, that's the **main checkout's** `.playwright-mcp/`: a screenshot reported as written isn't in the worktree's (`scripts/ux-measure.js`' script still is, passed by absolute path).
 
 ## A background agent's chained `git` command or heredoc is refused
 
