@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The game panel's section tabs stay in place as its sections finish loading, instead of being rebuilt each time one arrives
 - When HLTB asks to slow down, the app pauses its HLTB lookups instead of retrying the next game at once
 - In fullscreen on Firefox for Android, a trailer no longer shifts as its controls show and hide
+- On a narrow phone, the game panel's current section tab stays in view when another section's tab appears before it
 
 ### Development
 

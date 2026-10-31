@@ -371,10 +371,12 @@ function updateSubnavScrollSpy() {
   }
   const list = nav.querySelector('ul');
   placeSubnavUnderline(list, active);
-  // The tabs scroll sideways in one row: bring a newly current one into view, leaving a manual swipe alone.
-  if (list && active && list.dataset.active !== activeTarget) {
-    list.dataset.active = activeTarget;
-    const li = active.parentElement!;
+  // The tabs scroll sideways in one row: bring the current one into view when it changes or moves (a tab
+  // arriving before it, a resize), leaving a manual swipe alone.
+  const li = active?.parentElement;
+  const placed = li ? `${activeTarget} ${li.offsetLeft} ${li.offsetWidth}` : undefined;
+  if (list && li && list.dataset.active !== placed) {
+    list.dataset.active = placed;
     const left = Math.min(li.offsetLeft, Math.max(list.scrollLeft, li.offsetLeft + li.offsetWidth - list.clientWidth));
     if (left !== list.scrollLeft) list.scrollTo({ left, behavior: smoothScroll() });
   }

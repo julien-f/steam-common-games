@@ -4815,15 +4815,24 @@ test("F1 edge: on a narrow phone, the panel's tabs stay one row and scroll to th
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await page.setViewportSize({ width: 320, height: 844 });
   await asPlayer(page, ALICE);
+  const achievements = await gate(page, '**/api/achievements/**');
   await page.goto('/lists/owned?game=1145360');
   const list = page.locator('.panel-subnav-list');
   const last = list.getByRole('button', { name: 'DLC' });
   await expect(last).toBeAttached();
-  const tops = await list.locator('li').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top));
-  expect(new Set(tops).size).toBe(1);
+  const oneRow = async () =>
+    new Set(await list.locator('li').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top))).size;
+  expect(await oneRow()).toBe(1);
 
   await page.locator('#panel-body').evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await expect(last).toHaveClass(/active/);
+  // A tab arriving before the current one pushes it along: it's brought back into view.
+  await expect(list.getByRole('button', { name: 'Achievements' })).toHaveCount(0);
+  achievements.release();
+  await expect(list.getByRole('button', { name: 'Achievements' })).toBeAttached();
+  await page.locator('#panel-body').evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(last).toHaveClass(/active/);
+  expect(await oneRow()).toBe(1);
   await expect
     .poll(() =>
       last.evaluate((el) => {
