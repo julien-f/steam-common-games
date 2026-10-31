@@ -27,7 +27,7 @@ const {
   pickRate,
   cheapestPicks,
   pickPlanDetail,
-  pickSavings,
+  savingsText,
   bundlePackages,
   wholePackages,
 } = require('../public/bundleRows.ts');
@@ -497,11 +497,12 @@ test('pickPlanDetail: the rate, or the tier filled with its spare picks', () => 
   assert.equal(pickPlanDetail(cheapestPicks(PICKS, 1), 1), '1 pick · 1-game tier');
 });
 
-test('pickSavings: saved, overpaid or even against the best deals', () => {
+test('savingsText: saved, overpaid or even against the best deals, estimated in the region currency', () => {
   const plan = cheapestPicks(PICKS, 5);
-  assert.deepEqual(pickSavings(plan, 23.4), { text: 'saves $16.41', overpays: false });
-  assert.deepEqual(pickSavings(plan, 5), { text: '$1.99 more', overpays: true });
-  assert.deepEqual(pickSavings(plan, 6.99), { text: 'same as best deals', overpays: false });
+  assert.deepEqual(savingsText(plan.cost, 23.4, 'USD', 'USD'), { text: 'saves $16.41', overpays: false });
+  assert.deepEqual(savingsText(plan.cost, 5, 'USD', 'USD'), { text: '$1.99 more', overpays: true });
+  assert.deepEqual(savingsText(plan.cost, 6.99, 'USD', 'USD'), { text: 'same as best deals', overpays: false });
+  assert.match(savingsText(plan.cost, 23.4, 'USD', 'EUR').text, /^saves \$16\.41 \(≈ €[\d.]+\)$/);
 });
 
 // ── Steam packages ───────────────────────────────────────────────────────────────────────────

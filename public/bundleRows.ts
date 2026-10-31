@@ -8,6 +8,7 @@
 // own filter checklists/group keys are built from.
 
 import { compareByOrder, formatMoney, fmtLocalDate, pad2 } from './utils.ts';
+import { formatWithEstimate } from './currency.ts';
 import type { PriceAmount } from './types.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
 
@@ -110,11 +111,17 @@ export function pickPlanDetail(plan: PickPlan, picks: number): string {
   return `${picks} pick${picks === 1 ? '' : 's'} · ${how}${spare}`;
 }
 
-// What the plan saves over the same games at their best deals, or `overpays` when it doesn't.
-export function pickSavings(plan: PickPlan, bestDeals: number): { text: string; overpays: boolean } {
-  const diff = Math.round((bestDeals - plan.cost) * 100) / 100;
+// What paying `cost` saves over the same games at their best deals (`bestDeals`, in the same
+// `currency`), or `overpays` when it doesn't; with an estimate in `target` when it differs.
+export function savingsText(
+  cost: number,
+  bestDeals: number,
+  currency: string,
+  target: string,
+): { text: string; overpays: boolean } {
+  const diff = Math.round((bestDeals - cost) * 100) / 100;
   if (diff === 0) return { text: 'same as best deals', overpays: false };
-  const amount = formatMoney(Math.abs(diff), plan.currency);
+  const amount = formatWithEstimate(Math.abs(diff), currency, target);
   return diff > 0 ? { text: `saves ${amount}`, overpays: false } : { text: `${amount} more`, overpays: true };
 }
 

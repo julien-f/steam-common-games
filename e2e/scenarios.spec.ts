@@ -4147,6 +4147,8 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(page.locator('.selection-pick-total')).toHaveText(/^\$3\.50 \(≈ €/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('2 picks · 3-game tier · 1 more free');
   await expect(page.locator('.bundle-tier-chip--active')).toHaveText(/^3 for \$3\.50/);
+  // The saving, in USD like the rate, carries its estimate too.
+  await expect(page.locator('.selection-pick-savings')).toHaveText(/\$[\d.]+ \(≈ €[\d.]+\)/);
 
   // A package's two rows are one pick, ticked and unticked together.
   const pack = rows(page).filter({ hasText: 'package · 2 games' });

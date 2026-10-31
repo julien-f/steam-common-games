@@ -217,7 +217,7 @@ import {
   pickPlanDetail,
   bundlePackages,
   wholePackages,
-  pickSavings,
+  savingsText,
   type BundlePackage,
   type BundlePricingModel,
   type BundleTierSummary,
@@ -580,7 +580,7 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
           ? 'Free'
           : row.tierPriceMax != null
             ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
-            : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
+            : formatWithEstimate(Number(v), row.tierCurrency, regionCurrency(), row.tierPerGame ? '/game' : '');
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
   // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
   const included = pkg && row.tierPerGame && !pkg.lead;
@@ -4558,10 +4558,14 @@ export default function ListRoute() {
                   {(deals) => (
                     <span
                       class="selection-pick-savings"
-                      style={{ color: pickSavings(plan(), deals().amount).overpays ? 'var(--bad)' : 'var(--good)' }}
+                      style={{
+                        color: savingsText(plan().cost, deals().amount, plan().currency, regionCurrency()).overpays
+                          ? 'var(--bad)'
+                          : 'var(--good)',
+                      }}
                       title={`vs ${formatMoney(deals().amount, plan().currency)} for the games you don't own at their best deals`}
                     >
-                      {pickSavings(plan(), deals().amount).text}
+                      {savingsText(plan().cost, deals().amount, plan().currency, regionCurrency()).text}
                     </span>
                   )}
                 </Show>
