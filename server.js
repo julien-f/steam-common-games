@@ -211,6 +211,11 @@ const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
 // One string per param (the last), so a repeated `?q=a&q=b` can't hand a route an array.
 app.set('query parser', (str) => Object.fromEntries(new URLSearchParams(str)));
+// The Steam callback's query carries a signed assertion, replayable from the logs.
+morgan.token('url', (req) => {
+  const url = req.originalUrl || req.url;
+  return url.startsWith('/auth/steam/callback?') ? '/auth/steam/callback' : url;
+});
 if (process.env.NODE_ENV !== 'test') app.use(morgan('dev'));
 // Express 5 leaves req.body undefined when no JSON body was parsed.
 app.use((req, _res, next) => {

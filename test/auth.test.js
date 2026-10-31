@@ -70,6 +70,10 @@ test('buildLoginUrl: points at Steam with the realm, return_to and state set', (
 const ORIGIN = 'https://example.com';
 const STATE = 'the-state';
 
+// A fresh OpenID response_nonce, as Steam mints one: its UTC timestamp, then a unique suffix.
+let nonceCount = 0;
+const freshNonce = (at = Date.now()) => `${new Date(at).toISOString().slice(0, 19)}Z${nonceCount++}`;
+
 // A positive assertion as Steam returns it for a login this app started with ORIGIN and STATE.
 function assertion(overrides = {}) {
   return {
@@ -79,7 +83,7 @@ function assertion(overrides = {}) {
     'openid.claimed_id': VALID_CLAIMED_ID,
     'openid.identity': VALID_CLAIMED_ID,
     'openid.return_to': `${ORIGIN}/auth/steam/callback?state=${STATE}`,
-    'openid.response_nonce': '2026-10-10T00:00:00Z0123456789',
+    'openid.response_nonce': freshNonce(),
     'openid.assoc_handle': '1234567890',
     'openid.signed': 'signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle',
     'openid.sig': 'abc',
@@ -125,6 +129,9 @@ for (const [why, overrides] of [
   ['a foreign op_endpoint', { 'openid.op_endpoint': 'https://evil.example/openid/login' }],
   ['an unsigned return_to', { 'openid.signed': 'signed,op_endpoint,claimed_id,identity,response_nonce,assoc_handle' }],
   ['a missing signed list', { 'openid.signed': undefined }],
+  ['a nonce older than 5 minutes', { 'openid.response_nonce': freshNonce(Date.now() - 6 * 60 * 1000) }],
+  ['a nonce without a timestamp', { 'openid.response_nonce': 'not-a-nonce' }],
+  ['a missing nonce', { 'openid.response_nonce': undefined }],
 ]) {
   test(`verifySteamAssertion: null for ${why}, without even calling Steam`, async (t) => {
     const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
@@ -132,6 +139,25 @@ for (const [why, overrides] of [
     assert.equal(fetchMock.mock.callCount(), 0);
   });
 }
+
+// OpenID 2.0 §11.3: a logged assertion replayed later must not sign anyone in again.
+test('verifySteamAssertion: null for a nonce already used, without calling Steam again', async (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  assert.equal(await verify(query), '76561198000000001');
+  assert.equal(await verify(query), null);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('verifySteamAssertion: a nonce stays used for as long as its age lets it pass', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-10T00:00:00Z') });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  assert.equal(await verify(query), '76561198000000001');
+  t.mock.timers.tick(4 * 60 * 1000);
+  assert.equal(await verify(query), null);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
 
 // ── users & sessions ──────────────────────────────────────────────────────────
 
