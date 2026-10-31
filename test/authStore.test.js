@@ -23,16 +23,14 @@ function withFetch(t, handler) {
 beforeEach(() => {
   global.localStorage = makeMemoryLocalStorage();
   delete require.cache[require.resolve('../public/prefs.ts')];
-  delete require.cache[require.resolve('../public/tableViewSync.ts')];
   delete require.cache[require.resolve('../public/listsStore.ts')];
   delete require.cache[require.resolve('../public/accountsStore.ts')];
   delete require.cache[require.resolve('../public/accountData.ts')];
   delete require.cache[require.resolve('../public/authStore.ts')];
   require('../public/accountsStore.ts').setAccountOverride(null);
-  // require.cache deletion above doesn't reach signedInSteamid/the table-view baselines (both
-  // module-level state) — see _resetPrefsState's own comment in prefs.ts.
+  // require.cache deletion above doesn't reach signedInSteamid (module-level state) — see
+  // _resetPrefsState's own comment in prefs.ts.
   require('../public/prefs.ts')._resetPrefsState();
-  require('../public/tableViewSync.ts').resetBaselines();
 });
 
 function auth() {
@@ -43,9 +41,6 @@ function accounts() {
 }
 function prefs() {
   return require('../public/prefs.ts');
-}
-function tableViewSync() {
-  return require('../public/tableViewSync.ts');
 }
 
 function makeAccount(id) {
@@ -229,47 +224,85 @@ test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alo
   assert.equal(called, false);
 });
 
-// ── syncPrefsWithServer: table-view keys (baseline tracking, never adopted or pushed) ────
-
-test('syncPrefsWithServer: a table-view key is never adopted or pushed, regardless of what either side has', async (t) => {
+test('syncPrefsWithServer (ongoing): a newer server entry with the same value takes its time without a reload', async (t) => {
   markAlreadySynced();
-  prefs().setPref('ownedListView', { sorts: [{ key: 'name', dir: 'asc' }] });
+  const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 900 } });
+
+  assert.equal(adopted, false);
+  assert.deepEqual(prefs().getAllPrefEntries().region, { value: 'DE', updatedAt: 900 });
+});
+
+test("syncPrefsWithServer (ongoing): a same-value adoption storage can't keep is warned, like any other", async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 3, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  global.localStorage.setItem = () => {
+    throw new DOMException('full', 'QuotaExceededError');
+  };
+  const warn = t.mock.method(console, 'warn', () => {});
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 900 } });
+
+  assert.equal(adopted, false);
+  assert.match(warn.mock.calls[0]?.arguments[0] ?? '', /^\[auth\]/);
+});
+
+// ── syncPrefsWithServer: table-view keys ─────────────────────────────────────────
+
+test('syncPrefsWithServer (ongoing): a table-view key merges like any other: a newer server view is adopted', async (t) => {
+  markAlreadySynced();
+  const entries = {
+    schemaVersion: 2,
+    ownedListView: { value: { sorts: [{ key: 'name', dir: 'asc' }] }, updatedAt: 500 },
+  };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
   withFetch(t, async () => {
-    throw new Error('should not push or adopt');
+    throw new Error('should not push');
   });
 
   const adopted = await auth().syncPrefsWithServer(STEAMID, {
-    ownedListView: { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 999999999999 },
+    ownedListView: { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 900 },
   });
+
+  assert.equal(adopted, true);
+  assert.deepEqual(prefs().getPref('ownedListView'), { sorts: [{ key: 'rating', dir: 'desc' }] });
+});
+
+test('syncPrefsWithServer (ongoing): a newer local table view is pushed', async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 3, ownedListView: { value: { pageSize: 25 }, updatedAt: 900 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  const urls = [];
+  withFetch(t, async (url) => {
+    urls.push(url);
+    return { ok: true, json: async () => ({ ok: true }) };
+  });
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { ownedListView: { value: {}, updatedAt: 500 } });
 
   assert.equal(adopted, false);
-  assert.deepEqual(
-    prefs().getPref('ownedListView'),
-    { sorts: [{ key: 'name', dir: 'asc' }] },
-    'local value left untouched',
-  );
+  assert.deepEqual(urls, ['/api/me/prefs/ownedListView']);
 });
 
-test('syncPrefsWithServer: a table-view key the server has refreshes its baseline', async (t) => {
+test("syncPrefsWithServer: a table view stored before Save existed (v2) loses to the account's Saved one", async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 2, ownedListView: { value: { pageSize: 25 }, updatedAt: 900 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
   withFetch(t, async () => {
     throw new Error('should not push');
   });
 
-  const serverEntry = { value: { sorts: [{ key: 'rating', dir: 'desc' }] }, updatedAt: 500 };
-  await auth().syncPrefsWithServer(STEAMID, { ownedListView: serverEntry });
-
-  assert.deepEqual(tableViewSync().getBaseline('ownedListView'), serverEntry);
-});
-
-test('syncPrefsWithServer: a table-view key the server has never saved clears its baseline', async (t) => {
-  tableViewSync().setBaseline('ownedListView', { value: { pageSize: 25 }, updatedAt: 1 });
-  withFetch(t, async () => {
-    throw new Error('should not push');
+  const adopted = await auth().syncPrefsWithServer(STEAMID, {
+    ownedListView: { value: { pageSize: 100 }, updatedAt: 500 },
   });
 
-  await auth().syncPrefsWithServer(STEAMID, {});
-
-  assert.equal(tableViewSync().getBaseline('ownedListView'), undefined);
+  assert.equal(adopted, true);
+  assert.deepEqual(prefs().getPref('ownedListView'), { pageSize: 100 });
 });
 
 // ── autoPopulateAccountFromLogin ─────────────────────────────────────────────
@@ -443,21 +476,16 @@ test('initAuth: /api/me failing reads as signed out, without throwing', async (t
   assert.equal(error.mock.callCount(), 1);
 });
 
-test('signOut: logs out, clears the user, stops syncing edits and drops table-view baselines', async (t) => {
+test('signOut: logs out, clears the user and stops syncing edits', async (t) => {
   const seen = withBrowser(t);
-  const calls = mockMeFetch(t, {
-    steamid: STEAMID,
-    prefs: { ownedListView: { value: { pageSize: 25 }, updatedAt: 500 } },
-  });
+  const calls = mockMeFetch(t, { steamid: STEAMID, prefs: {} });
   await auth().initAuth();
-  assert.ok(tableViewSync().getBaseline('ownedListView'));
   calls.length = 0;
 
   await auth().signOut();
 
   assert.deepEqual(calls, [{ url: '/auth/logout', method: 'POST' }]);
   assert.equal(auth().getAuthUser(), null);
-  assert.equal(tableViewSync().getBaseline('ownedListView'), undefined);
   prefs().setPref('region', 'DE');
   assert.deepEqual(pushes(calls), []);
 });

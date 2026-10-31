@@ -425,9 +425,13 @@ test("S3 edge: editing a shared layout warns it's lost on reload unless kept", a
   await toggle.click(); // collapse a group
   await expect(banner).toContainText("You've changed this shared layout — it's lost on reload unless you keep it");
   await expect(banner.getByRole('button', { name: 'Keep as my layout' })).toBeVisible();
+  await expect(page.getByText('Unsaved changes to')).toHaveCount(0); // one banner at a time
   // Back to the link's own layout: nothing of the viewer's is left to lose.
   await toggle.click();
   await expect(banner).toContainText('for this visit only');
+  await banner.getByRole('button', { name: 'Keep as my layout' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByText('Unsaved changes to')).toHaveCount(0); // kept is saved
 });
 
 test("S3 edge: another browser's list link explains lists are local", async ({ page }) => {
@@ -634,6 +638,7 @@ test('C1 edge: the panel sorts the list by similarity to its game, until stopped
   await row(page, 'Valheim').getByText('Valheim').click();
   await page.getByRole('button', { name: 'Sort list by similarity' }).click();
   await expect(page.getByRole('columnheader', { name: /Similarity/ })).toBeVisible();
+  await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0); // not a layout change
   // Terraria's tags match Valheim's as closely as Valheim's own, so the two 100% tie.
   await expect
     .poll(async () => (await names()).slice(0, 4))
@@ -2504,30 +2509,62 @@ test('C1.4: compare three players — one table grouped from "all" to "only one"
   );
 });
 
-test('C1 edge: reverting to a saved ungrouped layout keeps the comparison grouped', async ({ page }) => {
+test("C1 edge: the account's ungrouped comparison layout keeps the comparison grouped, unchanged", async ({ page }) => {
   await mockApi(page, { states: ['signed-in'] });
-  // The account's saved comparison view, with the grouping removed.
+  // The account's saved comparison layout, with the grouping removed: adopted, then reloaded.
   const now = Date.now();
   const compareListView = { value: { groupBy: [], sorts: [{ key: 'name', dir: 'asc' }] }, updatedAt: now };
   const prefs = { ...signedInPrefs(now), compareListView };
   await page.route('**/api/me', (route) => route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs } }));
   await page.goto('/lists/compare?u=alice&u=bob');
-  await expect(groupRows(page)).toHaveCount(3);
-  await page.getByRole('button', { name: 'Revert' }).click();
-  await expect(row(page, 'Hades')).toBeVisible(); // the reverted name sort applies…
+  // The saved name sort applies (the default sorts by rating)…
+  await expect(page.getByRole('columnheader', { name: /^Name/ })).toHaveAttribute('aria-sort', 'ascending');
   await expect(groupRows(page)).toHaveCount(3); // …but the comparison stays grouped
+  await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0); // and nobody changed anything
 });
 
-test('C1 edge: the unsaved-view banner shows when sign-in lands after the table', async ({ page }) => {
+test('L3 edge: a table change waits for Save, survives a reload in the tab, and Discard drops it', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(6);
+  const header = page.locator('.dt-th[data-col-key="releaseDate"]');
+  await header.locator('.dt-th-sort').click();
+  const banner = page.locator('.pref-unsaved-banner');
+  await expect(banner).toContainText('Unsaved changes to your Owned layout (Sort)');
+  const stored = () => page.evaluate(() => localStorage.getItem('steam.isonoe.net:prefs') ?? '');
+  expect(await stored()).not.toContain('releaseDate');
+  await page.reload();
+  await expect(header).toHaveAttribute('aria-sort', /ascending|descending/);
+  await expect(banner).toContainText('Unsaved changes to your Owned layout (Sort)');
+  await banner.getByRole('button', { name: 'Discard' }).click();
+  await expect(header).not.toHaveAttribute('aria-sort', /ascending|descending/);
+  await expect(banner).toHaveCount(0);
+
+  await header.locator('.dt-th-sort').click();
+  await banner.getByRole('button', { name: 'Save' }).click();
+  await expect(banner).toHaveCount(0);
+  expect(await stored()).toContain('releaseDate');
+});
+
+test('Y1 edge: signed in, a saved table layout syncs, without page or search, and only on Save', async ({ page }) => {
   await mockApi(page, { states: ['signed-in'] });
-  const bundlesBrowseView = { value: { sorts: [{ key: 'title', dir: 'desc' }] }, updatedAt: Date.now() };
-  // Delayed so the banner mounts signed out: its `when` must still pick up the user arriving.
-  await page.route('**/api/me', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    await route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs: { bundlesBrowseView } } });
+  // An account with no prefs: nothing to adopt, so no reload under the typing.
+  await page.route('**/api/me', (route) => route.fulfill({ json: { steamid: SIGNED_IN.steamid, prefs: {} } }));
+  const pushed: unknown[] = [];
+  await page.route('**/api/me/prefs/bundlesBrowseView', async (route) => {
+    pushed.push(route.request().postDataJSON().value);
+    await route.fulfill({ json: { ok: true } });
   });
   await page.goto('/bundles');
-  await expect(page.locator('.pref-unsaved-banner')).toContainText('Unsaved changes to this view');
+  await page.locator('.dt-search-input').fill('humble');
+  await page.locator('.list-stat-btn[aria-pressed="false"]').first().click();
+  const banner = page.locator('.pref-unsaved-banner');
+  await expect(banner).toContainText('Unsaved changes to your bundles layout');
+  expect(pushed).toEqual([]);
+  await banner.getByRole('button', { name: 'Save' }).click();
+  await expect.poll(() => pushed.length).toBe(1);
+  expect(pushed[0]).not.toHaveProperty('searchQuery');
+  expect(pushed[0]).not.toHaveProperty('page');
 });
 
 test('C1 edge: my account comes first, is prefilled, and only once', async ({ page }) => {
@@ -3165,17 +3202,17 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
 
 const SHORT_VIEW = { id: 'short', name: 'Short', tableView: { rangeFilters: { playtime: { min: '', max: '2' } } } };
 
-test('L5.4: a view keeps its edits until Save or Revert', async ({ page }) => {
+test('L5.4: a view keeps its edits until Save or Discard', async ({ page }) => {
   await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW] } });
   await page.goto('/lists/owned?view=short');
   await expect(rows(page)).toHaveCount(4); // played 2 h or less
-  await expect(page.getByRole('button', { name: 'Default view' })).toHaveCount(0); // Revert does it
+  await expect(page.getByRole('button', { name: 'Default view' })).toHaveCount(0); // Discard does it
 
   await page.getByRole('button', { name: /Clear all/ }).click();
   await expect(rows(page)).toHaveCount(6);
   const banner = page.locator('.pref-unsaved-banner');
   await expect(banner).toContainText('Unsaved changes to Short (Sort, Filters)'); // Clear all drops the sort too
-  await banner.getByRole('button', { name: 'Revert' }).click();
+  await banner.getByRole('button', { name: 'Discard' }).click();
   await expect(rows(page)).toHaveCount(4);
   await expect(banner).toHaveCount(0);
 
@@ -3274,7 +3311,7 @@ test('L5 edge: Bargains is suggested on Wishlist, and only with prices', async (
   await expect(menu.getByRole('button')).toHaveText(['Save as view']);
 });
 
-test('L5.3: the tabs switch views in place, and leaving one drops its unsaved edits', async ({ page }) => {
+test('L5.3: the tabs switch views in place, each keeping its unsaved edits', async ({ page }) => {
   await asPlayer(page, ALICE, { listViews: { owned: [SHORT_VIEW, LONG_VIEW] } });
   await page.goto('/lists/owned');
   const tabs = page.getByRole('navigation', { name: 'Views' });
@@ -3291,9 +3328,11 @@ test('L5.3: the tabs switch views in place, and leaving one drops its unsaved ed
   await expect(rows(page)).toHaveCount(2); // 10 h and 20 h
   await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0);
   await tabs.getByRole('link', { name: 'Short' }).click();
-  await expect(rows(page)).toHaveCount(4); // its edit didn't follow
+  await expect(rows(page)).toHaveCount(6); // its draft is still there…
+  await expect(page.locator('.pref-unsaved-banner')).toContainText('Unsaved changes to Short');
   await tabs.getByRole('link', { name: 'All games' }).click();
   await expect(rows(page)).toHaveCount(6);
+  await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0); // …and stayed with its view
 });
 
 test('L5 edge: the active view is renamed and deleted from its ⋯', async ({ page }) => {
@@ -4122,6 +4161,22 @@ test("A2 edge: a cold link to someone's Owned list loads theirs once it resolves
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?u=bob');
   await expect(rows(page)).toHaveCount(BOB.owned.length);
+});
+
+test("A2 edge: sorting someone else's Owned list leaves my own layout as it was", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?u=bob');
+  await expect(rows(page)).toHaveCount(BOB.owned.length);
+  const header = page.locator('.dt-th[data-col-key="releaseDate"]');
+  await header.locator('.dt-th-sort').click();
+  await expect(page.locator('.pref-unsaved-banner')).toContainText('Save makes it your Owned layout.');
+  await page.goto('/lists/owned');
+  await expect(rows(page)).toHaveCount(ALICE.owned.length);
+  await expect(page.locator('.dt-th[data-col-key="releaseDate"]')).not.toHaveAttribute(
+    'aria-sort',
+    /ascending|descending/,
+  );
+  await expect(page.locator('.pref-unsaved-banner')).toHaveCount(0);
 });
 
 test("B3 edge: a link's account, resolving after the bundle loaded, re-marks what it owns", async ({ page }) => {

@@ -46,16 +46,10 @@ import {
 import { currentRegion, regionCurrency, regionLabel } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
 import { openPrefsPopover } from './prefsPopover.tsx';
-import {
-  restoreTableView,
-  shareTableView,
-  resetTableView,
-  bindViewPersistence,
-  prefViewStore,
-} from './tableViewPrefs.ts';
+import { shareTableView, resetTableView, bindViewPersistence, prefViewStore, layoutDraft } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
-import { UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { UnsavedChangesBanner, ViewActions } from './TableViewControls.tsx';
 import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
@@ -75,7 +69,6 @@ const MAX_AUTO_PAGES = 4;
 const FETCH_SORT = '-publish';
 
 const VIEW_PREF_KEY = 'bundlesBrowseView';
-const viewStore = prefViewStore(VIEW_PREF_KEY);
 
 // ── Cell rendering ────────────────────────────────────────────────────────────────────────────
 
@@ -310,13 +303,14 @@ export default function BundlesBrowseRoute() {
     () => tableContainer,
   );
   slideRowsOnViewChange(table, () => tableContainer);
-  // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
-  const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
+  // The layout as a draft until Save; a 🔗 Share view link's layout is shown but not saved until kept.
+  const layout = layoutDraft(table, VIEW_PREF_KEY, prefViewStore(VIEW_PREF_KEY));
+  const [viewingShared, setViewingShared] = createSignal(layout.restore());
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   // eslint-disable-next-line solid/reactivity -- bindViewPersistence reads it in its own effect
-  onCleanup(bindViewPersistence(table, viewStore, viewingShared, setSharedViewEdited));
+  onCleanup(bindViewPersistence(table, layout.store, viewingShared, setSharedViewEdited));
   function handleDiscardSharedView(): void {
-    table.setViewState(viewStore.load());
+    table.setViewState(layout.store.load());
     setViewingShared(false);
   }
   // Feeds /lists/bundle/:bundleId's prev/next nav (see bundleBrowseStore.ts) — off processedData,
@@ -505,11 +499,22 @@ export default function BundlesBrowseRoute() {
         <Show when={viewingShared()}>
           <SharedViewBanner
             edited={sharedViewEdited()}
-            onKeep={() => setViewingShared(false)}
+            onKeep={() => {
+              setViewingShared(false);
+              layout.save();
+            }}
             onDiscard={handleDiscardSharedView}
           />
         </Show>
-        <UnsavedViewBanner table={table} prefKey={VIEW_PREF_KEY} />
+        <Show when={!viewingShared()}>
+          <UnsavedChangesBanner
+            name="your bundles layout"
+            changes={layout.changes()}
+            note="kept in this tab until you save or discard."
+            onSave={() => layout.save()}
+            onDiscard={() => layout.discard()}
+          />
+        </Show>
         <Show when={statusText()}>
           <div class="bundles-status">{statusText()}</div>
         </Show>
@@ -522,7 +527,7 @@ export default function BundlesBrowseRoute() {
             toolbarEnd={
               <ViewActions
                 onShare={(btn) => shareTableView(table, btn)}
-                onReset={() => resetTableView(table, viewStore)}
+                onReset={() => resetTableView(table, layout.store)}
               />
             }
           />

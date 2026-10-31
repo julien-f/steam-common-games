@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Menus, the game panel, its sections, table rows, banners, cards and hero counts now animate their changes
 - Update dependencies
 - Settings and lists are read faster, and an unchanged setting is no longer re-synced to your account
+- A table layout (columns, sort, filters, grouping) now changes only when you Save it, on every table: until then it's kept in the tab with Save and Discard, and saved layouts sync to your account
 
 ### Fixed
 

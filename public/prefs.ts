@@ -20,11 +20,9 @@ export interface PrefEntry {
   updatedAt: number; // ms epoch — this device's clock, used for last-write-wins merges (authStore.ts)
 }
 
-// Bumped once, moving from "raw value per key" (v1) to "{value, updatedAt} per key" (v2) — the
-// timestamp is what lets a signed-in device merge its local prefs against the server's per key
-// (authStore.ts) instead of only ever comparing "does either side have anything at all". See
-// migrateEntries below for the one-time upgrade of an existing v1 blob.
-const SCHEMA_VERSION = 2;
+// v2: {value, updatedAt} per key, for authStore.ts's per-key merge. v3: a v2 blob's table layouts were
+// written on every edit and never pushed, so they read as `updatedAt: 0` and the account's Saved one wins.
+const SCHEMA_VERSION = 3;
 
 function readRawBlob(raw: string | null): Record<string, unknown> {
   try {
@@ -48,7 +46,12 @@ function parseEntries(raw: string | null): Record<string, PrefEntry> {
   const { schemaVersion, ...rest } = readRawBlob(raw);
   const entries: Record<string, PrefEntry> = {};
   for (const [key, value] of Object.entries(rest)) {
-    entries[key] = schemaVersion === SCHEMA_VERSION && isPrefEntry(value) ? value : { value, updatedAt: 0 };
+    const entry = (schemaVersion === 2 || schemaVersion === SCHEMA_VERSION) && isPrefEntry(value);
+    entries[key] = !entry
+      ? { value, updatedAt: 0 }
+      : schemaVersion === 2 && TABLE_VIEW_PREF_KEYS.includes(key)
+        ? { value: value.value, updatedAt: 0 }
+        : value;
   }
   return entries;
 }
@@ -132,11 +135,8 @@ export function setPref(key: string, value: unknown): void {
   if (!written) return;
   // Per-key push to the server once signed in (authStore.ts calls setSignedInSteamid on
   // sign-in/out) — deliberately never a whole-blob PUT, so two preferences changing around the
-  // same time (different tabs/devices) can't race each other's writes. A table-view key is never
-  // auto-pushed at all, local-only until the user explicitly hits Save on the "unsaved changes"
-  // banner (tableViewSync.ts) — every edit to a table would otherwise silently overwrite whatever's
-  // saved to the account before the user ever saw a diff; DEBOUNCED_PUSH_PREFIXES' keys are debounced.
-  if (!signedInSteamid || TABLE_VIEW_PREF_KEYS.includes(key)) return;
+  // same time (different tabs/devices) can't race each other's writes.
+  if (!signedInSteamid) return;
   if (DEBOUNCED_PUSH_PREFIXES.some((p) => key.startsWith(p))) schedulePush(key);
   else pushPrefToServer(key, value, updatedAt);
 }

@@ -202,9 +202,11 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
 - **Steps**:
   1. any list
   2. change columns, sort, group, filters
-  3. reload
-  4. **Default view**
-- **Done when**: the view persists per list kind; reset restores defaults.
+  3. **Save**
+  4. reload
+  5. **Default view**, then **Save**
+- **Done when**: a change shows "Unsaved changes" with **Save** / **Discard** until one is picked, survives a reload in the tab meanwhile, and is stored per list kind once saved; reset restores defaults.
+- **Edges**: **Discard**; a game page and Back with unsaved changes; someone else's Owned (A2).
 
 ### L4 Turn lookups into a shortlist
 
@@ -223,9 +225,9 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. Owned
   2. **New view**: a suggested view, or **Save as view** for the table as it is
   3. switch views from the tabs under the header
-  4. change a view's sort or filters, then **Save** or **Revert**
+  4. change a view's sort or filters, then **Save** or **Discard**
   5. Home: open a view from the Owned card
-- **Done when**: each view keeps its own layout; a friend's Owned opens through the same views; leaving a view drops its unsaved edits; Share view sends the layout, not the view.
+- **Done when**: each view keeps its own layout; a friend's Owned opens through the same views; each view keeps its unsaved edits in the tab until Save or Discard; Share view sends the layout, not the view.
 - **Edges**: a link to a deleted view; Bargains while prices load; Short games while HLTB loads, and games with no HLTB entry; the tabs on a phone.
 
 ## Ranking
@@ -348,7 +350,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   4. sort by HLTB (shortest first) or rating
   5. **Pick a random game** (or **R**) for a random pick, or browse with ↑/↓
 - **Or**: steps 2–4 as Owned's **Play next** view, or **Short games** for the short ones (L5).
-- **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload (L3).
+- **Done when**: HLTB and rating fill in without a reload; the random pick draws only from the filtered rows and works on a phone; the filter survives a reload in the tab, and every visit once saved (L3).
 - **Edges**: games with no HLTB entry (where do they sort?); a Family account (whose playtime counts?); Plays mostly's **Why these?** on a phone (each tag's games stack under its bar).
 
 ### F4 What else did this studio make?
@@ -441,7 +443,7 @@ Tests map to journeys by title: `A1: …` covers A1's built steps, `A1.1,3-4: �
   1. sign in with Steam (nav chip) on both
   2. edit a list on one
   3. reload the other
-- **Done when**: first sign-in on a new device never overwrites the account's existing prefs; later edits merge per key, last-write-wins; a changed table view shows the "unsaved changes" banner with Save / Revert instead of syncing silently.
+- **Done when**: first sign-in on a new device never overwrites the account's existing prefs; later edits merge per key, last-write-wins; a table layout syncs on **Save**, without its page or search.
 - **Edges**: a list deleted on one device while the other edits it; signing out; signing in as a Steam account other than my ★ one.
 
 ### Y2 Losing my browser data

@@ -1,26 +1,6 @@
 import { Show, createSignal, onCleanup, type JSX } from 'solid-js';
 import Link from 'lucide-solid/icons/link';
 import RotateCcw from 'lucide-solid/icons/rotate-ccw';
-import { getAuthUser } from './authStore.ts';
-import { summarizeViewDiff } from './tableViewSync.ts';
-import type { ViewStateApi } from '@vates/data-table-solid';
-import { revertTableViewToServer, saveTableViewToServer } from './tableViewPrefs.ts';
-
-// Shown while a signed-in viewer's table view differs from what's saved to their account (a
-// table-view pref is never auto-pushed, see prefs.ts's setPref).
-export function UnsavedViewBanner(props: { table: ViewStateApi; prefKey: string }): JSX.Element {
-  return (
-    <Show when={getAuthUser()}>
-      <UnsavedChangesBanner
-        name="this view"
-        changes={summarizeViewDiff(props.prefKey, props.table.getViewState())}
-        note="differs from what's saved to your account."
-        onSave={() => saveTableViewToServer(props.prefKey, props.table.getViewState())}
-        onRevert={() => revertTableViewToServer(props.table, props.prefKey)}
-      />
-    </Show>
-  );
-}
 
 // Hidden while `changes` is empty.
 export function UnsavedChangesBanner(props: {
@@ -28,7 +8,7 @@ export function UnsavedChangesBanner(props: {
   changes: string[];
   note: string;
   onSave: () => void;
-  onRevert: () => void;
+  onDiscard: () => void;
 }): JSX.Element {
   return (
     <Show when={props.changes.length}>
@@ -37,8 +17,8 @@ export function UnsavedChangesBanner(props: {
         <button type="button" class="btn" onClick={() => props.onSave()}>
           Save
         </button>
-        <button type="button" class="btn" onClick={() => props.onRevert()}>
-          Revert
+        <button type="button" class="btn" onClick={() => props.onDiscard()}>
+          Discard
         </button>
       </div>
     </Show>

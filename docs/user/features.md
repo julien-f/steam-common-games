@@ -40,7 +40,7 @@ A private profile or wishlist looks identical to an empty one from the outside; 
     - **Play next** (Owned): played 2 h or less and not marked Finished or Abandoned (see [Statuses](#statuses)), best Taste fit first.
     - **Short games** (Owned): the same, with a main story of 5 h or less on How Long To Beat, best rated first.
     - **Bargains** (Wishlist): at a 1-year or all-time low, biggest discount first.
-  - Changing a view's table doesn't save it: **Save** or **Revert** in the banner above it; leaving the view drops the changes. Its **⋯** renames or deletes it.
+  - Its **⋯** renames or deletes it.
   - A view follows the account you're exploring, like Owned and Wishlist themselves; Home's Owned and Wishlist cards link each one.
 - **Recently Looked Up** collects the last 500 games you searched for (the search box's dropdown shows the latest 10), latest first (its **Looked up** column), browsable like any other list.
 - **PC Game Pass** lists the Steam games currently in PC Game Pass, from the catalog of the region set in Preferences (catalogs differ slightly by country). Game Pass plays them through the Xbox app, not Steam. Its games not on Steam are listed below the table, each linking to its Xbox store page. Combine it with your Wishlist to see what you could play without buying (see [Combining lists](#combining-lists)). Like Bundles, it needs the app's IsThereAnyDeal key.
@@ -172,6 +172,14 @@ A lightbox on another screen, for showing trailers and screenshots to the people
 
 `/search?q=<term>` searches by name, leaving out demos (a game's panel links its own), and opens the closest match in the panel — useful as a browser keyword search. The site publishes an OpenSearch descriptor, so Chrome offers to add it as a search engine on its own (right-click the address bar → manage search engines) — pick it, then type its keyword followed by a game name to jump straight there. Firefox needs a manual bookmark instead: bookmark `https://<your-instance>/search?q=%s`, give it a keyword (e.g. `steam`), then type `steam half-life` in the address bar. The page has its own search box too, for refining or starting a new search without leaving it (both search boxes select their text on focus, and their clear button (x) empties them) — typing there updates the list without reopening the panel until you click a result. The nav bar's own "Look up any game" box also offers a "See all results for…" link into this page once you've typed a query.
 
+## Table layouts
+
+- A table's layout — columns, sort, grouping, filters, page size — changes only when you **Save** it: after any change, a line names what differs ("Unsaved changes to your Owned layout (Sort)") with **Save** and **Discard**.
+- Until then the change stays in this tab: opening a game and going back, or reloading, keeps it; closing the tab drops it. Page and search are never part of a layout.
+- Owned, Wishlist, bundles, comparisons and the other built-in lists each have one layout; each of your lists and each saved view has its own.
+- **Default view** puts the defaults back, to Save or Discard like any change.
+- On someone else's Owned or Wishlist, your changes stay with them: **Save** there makes it your own layout, and the line says so.
+
 ## Sharing
 
 - A game's own link (`/game/<appid>`) opens that game for anyone, whether or not they own it.
@@ -185,7 +193,7 @@ A lightbox on another screen, for showing trailers and screenshots to the people
 
 **Sign in with Steam** (in the nav-bar account chip) to keep your accounts, lists, rankings, recently looked-up games and region the same on every device. Signing in is optional; it also sets your account if you hadn't picked one. Changes sync as you make them, and the newest edit of each setting wins. A device signing in for the first time takes the account's settings rather than overwriting them.
 
-Table layouts are the exception: changing a table stays on this device, and the table then offers **Save** (make it your account's layout) or **Revert** (go back to the saved one).
+Table layouts sync too, once saved (see [Table layouts](#table-layouts)). The first sync after the update that brought Save keeps the account's saved layouts over a device's unsaved ones.
 
 ## Keyboard shortcuts
 

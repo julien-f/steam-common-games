@@ -123,13 +123,10 @@ Signing in (the account chip's popover, `AccountChip.tsx`) is optional; without 
   - One key is one value: concurrent edits to it on two devices keep the newest whole, `lists` and `listViews` alike (two views added at once on two devices: one is lost).
   - Adopting anything from the server reloads the page, since every store seeds its state from `localStorage` once at load. An adoption storage refuses (full, disabled) is skipped with an `[auth]` warning instead, or every load would re-adopt and reload.
 - **Signing in fills `myAccount`/`currentAccount` when unset** (`autoPopulateAccountFromLogin`), via the same `resolveAccountSlot` as Home's picker; an existing pick is never overwritten, and a failed resolve retries on the next load.
-- **Table-view keys are never auto-synced** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `gamePassListView`, `bundlesBrowseView`). Editing a table stays local until the user saves it:
-  - `public/tableViewSync.ts` keeps an in-memory `baseline` per key — the server's value as of the last `syncPrefsWithServer`.
-  - `ListRoute.tsx`/`BundlesBrowseRoute.tsx` compare the live table against it; when they differ, an "Unsaved changes to this view (Sort, Filters) — Save / Revert" banner replaces Share/Reset view, naming the changed parts (`summarizeViewDiff`).
-  - `page`/`searchQuery` are never part of it: `stripTransientViewFields` strips them from the diff, from Save and from Revert.
-  - **Save** (`tableViewPrefs.ts`'s `saveTableViewToServer`) pushes the stripped view and advances the baseline. **Revert** (`revertTableViewToServer`) applies the baseline with `setViewState` and stores it through `adoptPrefEntry` (not `setPref`, so it isn't a fresh edit) — no reload either way.
-  - Signing out clears every baseline (`resetBaselines`).
-- **A user list's view is not a table-view key**: it is the list's own `tableView`, saved into `lists` on every change (`setListTableView`, minus `page`/`searchQuery`, skipped when unchanged), so it syncs with no Save/Revert banner.
+- **Table-view keys sync like any key** (`public/tableViewKeys.ts`: `ownedListView`, `wishlistListView`, `bundleListView`, `recentListView`, `compareListView`, `sharedListView`, `creatorListView`, `gamePassListView`, `bundlesBrowseView`). They're written only on **Save** (a table change is a draft until then, [frontend.md](frontend.md)), so each push is one.
+  - Prefs schema v3: a v2 blob's table-view keys were written on every edit and never pushed, so they read as `updatedAt: 0` — the account's Saved layout wins at the next sync.
+- **An adopted entry with the same value** as this device's (another device pushed it) only takes the server's `updatedAt`: no reload.
+- **A user list's view is not a table-view key**: it is the list's own `tableView`, saved into `lists` on **Save** (`setListTableView`, minus `page`/`searchQuery`).
 
 ## Storage schema
 
@@ -151,7 +148,7 @@ ListRef      kind 'account-owned' | 'account-wishlist' | 'bundle' | 'recent-game
              accountId? (pinned explicitly, never "whichever is current") · bundleId? · listId? · name?
 ```
 
-Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `listViews` (`{ owned?, wishlist? }`: `SavedView[]` each — `id` · `name` · `tableView` · `template?` — for whichever account is current, never a list or combine source), `recentGames`, `gameStatuses` (appid → `f` finished / `a` abandoned, one flat map for whoever uses the browser — not per account: a Family's or solo slot's id would split it; shown where `gameStatuses.ts`'s `statusesApply` says the account on screen is theirs), `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
+Pref keys: `schemaVersion`, `myAccount`, `currentAccount`, `recentAccounts`, `region`, `lists`, `folders`, `listViews` (`{ owned?, wishlist? }`: `SavedView[]` each — `id` · `name` · `tableView` · `template?` — for whichever account is current, never a list or combine source), `recentGames`, `gameStatuses` (appid → `f` finished / `a` abandoned, one flat map for whoever uses the browser — not per account: a Family's or solo slot's id would split it; shown where `accountsStore.ts`'s `showingMyAccount` says the account on screen is theirs), `ranking:<listId>`, `bundleSnapshots`, the table-view keys above (each shared across all bundles/comparisons/shared links/developer and publisher lists; a user list keeps its own `tableView`), with `bundlesBrowseView` for `/bundles`' table of bundles.
 
 Outside the blob: `steam.isonoe.net:taste:<accountId>` (`tagTaste.ts`'s `Taste`: play profile, the library's tag rarities and each owned game's top 10 tags — ~325 KB for 1,000 games), rewritten each time that account's Owned list finishes loading and read by every list's Taste fit and the panel's similar owned games. A device-local cache (`tasteCache.ts`): never synced, and kept out of the blob that every pref read parses.
 

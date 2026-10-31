@@ -201,11 +201,11 @@ test('setPref: does not push anywhere when signed out', async (t) => {
   assert.equal(called, false);
 });
 
-test('setPref: never pushes a table-view key, even when signed in — local-only until an explicit Save', async (t) => {
+test('setPref: a table-view key (written only on Save) is pushed at once when signed in', async (t) => {
   const restore = globalThis.fetch;
-  let called = false;
-  globalThis.fetch = async () => {
-    called = true;
+  const seen = [];
+  globalThis.fetch = async (url, opts) => {
+    seen.push([url, JSON.parse(opts.body).value]);
     return { ok: true, json: async () => ({}) };
   };
   t.after(() => {
@@ -216,7 +216,22 @@ test('setPref: never pushes a table-view key, even when signed in — local-only
   setSignedInSteamid('76561198000000001');
   setPref('ownedListView', { pageSize: 25 });
 
-  assert.equal(called, false);
+  assert.deepEqual(seen, [['/api/me/prefs/ownedListView', { pageSize: 25 }]]);
+});
+
+test("getPref: a v2 blob's table views read as older than anything, other keys keep their time", () => {
+  global.localStorage.setItem(
+    'steam.isonoe.net:prefs',
+    JSON.stringify({
+      schemaVersion: 2,
+      ownedListView: { value: { pageSize: 25 }, updatedAt: 900 },
+      region: { value: 'DE', updatedAt: 900 },
+    }),
+  );
+  const { getAllPrefEntries } = require('../public/prefs.ts');
+  const entries = getAllPrefEntries();
+  assert.deepEqual(entries.ownedListView, { value: { pageSize: 25 }, updatedAt: 0 });
+  assert.deepEqual(entries.region, { value: 'DE', updatedAt: 900 });
 });
 
 test('setPref: debounces the push of a ranking: key and sends only the latest value', async (t) => {

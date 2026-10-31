@@ -1,39 +1,8 @@
-// A table view's "unsaved changes" state against the account: a table-view key (see
-// tableViewKeys.ts) is never auto-pushed to the server the way every other pref is (prefs.ts's
-// setPref skips it) — editing a table locally is local-only until the user explicitly decides to
-// Save or Revert, so switching accounts/devices/experimenting with a view never risks clobbering
-// what's actually saved. This module is what tells "local differs from saved" apart from "nothing
-// changed": a per-key `baseline`, this session's best-known copy of the server's own value,
-// refreshed from `authStore.ts`'s `syncPrefsWithServer` on every sign-in check (not persisted to
-// localStorage itself — a stale in-memory copy only matters for a few seconds until the next
-// sync, and re-deriving it that way is simpler than a second synced-to-localStorage blob).
-import { createSignal } from 'solid-js';
-import type { PrefEntry } from './prefs.ts';
+// Comparing table views: what a stored layout leaves out (page, search) and which parts of two views
+// differ, for the unsaved-changes banner (tableViewPrefs.ts's layoutDraft).
 import type { TableViewState } from '@vates/data-table-solid';
 
-const [baselines, setBaselines] = createSignal<Record<string, PrefEntry | undefined>>({});
-
-// The server's currently-known entry for `key`, or undefined when the server has never saved it
-// (a brand-new account, or a view never Saved yet) — treated the same as an empty view by
-// summarizeViewDiff below, so a first-time local customization shows as unsaved too.
-export function getBaseline(key: string): PrefEntry | undefined {
-  return baselines()[key];
-}
-
-export function setBaseline(key: string, entry: PrefEntry): void {
-  setBaselines((prev) => ({ ...prev, [key]: entry }));
-}
-
-export function clearBaseline(key: string): void {
-  setBaselines((prev) => (key in prev ? { ...prev, [key]: undefined } : prev));
-}
-
-// `page`/`searchQuery` are excluded from the diff/unsaved check below, and from what Save/Revert
-// (tableViewPrefs.ts) actually write — pagination and an in-progress search aren't "a setting".
-// Excluding them only from the diff wouldn't be enough on its own: Save pushes whatever
-// `currentValue` it's given, so without this a still-typed search term would ride along into the
-// saved view the moment something else genuinely unsaved got Saved, even though the banner never
-// mentioned it.
+// Pagination and an in-progress search aren't a setting: never stored, synced or diffed.
 const TRANSIENT_VIEW_FIELDS = ['page', 'searchQuery'] as const;
 
 export function stripTransientViewFields(view: unknown): TableViewState {
@@ -59,14 +28,8 @@ const FIELD_LABELS: readonly (readonly [keyof TableViewState, string])[] = [
   ['pageSize', 'Page size'],
 ];
 
-// The labels (deduped, in FIELD_LABELS order) of whatever differs between `currentValue` and
-// `key`'s baseline — what the unsaved-changes banner names, e.g. "Sort, Columns". Empty when
-// there's nothing to save.
-export function summarizeViewDiff(key: string, currentValue: unknown): string[] {
-  return diffViewLabels(baselines()[key]?.value, currentValue);
-}
-
-// The same, against any saved view (a listViews.ts view's own definition).
+// The labels (deduped, in FIELD_LABELS order) of whatever differs between a stored layout and the current one,
+// e.g. "Sort, Columns". Empty when there's nothing to save.
 export function diffViewLabels(savedValue: unknown, currentValue: unknown): string[] {
   const saved = stripTransientViewFields(savedValue);
   const current = stripTransientViewFields(currentValue);
@@ -77,13 +40,4 @@ export function diffViewLabels(savedValue: unknown, currentValue: unknown): stri
     }
   }
   return labels;
-}
-
-// Clears every baseline — called from authStore.ts's signOut() so a lingering baseline from the
-// previous account can't leak into the next (either a different signed-in account, or back to
-// signed-out, where there's no account to diff against at all). Also the test-only reset (see
-// test/tableViewSync.test.js), same module-level-signal reset need _resetPrefsState
-// documents in prefs.ts.
-export function resetBaselines(): void {
-  setBaselines({});
 }

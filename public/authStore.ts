@@ -3,9 +3,7 @@
 // /auth/steam/login (AccountChip.tsx), not something this module drives.
 import { createSignal } from 'solid-js';
 import { getAllPrefEntries, adoptPrefEntry, pushPrefToServer, setSignedInSteamid, type PrefEntry } from './prefs.ts';
-import { TABLE_VIEW_PREF_KEYS } from './tableViewKeys.ts';
 import { isSyncedPrefKey } from './syncedPrefKeys.ts';
-import { setBaseline, clearBaseline, resetBaselines } from './tableViewSync.ts';
 import { getMyAccount, setMyAccount, getCurrentAccount, setCurrentAccount } from './accountsStore.ts';
 import { resolveAccountSlot } from './accountData.ts';
 
@@ -45,17 +43,7 @@ function markSyncedBefore(steamid: string): void {
 // check, not just the first, so two devices signed into the same account converge instead of
 // drifting apart after their one and only sync.
 //
-// A table-view key (TABLE_VIEW_PREF_KEYS) is handled entirely differently from every other pref:
-// it's never adopted or pushed here at all. Its local value is never auto-synced in the first
-// place (prefs.ts's setPref skips the push for these keys), so there's nothing to merge —
-// instead, this just refreshes tableViewSync.ts's `baseline` (this session's best-known copy of
-// the server's value) for the owning route to diff the live table against, showing an explicit
-// Save/Revert "unsaved changes" banner when they differ. A key the server has never saved clears
-// its baseline instead, which summarizeViewDiff (tableViewSync.ts) treat the same as an
-// empty view.
-//
-// Every other pref (region, ...) keeps the original rule — a device's *first ever* sync with a
-// given account is treated differently from every sync after it:
+// A device's *first ever* sync with a given account is treated differently from every sync after it:
 //
 //   - First sync: local never overrides a key the server already has, no matter its timestamp —
 //     only server → local for anything both sides have, since a brand-new device's local
@@ -73,9 +61,7 @@ function markSyncedBefore(steamid: string): void {
 // reloads in that case (a partial one would reload into another first sync, forever), since
 // every store (accountsStore, listsStore, ...) seeds its in-memory state from localStorage once
 // at load; live-patching each of them to notice an external write isn't worth it for something
-// that, once merged, won't differ again until the next real edit on either side. A table-view key
-// never counts toward this — its owning route live-patches the table directly via Save/Revert, no
-// reload needed.
+// that, once merged, won't differ again until the next real edit on either side.
 //
 // Exported for unit testing (see test/authStore.test.js) — same reasoning as
 // autoPopulateAccountFromLogin's own comment below.
@@ -83,21 +69,7 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
   const firstSync = !hasSyncedBefore(steamid);
   const localEntries = getAllPrefEntries();
 
-  // Every table-view key's baseline is refreshed unconditionally — not just the ones this
-  // particular local/server pair happens to both mention — so a key with no local value this
-  // session (a fresh browser) still gets a correct baseline, and one the server has since dropped
-  // still gets its stale in-memory baseline cleared.
-  for (const key of TABLE_VIEW_PREF_KEYS) {
-    const server = serverEntries[key];
-    if (server) setBaseline(key, server);
-    else clearBaseline(key);
-  }
-
-  const keys = new Set(
-    [...Object.keys(localEntries), ...Object.keys(serverEntries)].filter(
-      (k) => isSyncedPrefKey(k) && !TABLE_VIEW_PREF_KEYS.includes(k),
-    ),
-  );
+  const keys = new Set([...Object.keys(localEntries), ...Object.keys(serverEntries)].filter(isSyncedPrefKey));
   let adopted = false;
   let unkept = false;
   const pushes: Promise<void>[] = [];
@@ -106,8 +78,10 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
     const local = localEntries[key];
     const server = serverEntries[key];
     if (server && (!local || firstSync || server.updatedAt > local.updatedAt)) {
+      // The same value under a newer time (a push from another device): nothing on screen changes, so no reload.
+      const sameValue = !!local && JSON.stringify(local.value) === JSON.stringify(server.value);
       // Counted only once persisted: a reload re-reads storage, so an unkept adoption would reload forever.
-      if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted = true;
+      if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted ||= !sameValue;
       else {
         unkept = true;
         console.warn(
@@ -161,7 +135,7 @@ export async function initAuth(): Promise<void> {
       setSignedInSteamid(null);
       return;
     }
-    // Set only after the merge has filled the table-view baselines, or the banner would flash "unsaved".
+    // Set only after the merge: an adoption reloads, and pending pushes would flush under the old state.
     const adopted = await syncPrefsWithServer(steamid, prefs ?? {});
     setCurrentUser({ steamid });
     setSignedInSteamid(steamid);
@@ -184,5 +158,4 @@ export async function signOut(): Promise<void> {
   }
   setCurrentUser(null);
   setSignedInSteamid(null);
-  resetBaselines();
 }
