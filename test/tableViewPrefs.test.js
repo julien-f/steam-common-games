@@ -1,23 +1,11 @@
 'use strict';
 
-const { test, beforeEach } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  restoreTableView,
-  resetTableView,
-  prefViewStore,
-  shareTableView,
-  saveTableViewToServer,
-  revertTableViewToServer,
-} = require('../public/tableViewPrefs.ts');
-const { setBaseline, getBaseline, resetBaselines } = require('../public/tableViewSync.ts');
+const { layoutDraft, resetTableView, prefViewStore, shareTableView } = require('../public/tableViewPrefs.ts');
 
 // Just enough DOM for clipboard.ts's copy announcement.
 globalThis.document = { createElement: () => ({ setAttribute() {}, style: {} }), body: { append() {} } };
-
-beforeEach(() => {
-  resetBaselines();
-});
 
 // tableViewPrefs.js reads/writes `location`/`history` and prefs.js's own localStorage-backed
 // store directly — stub the minimal browser globals it touches, same idea prefs.test.js/
@@ -43,6 +31,16 @@ function withLocation(search, fn) {
       delete store[k];
     },
   };
+  const session = {};
+  globalThis.sessionStorage = {
+    getItem: (k) => (k in session ? session[k] : null),
+    setItem: (k, v) => {
+      session[k] = v;
+    },
+    removeItem: (k) => {
+      delete session[k];
+    },
+  };
   let currentSearch = search;
   globalThis.location = { search: currentSearch, origin: 'https://example.test', pathname: '/library.html' };
   globalThis.history = {
@@ -60,46 +58,47 @@ function withLocation(search, fn) {
   }
   function cleanup() {
     delete globalThis.localStorage;
+    delete globalThis.sessionStorage;
     delete globalThis.location;
     delete globalThis.history;
   }
 }
 
-test('restoreTableView: an incoming param wins for this visit only — applied, not stored, stripped from the URL', () => {
+test('layoutDraft restore: an incoming param wins for this visit only — applied, not stored, stripped from the URL', () => {
   withLocation('?tv=%7B%22pageSize%22%3A25%7D', () => {
     const { getPref, setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    assert.equal(restoreTableView(table, prefViewStore('libraryView')), true, 'reports a shared view');
+    assert.equal(restoreFor(table), true, 'reports a shared view');
     assert.deepEqual(table.getViewState(), { pageSize: 25 });
     assert.deepEqual(getPref('libraryView'), { pageSize: 10 }, "the viewer's own view is untouched");
     assert.equal(new URLSearchParams(location.search).has('tv'), false, 'param consumed');
   });
 });
 
-test('restoreTableView: a malformed param falls through to the stored default', () => {
+test('layoutDraft restore: a malformed param falls through to the stored default', () => {
   withLocation('?tv=not-json', () => {
     const table = fakeTable();
-    assert.equal(restoreTableView(table, prefViewStore('libraryView')), false);
+    assert.equal(restoreFor(table), false);
     assert.deepEqual(table.getViewState(), {}, 'no stored pref yet either');
     assert.equal(new URLSearchParams(location.search).has('tv'), false, 'param consumed anyway');
   });
 });
 
-test('restoreTableView: valid JSON that is no view object falls through to the stored default', () => {
+test('layoutDraft restore: valid JSON that is no view object falls through to the stored default', () => {
   const bad = ['[]', '5', 'null', '"view"'];
   for (const raw of bad) {
     withLocation(`?tv=${encodeURIComponent(raw)}`, () => {
       const { setPref } = require('../public/prefs.ts');
       setPref('libraryView', { pageSize: 10 });
       const table = fakeTable();
-      assert.equal(restoreTableView(table, prefViewStore('libraryView')), false, raw);
+      assert.equal(restoreFor(table), false, raw);
       assert.deepEqual(table.getViewState(), { pageSize: 10 }, raw);
     });
   }
 });
 
-test('restoreTableView: a full well-formed view is applied', () => {
+test('layoutDraft restore: a full well-formed view is applied', () => {
   const view = {
     visibleCols: ['name'],
     columnOrder: ['name', 'price'],
@@ -116,17 +115,17 @@ test('restoreTableView: a full well-formed view is applied', () => {
   };
   withLocation(`?tv=${encodeURIComponent(JSON.stringify(view))}`, () => {
     const table = fakeTable();
-    assert.equal(restoreTableView(table, prefViewStore('libraryView')), true);
+    assert.equal(restoreFor(table), true);
     assert.deepEqual(table.getViewState(), view);
   });
 });
 
-test('restoreTableView: no param at all falls back to whatever is already stored', () => {
+test('layoutDraft restore: no param at all falls back to whatever is already stored', () => {
   withLocation('', () => {
     const { setPref } = require('../public/prefs.ts');
     setPref('libraryView', { pageSize: 10 });
     const table = fakeTable();
-    restoreTableView(table, prefViewStore('libraryView'));
+    restoreFor(table);
     assert.deepEqual(table.getViewState(), { pageSize: 10 });
   });
 });
@@ -142,83 +141,65 @@ test('resetTableView: blanks the view and the stored default', () => {
   });
 });
 
-test('saveTableViewToServer: pushes the given value and advances the baseline to match', async () => {
-  await withLocation('', async () => {
-    const restore = globalThis.fetch;
-    let sent;
-    globalThis.fetch = async (url, opts) => {
-      sent = { url, body: JSON.parse(opts.body) };
-      return { ok: true, json: async () => ({}) };
-    };
-    const before = Date.now();
-    try {
-      saveTableViewToServer('libraryView', { pageSize: 25 });
-    } finally {
-      globalThis.fetch = restore;
-    }
+// ── layoutDraft: a change stays a draft until Save or Discard ───────────────────────────────
 
-    assert.equal(sent.url, '/api/me/prefs/libraryView');
-    assert.deepEqual(sent.body.value, { pageSize: 25 });
-    const baseline = getBaseline('libraryView');
-    assert.deepEqual(baseline.value, { pageSize: 25 });
-    assert.ok(baseline.updatedAt >= before);
-  });
-});
+const restoreFor = (table) => layoutDraft(table, 'libraryView', prefViewStore('libraryView')).restore();
 
-test('saveTableViewToServer: strips page/searchQuery before pushing and before storing the baseline', async () => {
-  await withLocation('', async () => {
-    const restore = globalThis.fetch;
-    let sent;
-    globalThis.fetch = async (url, opts) => {
-      sent = { url, body: JSON.parse(opts.body) };
-      return { ok: true, json: async () => ({}) };
-    };
-    try {
-      saveTableViewToServer('libraryView', { pageSize: 25, page: 3, searchQuery: 'portal' });
-    } finally {
-      globalThis.fetch = restore;
-    }
-
-    assert.deepEqual(sent.body.value, { pageSize: 25 });
-    assert.deepEqual(getBaseline('libraryView').value, { pageSize: 25 });
-  });
-});
-
-test('revertTableViewToServer: live-patches the table and adopts the baseline locally, without re-pushing it', async () => {
-  await withLocation('', async () => {
-    const { getPref, setSignedInSteamid, _resetPrefsState } = require('../public/prefs.ts');
-    const table = fakeTable({ pageSize: 25 });
-    setBaseline('libraryView', { value: { pageSize: 10 }, updatedAt: 42 });
-    setSignedInSteamid('76561198000000001');
-
-    const restore = globalThis.fetch;
-    let called = false;
-    globalThis.fetch = async () => {
-      called = true;
-      return { ok: true, json: async () => ({}) };
-    };
-    try {
-      revertTableViewToServer(table, 'libraryView');
-    } finally {
-      globalThis.fetch = restore;
-      _resetPrefsState();
-    }
-
-    assert.deepEqual(table.getViewState(), { pageSize: 10 });
+test('layoutDraft: a change goes to the draft, not the stored layout, and says what differs', () => {
+  withLocation('', () => {
+    const { getPref, setPref } = require('../public/prefs.ts');
+    setPref('libraryView', { pageSize: 10 });
+    const table = fakeTable();
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'));
+    layout.restore();
+    assert.deepEqual(layout.changes(), []);
+    table.setViewState({ pageSize: 25, sorts: [{ key: 'name', dir: 'asc' }] });
+    layout.store.save(table.getViewState());
+    assert.deepEqual(layout.changes(), ['Sort', 'Page size']);
     assert.deepEqual(getPref('libraryView'), { pageSize: 10 });
-    assert.equal(called, false, 'the reverted-to value must not be pushed back as if it were a fresh edit');
+    // A reload in the same tab finds the draft.
+    const again = fakeTable();
+    layoutDraft(again, 'libraryView', prefViewStore('libraryView')).restore();
+    assert.deepEqual(again.getViewState(), { pageSize: 25, sorts: [{ key: 'name', dir: 'asc' }] });
   });
 });
 
-test('revertTableViewToServer: with no baseline saved yet, reverts to an empty view', () => {
-  return withLocation('', () => {
+test('layoutDraft: Save stores the layout without page or search; Discard goes back to it', () => {
+  withLocation('', () => {
     const { getPref } = require('../public/prefs.ts');
-    const table = fakeTable({ pageSize: 25 });
+    const table = fakeTable();
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'));
+    layout.restore();
+    table.setViewState({ pageSize: 25, page: 3, searchQuery: 'hades' });
+    layout.store.save(table.getViewState());
+    layout.save();
+    assert.deepEqual(getPref('libraryView'), { pageSize: 25 });
+    assert.deepEqual(layout.changes(), []);
+    table.setViewState({ pageSize: 100 });
+    layout.store.save(table.getViewState());
+    layout.discard();
+    assert.deepEqual(table.getViewState(), { pageSize: 25 });
+    assert.deepEqual(layout.changes(), []);
+  });
+});
 
-    revertTableViewToServer(table, 'libraryView');
-
-    assert.deepEqual(table.getViewState(), {});
-    assert.deepEqual(getPref('libraryView'), {});
+test('layoutDraft: compares against the stored layout as the table applies it, temporary columns aside', () => {
+  withLocation('', () => {
+    const { setPref } = require('../public/prefs.ts');
+    setPref('libraryView', { pageSize: 25, visibleCols: ['name', 'gone'] });
+    // A table that resolves away a column it doesn't have.
+    let state = {};
+    const table = {
+      setViewState: (v) => {
+        state = { ...v, ...(v.visibleCols && { visibleCols: v.visibleCols.filter((c) => c !== 'gone') }) };
+      },
+      getViewState: () => state,
+    };
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), ['similarity']);
+    layout.restore();
+    assert.deepEqual(layout.changes(), []);
+    table.setViewState({ ...state, sorts: [{ key: 'similarity', dir: 'desc' }], visibleCols: ['similarity', 'name'] });
+    assert.deepEqual(layout.changes(), []);
   });
 });
 

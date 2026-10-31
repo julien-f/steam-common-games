@@ -3,10 +3,10 @@
 // copies (see docs/dev/frontend.md's table section for the "share on demand, not
 // live-synced" reasoning). Both pages call these the same way: a `table` instance and the
 // ViewStore that page's view is kept in.
-import { createEffect, createRoot, untrack } from 'solid-js';
+import { createEffect, createRoot, createSignal, untrack } from 'solid-js';
 import type { TableViewState, ViewStateApi } from '@vates/data-table-solid';
-import { getPref, setPref, adoptPrefEntry, pushPrefToServer } from './prefs.ts';
-import { getBaseline, setBaseline, stripTransientViewFields } from './tableViewSync.ts';
+import { getPref, setPref } from './prefs.ts';
+import { diffViewLabels, stripTransientViewFields } from './tableViewSync.ts';
 import { urlWithParams } from './urlState.ts';
 import { copyWithFeedback } from './clipboard.ts';
 
@@ -23,16 +23,6 @@ export function prefViewStore(key: string): ViewStore {
 // The URL param a "🔗 Share view" link carries the view in — one for every table, since a route
 // only ever has one on screen (see urlState.ts's own comment on `tv`).
 export const VIEW_PARAM = 'tv';
-
-// An incoming param (from a shared/bookmarked link) wins over the stored default, for this visit
-// only: applied but not stored, then stripped from the live URL so a later table rebuild (a fresh
-// search, an account refresh) falls back to the viewer's own. Returns whether it applied one — the
-// caller then pauses its view persistence until the viewer keeps or drops it (SharedViewBanner).
-export function restoreTableView(table: ViewStateApi, store: ViewStore): boolean {
-  const shared = takeSharedView();
-  table.setViewState(shared ?? store.load());
-  return shared != null;
-}
 
 // The incoming view param, parsed and stripped from the URL (malformed too); null when absent or malformed.
 function takeSharedView(): TableViewState | null {
@@ -111,36 +101,104 @@ export function resetTableView(table: ViewStateApi, store: ViewStore): void {
   store.save({});
 }
 
-// The two halves of the "unsaved changes" banner (tableViewSync.ts) — a table-view key is never
-// auto-pushed (see prefs.ts's setPref), so the live/local view can sit indefinitely ahead of
-// tableViewSync.ts's `baseline` (this session's best-known copy of what's actually saved) until
-// the user picks one of these.
-//
-// "Save" pushes the current view up unconditionally (the server no longer timestamp-guards a
-// write, see lib/auth.js) and advances the baseline to match, so the banner clears immediately
-// rather than waiting for the next sign-in check to notice. `page`/`searchQuery` are stripped
-// first (tableViewSync.ts's stripTransientViewFields) — otherwise whatever's currently typed into
-// the search box would silently ride along into the saved view the moment something else genuinely
-// unsaved got Saved, even though the banner never counted it as part of the diff.
-export function saveTableViewToServer(prefKey: string, currentValue: TableViewState): void {
-  const updatedAt = Date.now();
-  const value = stripTransientViewFields(currentValue);
-  pushPrefToServer(prefKey, value, updatedAt);
-  setBaseline(prefKey, { value, updatedAt });
+// ── Layout drafts ─────────────────────────────────────────────────────────────────────────────
+
+const DRAFT_PREFIX = 'steam.isonoe.net:layout-draft:';
+
+function readDraft(id: string): TableViewState | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_PREFIX + id);
+    return raw ? (JSON.parse(raw) as TableViewState) : null;
+  } catch {
+    return null; // unavailable storage, or a corrupted value
+  }
 }
 
-// "Revert" discards the local view in favor of the baseline instead: live-patches the table
-// directly via setViewState (no reload needed, unlike authStore.ts's adopt-and-reload for every
-// other pref kind) and writes it locally through adoptPrefEntry, bypassing setPref so the
-// reverted-to value isn't immediately treated as a fresh local edit. No baseline saved yet (a
-// brand-new account, or a view never Saved) reverts to an empty view, same fallback
-// restoreTableView's own stored-default path uses. The baseline never carries `page`/
-// `searchQuery` (Save strips them before storing it) — symmetric with Save, Revert doesn't touch
-// them either, so reverting your columns/sort/filters doesn't also reset whatever you're
-// currently searching for or what page you're on.
-export function revertTableViewToServer(table: ViewStateApi, prefKey: string): void {
-  const baseline = getBaseline(prefKey);
-  const value = (baseline?.value ?? {}) as TableViewState;
-  table.setViewState(value);
-  adoptPrefEntry(prefKey, value, baseline?.updatedAt ?? 0);
+function writeDraft(id: string, view: TableViewState | null): void {
+  try {
+    if (view) sessionStorage.setItem(DRAFT_PREFIX + id, JSON.stringify(view));
+    else sessionStorage.removeItem(DRAFT_PREFIX + id);
+  } catch {
+    /* unavailable storage: the draft lives only on screen */
+  }
+}
+
+// What Save stores and the banner compares: no page, search or route-managed `temporaryCols` (a
+// similarity sort), and a field back to the table's default dropped, as getViewState drops it.
+function layoutOf(view: TableViewState, temporaryCols: readonly string[], defaults: TableViewState): TableViewState {
+  const v = stripTransientViewFields(view);
+  if (!temporaryCols.length) return v;
+  const keep = (key: string) => !temporaryCols.includes(key);
+  const fields: Partial<TableViewState> = {
+    sorts: v.sorts?.filter((e) => keep(e.key)),
+    visibleCols: v.visibleCols?.filter(keep),
+    columnOrder: v.columnOrder?.filter(keep),
+    rangeFilters: v.rangeFilters && Object.fromEntries(Object.entries(v.rangeFilters).filter(([k]) => keep(k))),
+  };
+  for (const [field, value] of Object.entries(fields) as [keyof TableViewState, unknown][]) {
+    if (value === undefined) continue;
+    const empty = Array.isArray(value) ? [] : {};
+    const isDefault = JSON.stringify(value) === JSON.stringify(defaults[field] ?? empty);
+    if (isDefault) delete v[field];
+    else (v as Record<string, unknown>)[field] = value;
+  }
+  return v;
+}
+
+export interface LayoutDraft {
+  // Applies the stored layout (the baseline), then a shared link's layout or this tab's draft over
+  // it; true when a shared one applied (the route then pauses persistence, see bindViewPersistence).
+  restore(): boolean;
+  // What bindViewPersistence and resetTableView write through: every change goes to the draft.
+  store: ViewStore;
+  // The labels of what differs from the stored layout (diffViewLabels'), empty when nothing.
+  changes(): string[];
+  save(): void;
+  discard(): void;
+}
+
+// A change stays a draft in this tab (sessionStorage, under `id`) until Save writes `stored` or Discard drops
+// it; the baseline is `stored` as this table applies it, so an untouched table reads as unchanged.
+export function layoutDraft(
+  table: ViewStateApi,
+  id: string,
+  stored: ViewStore,
+  temporaryCols: readonly string[] = [],
+  defaults: TableViewState = {},
+): LayoutDraft {
+  const [baseline, setBaseline] = createSignal<TableViewState>({});
+  const layout = (view: TableViewState) => layoutOf(view, temporaryCols, defaults);
+  const current = () => layout(table.getViewState());
+  const capture = () => setBaseline(untrack(current));
+  const store: ViewStore = {
+    load: () => readDraft(id) ?? stored.load(),
+    save: (view) => {
+      const { page, searchQuery } = view;
+      const changed = diffViewLabels(untrack(baseline), layout(view)).length > 0;
+      writeDraft(id, changed || page || searchQuery ? view : null);
+    },
+  };
+  return {
+    restore() {
+      table.setViewState(stored.load());
+      capture();
+      const shared = takeSharedView();
+      const draft = readDraft(id);
+      if (shared ?? draft) table.setViewState((shared ?? draft)!);
+      return shared != null;
+    },
+    store,
+    changes: () => diffViewLabels(baseline(), current()),
+    save() {
+      const view = untrack(() => table.getViewState());
+      stored.save(layout(view));
+      capture();
+      store.save(view);
+    },
+    discard() {
+      writeDraft(id, null);
+      table.setViewState(stored.load());
+      capture();
+    },
+  };
 }

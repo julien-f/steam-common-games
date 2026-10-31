@@ -9,7 +9,7 @@
 // name for every list kind (Owned/Wishlist/Bundle/Recent/a user list), not one per kind — unlike
 // the old separate Library/Bundles pages, each `/lists/...` route only ever has one table on
 // screen at a time, so there's never a moment where two of these could coexist in the same URL
-// the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own restoreTableView/shareTableView
+// the way e.g. `game`/`shot` can. See tableViewPrefs.ts's own layoutDraft/shareTableView
 // (VIEW_PARAM). Unlike most other params here, it's not
 // written automatically on every table interaction — only by the table's own "🔗 Share view" button.
 const PARAM_ORDER = ['u', 'op', 'q', 'game', 'shot', 'tv'];

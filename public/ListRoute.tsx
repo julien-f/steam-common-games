@@ -126,11 +126,12 @@ import {
   refusalMessage,
 } from './utils.ts';
 import {
-  restoreTableView,
   shareTableView,
   resetTableView,
   bindViewPersistence,
   prefViewStore,
+  layoutDraft,
+  type LayoutDraft,
   type ViewStore,
 } from './tableViewPrefs.ts';
 import { renderPanelNav as renderPanelNavShared, stepGameList } from './panelNav.ts';
@@ -159,7 +160,7 @@ import {
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
-import { UnsavedChangesBanner, UnsavedViewBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { UnsavedChangesBanner, ViewActions } from './UnsavedViewBanner.tsx';
 import {
   PLAY_NEXT_MAX_HOURS,
   VIEW_TEMPLATES,
@@ -170,7 +171,6 @@ import {
 } from './listViews.ts';
 import { STATUS_LABELS, getStatus } from './gameStatuses.ts';
 import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
-import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import {
@@ -2114,37 +2114,65 @@ export default function ListRoute() {
     const id = viewId();
     return viewKind && id ? (getListView(viewKind, id) ?? null) : null;
   });
-  // A saved view's edits until Save, kept across table rebuilds; dropped on leaving the view.
-  const viewDrafts = new Map<string, TableViewState>();
-  function savedViewStore(id: string): ViewStore {
-    return {
-      load: () => viewDrafts.get(id) ?? ((untrack(activeView)?.tableView ?? {}) as TableViewState),
-      save: (view) => viewDrafts.set(id, view),
-    };
-  }
-  // A user list keeps its own view (GameList.tableView); every other kind shares one pref key per kind.
-  function viewStore(): ViewStore {
+  // Where the layout on screen is stored: a saved view, a user list's own tableView, or the kind's
+  // pref key. Owned/Wishlist drafts are per account shown, so a friend's stays with the friend.
+  function storedLayout(): { id: string; store: ViewStore } {
     const saved = untrack(activeView);
-    if (saved) return savedViewStore(saved.id);
-    const id = userList()?.id;
-    return id ? userListViewStore(id) : prefViewStore(viewPrefKey());
+    const account = viewKind ? `:${untrack(getEffectiveCurrentAccount)?.id ?? ''}` : '';
+    if (saved && viewKind) {
+      const store: ViewStore = {
+        load: () => (untrack(activeView)?.tableView ?? {}) as TableViewState,
+        save: (view) => saveListViewTable(viewKind, saved.id, view),
+      };
+      return { id: `view:${saved.id}${account}`, store };
+    }
+    const id = untrack(userList)?.id;
+    if (id)
+      return {
+        id: `list:${id}`,
+        store: { load: () => getList(id)?.tableView ?? {}, save: (view) => setListTableView(id, view) },
+      };
+    const key = viewPrefKey();
+    return { id: key + account, store: prefViewStore(key) };
+  }
+  // The layout on screen as a draft over its stored one, rebound on each table build and view switch.
+  let tableDefaults: TableViewState = {};
+  const [layout, setLayout] = createSignal<LayoutDraft | null>(null);
+  function bindLayout(): void {
+    unsyncView?.();
+    const { id, store } = storedLayout();
+    const l = layoutDraft(viewTable, id, store, [SIMILARITY_KEY, TAG_MATCH_KEY], tableDefaults);
+    setLayout(l);
+    setSharedViewEdited(false);
+    setViewingShared(l.restore());
+    unsyncView = bindViewPersistence(viewTable, l.store, viewingShared, setSharedViewEdited);
   }
   // Another tab of the same list: no reload, only its view (and where it's kept) changes.
-  createEffect(
-    on(
-      viewId,
-      () => {
-        viewDrafts.clear();
-        if (!table) return;
-        unsyncView?.();
-        setViewingShared(false);
-        const store = viewStore();
-        applyView(store.load());
-        unsyncView = bindViewPersistence(table, store, viewingShared, setSharedViewEdited);
-      },
-      { defer: true },
-    ),
-  );
+  createEffect(on(viewId, () => table && bindLayout(), { defer: true }));
+  // What the unsaved-changes banner names, and what Save does.
+  const LAYOUT_NAMES: Record<string, string> = {
+    owned: 'Owned',
+    wishlist: 'Wishlist',
+    bundle: 'bundle',
+    recent: 'Recently Looked Up',
+    compare: 'comparison',
+    shared: 'shared list',
+    creator: 'developer and publisher list',
+    'game-pass': 'Game Pass',
+  };
+  const exploringSomeoneElse = () => !!viewKind && !!getAccountOverride() && !showingMyAccount() && !activeView();
+  function layoutName(): string {
+    const saved = activeView();
+    if (saved) return saved.name;
+    const list = userList();
+    if (list) return `the layout of “${list.name}”`;
+    return exploringSomeoneElse() ? 'this table' : `your ${LAYOUT_NAMES[kind] ?? ''} layout`;
+  }
+  function layoutNote(): string {
+    return exploringSomeoneElse()
+      ? `Save makes it your ${LAYOUT_NAMES[kind]} layout.`
+      : 'kept in this tab until you save or discard.';
+  }
   // A view filtering on prices (Bargains) matches nothing until they arrive: say so, not "no match".
   const viewAwaitsPrices = createMemo(() => {
     if (!tableReady() || !activeView() || itadOff()) return false;
@@ -2152,36 +2180,14 @@ export default function ListRoute() {
     const keys = [...Object.keys(view.filters ?? {}), ...Object.keys(view.rangeFilters ?? {})];
     return keys.some((k) => PRICE_KEYS.has(k)) && tableData().some((row) => row.bestDealPrice === undefined);
   });
-  function saveActiveView(): void {
-    const saved = activeView();
-    if (saved && viewKind) saveListViewTable(viewKind, saved.id, viewTable.getViewState());
-  }
-  function revertActiveView(): void {
-    const saved = activeView();
-    if (saved) applyView(saved.tableView);
-  }
-  // tableView drops page/searchQuery, so a rebuild (e.g. after a removal) keeps them from here.
-  let lastUserListView: { id: string; view: TableViewState } | null = null;
-  function userListViewStore(id: string): ViewStore {
-    return {
-      load: () => {
-        const stored = getList(id)?.tableView ?? {};
-        const last = lastUserListView?.id === id ? lastUserListView.view : null;
-        return last ? { ...stored, page: last.page, searchQuery: last.searchQuery } : stored;
-      },
-      save: (view) => {
-        lastUserListView = { id, view };
-        setListTableView(id, view);
-      },
-    };
-  }
   // "🔗 Share view"/"Default view" — see tableViewPrefs.ts for the share-on-demand-only reasoning
   // (a link written to the live URL goes stale the moment the table changes again).
-  // A 🔗 Share view link's layout, on screen but not saved (see restoreTableView).
+  // A 🔗 Share view link's layout, on screen but not saved (see layoutDraft's restore).
   const [viewingShared, setViewingShared] = createSignal(false);
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
   function handleDiscardSharedView(): void {
-    applyView(viewStore().load());
+    const l = layout();
+    if (l) applyView(l.store.load());
     setViewingShared(false);
   }
 
@@ -2233,7 +2239,8 @@ export default function ListRoute() {
     shareTableView(table, btn, u ? { u: u.join(',') } : {}, ['view']);
   }
   function handleResetView(): void {
-    if (table) resetTableView(viewTable, viewStore());
+    const l = layout();
+    if (table && l) resetTableView(viewTable, l.store);
   }
 
   function viewActions() {
@@ -2862,13 +2869,14 @@ export default function ListRoute() {
       let disposeTableState!: () => void;
       const ts = createRoot((dispose) => {
         disposeTableState = dispose;
+        tableDefaults = {
+          pageSize: 50,
+          visibleCols: defaultVisible,
+          sorts: sort,
+          ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : {}),
+        };
         const state = createTableState<Game>(tableData, allColumns, {
-          initialViewState: {
-            pageSize: 50,
-            visibleCols: defaultVisible,
-            sorts: sort,
-            ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : {}),
-          },
+          initialViewState: tableDefaults,
           // The old per-group tables showed every game; a collapsed group would hide them.
           defaultGroupsCollapsed: false,
         });
@@ -2930,10 +2938,7 @@ export default function ListRoute() {
         disposeView();
         disposeTableState();
       };
-      const store = viewStore();
-      setSharedViewEdited(false);
-      setViewingShared(restoreTableView(viewTable, store));
-      unsyncView = bindViewPersistence(table, store, viewingShared, setSharedViewEdited);
+      bindLayout();
       // A similarity sort isn't kept: its target was this table's predecessor's.
       setSimilarTo(null);
       syncLeadColumn(table, SIMILARITY_KEY, false);
@@ -4378,18 +4383,15 @@ export default function ListRoute() {
         {selectionActionStatus()?.text}
         <Show when={selectionActionStatus()?.listId}>{(listId) => <A href={`/lists/${listId()}`}>Open list</A>}</Show>
       </div>
-      {/* Never a user list's own view: it syncs within `lists` on every change (listsStore.ts), with nothing to Save. */}
-      <Show when={tableReady() && !userList() && !activeView()}>
-        <UnsavedViewBanner table={viewTable} prefKey={viewPrefKey()} />
-      </Show>
-      <Show when={tableReady() && activeView()}>
-        {(saved) => (
+      {/* A shared link's layout has its own banner. */}
+      <Show when={tableReady() && !viewingShared() && layout()}>
+        {(l) => (
           <UnsavedChangesBanner
-            name={saved().name}
-            changes={diffViewLabels(saved().tableView, viewTable.getViewState())}
-            note="lost if you leave this view."
-            onSave={saveActiveView}
-            onRevert={revertActiveView}
+            name={layoutName()}
+            changes={l().changes()}
+            note={layoutNote()}
+            onSave={() => l().save()}
+            onDiscard={() => l().discard()}
           />
         )}
       </Show>
@@ -4404,7 +4406,10 @@ export default function ListRoute() {
       <Show when={tableReady() && viewingShared()}>
         <SharedViewBanner
           edited={sharedViewEdited()}
-          onKeep={() => setViewingShared(false)}
+          onKeep={() => {
+            setViewingShared(false);
+            layout()?.save();
+          }}
           onDiscard={handleDiscardSharedView}
         />
       </Show>
