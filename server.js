@@ -1425,7 +1425,11 @@ if (require.main === module) {
     process.exit(1);
   }
   if (!isItadConfigured()) console.warn('ITAD_API_KEY is not set: bundles and prices are off (see default.env).');
-  app.listen(PORT, HOST, () => {
+  app.listen(PORT, HOST, (err) => {
+    if (err) {
+      console.error(`Error: cannot listen on ${HOST}:${PORT}: ${err.message}`);
+      process.exit(1);
+    }
     console.log(`\nPlayshelf → http://${HOST}:${PORT}\n`);
   });
 }

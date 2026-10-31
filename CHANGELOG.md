@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Large libraries no longer stutter while their games load
 - The lightbox no longer offers Zoom on a picture already shown at full size
 - Reloading PC Game Pass while Steam matches or game names fail to load now counts against the request limit
+- The server now stops with an error when its port is already in use, instead of reporting it started
 
 ### Development
 
