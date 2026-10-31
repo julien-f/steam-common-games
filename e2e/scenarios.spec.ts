@@ -77,7 +77,7 @@ test('A1 edge: an Explore card opens its list from anywhere on the card', async 
   await page.goto('/');
   const card = page.locator('.explore-card').filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
   // At the description, which the link's stretched ::after covers.
-  const box = (await card.getByText("The current account's wishlist").boundingBox())!;
+  const box = await visibleBox(card.getByText("The current account's wishlist"));
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page).toHaveURL(/\/lists\/wishlist$/);
 });
@@ -483,7 +483,7 @@ test("F3 edge: a game's thumbnail falls back to its smaller capsule, then hides"
   await expect(thumb).toHaveAttribute('src', /capsule_184x69/);
   await expect(thumb).toBeVisible();
   // The same box either way, so the row doesn't move as the image loads or fails (2px each side clipped off).
-  expect(await thumb.boundingBox()).toMatchObject(
+  expect(await visibleBox(thumb)).toMatchObject(
     testInfo.project.name === 'phone' ? { width: 100, height: 40 } : { width: 164, height: 64 },
   );
   await expect(row(page, 'Portal 2').locator('img.game-thumb')).toHaveCSS('visibility', 'hidden');
@@ -2216,7 +2216,7 @@ test("C8 edge: a linked trailer's scrubber seeks the TV once when let go; a canc
   await expect.poll(() => tv.evaluate((v: HTMLVideoElement) => !v.paused)).toBe(true);
   await reachForControls(page);
   const scrub = lightbox.getByRole('slider', { name: 'Seek on the TV' });
-  const box = (await scrub.boundingBox())!;
+  const box = await visibleBox(scrub);
   const seeks = () =>
     shown.evaluate(
       () =>
@@ -2722,11 +2722,11 @@ test('C1 edge: a disabled Compare libraries says why', async ({ page }) => {
   await expect(submit).toBeFocused();
   await expect(submit).toHaveAccessibleDescription('Add a second player');
   await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeVisible();
-  const box = await submit.boundingBox();
+  const box = await visibleBox(submit);
   await page.locator('.compare-form').getByRole('combobox').nth(1).fill('bob');
   await expect(submit).not.toHaveAttribute('aria-disabled');
   await expect(page.locator('.compare-form-actions').getByText('Add a second player')).toBeHidden();
-  expect(await submit.boundingBox()).toEqual(box);
+  expect(await visibleBox(submit)).toEqual(box);
 });
 
 test('C1 edge: with my account listed first, each group still names the right players', async ({ page }) => {
@@ -3484,20 +3484,20 @@ test('I1 edge: on desktop the nav starts on the content edge, close above it', a
   for (const width of [1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/lists/owned');
-    const nav = (await page.locator('.site-nav').boundingBox())!;
-    const first = (await page.locator('.site-brand').boundingBox())!;
-    const hero = (await page.locator('.list-hero').boundingBox())!;
+    const nav = await visibleBox(page.locator('.site-nav'));
+    const first = await visibleBox(page.locator('.site-brand'));
+    const hero = await visibleBox(page.locator('.list-hero'));
     expect(Math.round(first.x), `at ${width}px`).toBe(Math.round(hero.x));
     expect(hero.y - (nav.y + nav.height), `at ${width}px`).toBeLessThanOrEqual(28);
   }
   // The search fills the middle on a wide screen, and gives way so the bar stays one row on a narrow one.
   await page.setViewportSize({ width: 1440, height: 900 });
   const search = page.locator('.app-search-wrap');
-  expect((await search.boundingBox())!.width).toBe(
+  expect((await visibleBox(search)).width).toBe(
     await search.evaluate((el) => parseFloat(getComputedStyle(el).maxWidth)),
   );
   await page.setViewportSize({ width: 800, height: 900 });
-  expect((await page.locator('.site-nav').boundingBox())!.height).toBeLessThan(60);
+  expect((await visibleBox(page.locator('.site-nav'))).height).toBeLessThan(60);
 });
 
 test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo without scrolling, inside a gutter, down to 320px wide', async ({
@@ -3511,12 +3511,9 @@ test('I1 edge: on a phone, the ranking shows both cards and its Tie/Skip/Undo wi
   await expect(page.locator('.rank-card-name').nth(1)).not.toHaveText(/^App /);
 
   const viewport = page.viewportSize()!;
-  const actions = (await page.locator('.rank-actions').boundingBox())!;
+  const actions = await visibleBox(page.locator('.rank-actions'));
   expect(actions.y + actions.height).toBeLessThanOrEqual(viewport.height);
-  for (const box of [
-    await page.locator('.rank-pair').boundingBox(),
-    await page.locator('.rank-header').boundingBox(),
-  ]) {
+  for (const box of [await visibleBox(page.locator('.rank-pair')), await visibleBox(page.locator('.rank-header'))]) {
     expect(box!.x).toBeGreaterThanOrEqual(12);
     expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width - 12);
   }
@@ -3537,14 +3534,14 @@ test("I1 edge: on a phone, Home keeps the list pages' 16px gutter and the accoun
   await expect(page.locator('.account-tiles li')).toHaveCount(2);
 
   const viewport = page.viewportSize()!;
-  expect((await page.locator('.app-search-wrap').boundingBox())!.x).toBe(16);
-  const card = (await page.locator('.home-account').boundingBox())!;
+  expect((await visibleBox(page.locator('.app-search-wrap'))).x).toBe(16);
+  const card = await visibleBox(page.locator('.home-account'));
   expect(card.x).toBe(16);
   expect(card.x + card.width).toBe(viewport.width - 16);
-  expect((await page.locator('.home-account h3').boundingBox())!.x).toBeLessThanOrEqual(29);
+  expect((await visibleBox(page.locator('.home-account h3'))).x).toBeLessThanOrEqual(29);
 
   for (const li of await page.locator('.account-tiles li').all()) {
-    const box = (await li.boundingBox())!;
+    const box = await visibleBox(li);
     expect(box.x).toBeGreaterThanOrEqual(card.x);
     expect(box.x + box.width).toBeLessThanOrEqual(card.x + card.width);
   }
@@ -3561,8 +3558,8 @@ test("I1 edge: on a phone with no account yet, the nav's search, account and pre
   test.skip(testInfo.project.name !== 'phone', 'phone layout');
   await page.goto('/about');
   await expect(page.locator('.site-nav-account')).toContainText('No account');
-  const search = (await page.locator('.app-search-wrap').boundingBox())!;
-  const prefs = (await page.locator('.site-nav-prefs').boundingBox())!;
+  const search = await visibleBox(page.locator('.app-search-wrap'));
+  const prefs = await visibleBox(page.locator('.site-nav-prefs'));
   expect(prefs.y).toBeLessThan(search.y + search.height);
 });
 
@@ -3656,13 +3653,13 @@ test("R3 edge: a ranked list's Share view says why it can't be shared", async ({
   await expect(share).toHaveCSS('cursor', 'not-allowed');
   await expect(share).toHaveAccessibleDescription(/can't be shared/);
   // Said on press rather than beside it: an always-on note made the toolbar wrap on every saved list.
-  const toolbarHeight = (await page.locator('.dt-toolbar').boundingBox())!.height;
+  const toolbarHeight = (await visibleBox(page.locator('.dt-toolbar'))).height;
   await expect(page.getByRole('status').filter({ hasText: "can't be shared" })).toHaveCount(0);
   // Playwright won't click an aria-disabled button; a key press is what a keyboard user does anyway.
   await share.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: "can't be shared" })).toBeVisible();
-  expect((await page.locator('.dt-toolbar').boundingBox())!.height).toBe(toolbarHeight);
+  expect((await visibleBox(page.locator('.dt-toolbar'))).height).toBe(toolbarHeight);
 });
 
 test("R2 edge: ranking games you don't own offers 'Not interested', not 'Haven't played'", async ({ page }) => {
@@ -4000,10 +3997,10 @@ test("B1 edge: on a phone, every game's name stays in view while the table scrol
   }
   const wrap = page.locator('.dt-table-wrap');
   await wrap.evaluate((el) => (el.scrollLeft = 400));
-  const wrapLeft = (await wrap.boundingBox())!.x;
+  const wrapLeft = (await visibleBox(wrap)).x;
   for (const name of ['Hades', "Don't Starve Together"]) {
     const cell = row(page, name).locator('td', { hasText: name }).first();
-    expect(Math.round((await cell.boundingBox())!.x), name).toBe(Math.round(wrapLeft));
+    expect(Math.round((await visibleBox(cell)).x), name).toBe(Math.round(wrapLeft));
   }
 });
 
@@ -5097,7 +5094,7 @@ test('F1 edge: on a phone, a double-tap zooms a screenshot and another zooms bac
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
   await expect(img).toBeVisible();
-  const box = (await img.boundingBox())!;
+  const box = await visibleBox(img);
   const cdp = await page.context().newCDPSession(page);
   const doubleTap = async () => {
     for (let i = 0; i < 2; i++) {
@@ -5703,7 +5700,7 @@ test('F1 edge: on a phone, a swipe past the last media or game slides in with th
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
   const anims = () => page.evaluate(() => (window as unknown as { lbAnims: string[] }).lbAnims);
-  const box = (await img.boundingBox())!;
+  const box = await visibleBox(img);
   const cx = box.x + box.width / 2,
     cy = box.y + box.height / 2;
   // Left, past the last screenshot: the Cover comes in from the right, under the finger.
@@ -5850,7 +5847,7 @@ test("F1 edge: on a phone, a swipe past the panel's last item stays on it", asyn
   const current = page.locator('.panel-film-item[aria-current="true"]');
   await page.getByRole('button', { name: 'Screenshot 3 of 3' }).click();
   await expect(current).toHaveAccessibleName('Screenshot 3 of 3');
-  const box = (await page.locator('#panel-hero .panel-hero-img').boundingBox())!;
+  const box = await visibleBox(page.locator('#panel-hero .panel-hero-img'));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
@@ -5934,7 +5931,7 @@ test('F1 edge: a trailer fills the window, fullscreen or not, its controls over 
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=1145360&shot=v1');
   await page.getByRole('button', { name: 'Play trailer' }).click();
-  const video = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
+  const video = await visibleBox(page.locator('#screenshot-lightbox .lb-video'));
   expect(video).toEqual({ x: 0, y: 0, width: 1440, height: 900 });
 });
 
@@ -6152,7 +6149,7 @@ test('F1 edge: on a phone, swiping off a playing trailer leaves hidden controls 
   const lb = page.locator('#screenshot-lightbox');
   await page.clock.runFor(3500);
   await expect(lb).toHaveClass(/lb-idle/);
-  const box = (await page.locator('#screenshot-lightbox .lb-video').boundingBox())!;
+  const box = await visibleBox(page.locator('#screenshot-lightbox .lb-video'));
   const y = box.y + box.height / 2;
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
@@ -6191,7 +6188,7 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
   await stillShown(page, 'Screenshot 1 of 3');
-  const box = (await img.boundingBox())!;
+  const box = await visibleBox(img);
   await page.mouse.move(box.x + 5, 450); // the backdrop, beside the picture
   await page.mouse.move(box.x - 20, 450);
   await page.mouse.wheel(0, -100);
@@ -6201,7 +6198,7 @@ test('F1 edge: the wheel zooms toward the cursor over the picture only; a sidewa
   await page.mouse.move(at.x, at.y);
   await page.mouse.wheel(0, -100);
   await expect(img).toHaveAttribute('style', /scale\(1\.15\)/);
-  const after = (await img.boundingBox())!;
+  const after = await visibleBox(img);
   expect(Math.abs(after.x + after.width - 40 * 1.15 - at.x)).toBeLessThan(1);
   await page.keyboard.press('z'); // back out
   await expect(img).not.toHaveAttribute('style', /scale/);
@@ -6292,7 +6289,7 @@ test('M3 edge: on a phone, a double-tap seek leaves the trailer playing', async 
   await expect(page.locator('#screenshot-lightbox')).toHaveClass(/lb-idle/);
   // Paused, so a slow tap under load still lands within the double-tap's 300 ms.
   await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
-  const box = (await page.locator('.lb-video').boundingBox())!;
+  const box = await visibleBox(page.locator('.lb-video'));
   const point = { x: box.x + box.width * 0.85, y: box.y + box.height / 2 };
   const cdp = await page.context().newCDPSession(page);
   const tap = async (times: number) => {
@@ -6341,7 +6338,7 @@ test('F1 edge: on a phone, a pinch zooms around the point between the fingers', 
   await page.goto('/lists/owned?game=1145360&shot=s1');
   const img = page.locator('#screenshot-lightbox .lb-img');
   await stillShown(page, 'Screenshot 1 of 3');
-  const before = (await img.boundingBox())!;
+  const before = await visibleBox(img);
   const mid = { x: before.x + before.width * 0.75, y: before.y + before.height / 2 };
   const cdp = await page.context().newCDPSession(page);
   const fingers = (gap: number) => [
@@ -6352,7 +6349,7 @@ test('F1 edge: on a phone, a pinch zooms around the point between the fingers', 
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: fingers(40) });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(img).toHaveAttribute('style', /scale\(2\)/);
-  const after = (await img.boundingBox())!;
+  const after = await visibleBox(img);
   // The same spot of the picture is still between the fingers.
   expect(Math.abs((mid.x - after.x) / after.width - 0.75)).toBeLessThan(0.01);
 });
@@ -6893,8 +6890,8 @@ test("C3 edge: on a phone, the hero's More actions centres its ⋯", async ({ pa
     box!.x + box!.width / 2,
     box!.y + box!.height / 2,
   ];
-  const [bx, by] = centre(await more.boundingBox());
-  const [ix, iy] = centre(await more.locator('svg').boundingBox());
+  const [bx, by] = centre(await visibleBox(more));
+  const [ix, iy] = centre(await visibleBox(more.locator('svg')));
   expect(Math.abs(ix - bx)).toBeLessThan(1);
   expect(Math.abs(iy - by)).toBeLessThan(1);
 });
@@ -6936,8 +6933,8 @@ test('I1 edge: on a phone, small controls still take a 24px tap', async ({ page 
   // A header sorts from anywhere in its cell, not just its label's button.
   const header = page.locator('.dt-th[data-col-key="releaseDate"]');
   expect(await takes24pxTap(header)).toBe(true);
-  const label = (await header.locator('.dt-th-sort').boundingBox())!;
-  const cell = (await header.boundingBox())!;
+  const label = await visibleBox(header.locator('.dt-th-sort'));
+  const cell = await visibleBox(header);
   await page.mouse.click(label.x + 4, cell.y + cell.height - 3);
   await expect(header).toHaveAttribute('aria-sort', /ascending|descending/);
   expect(await takes24pxTap(page.getByRole('link', { name: 'About' }))).toBe(true);
@@ -7309,7 +7306,7 @@ test.describe('with motion on', () => {
     const card = page
       .locator('.explore-card')
       .filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
-    const box = (await card.boundingBox())!;
+    const box = await visibleBox(card);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height - 1);
     if (testInfo.project.name === 'phone') {
       await expect(card).toHaveCSS('translate', 'none');
@@ -7547,7 +7544,7 @@ test.describe('with motion on', () => {
           }
       }).observe(document.querySelector('.lb-surface')!, { childList: true });
     });
-    const box = (await img.boundingBox())!;
+    const box = await visibleBox(img);
     const y = box.y + box.height / 2;
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 300, y }] });
@@ -7858,7 +7855,7 @@ test('I2 edge: a click outside closes each nav popover, and opening one closes t
   const rank = page.locator('.rank-menu-panel');
   // In the left gutter, which no popover covers (clampPopoverLeft keeps them 12px in).
   const outside = async () => {
-    const title = (await page.locator('.list-hero-title').boundingBox())!;
+    const title = await visibleBox(page.locator('.list-hero-title'));
     await page.mouse.click(5, title.y + title.height / 2);
   };
   const triggers = [
