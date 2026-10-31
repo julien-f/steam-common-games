@@ -215,7 +215,7 @@ function oldestOf(timestamps) {
 // (isClientError), everything unmarked is logged too, on the assumption that an error
 // nobody bothered to mark expected is probably a bug worth being able to find later. Logs
 // the full stack, not just the message, since a bug needs its source line to be traceable.
-function routeErrorStatus(route, err) {
+function routeErrorStatus(route, err, unreadable) {
   if (err.isClientError) return 400;
   // Circuit-open errors (lib/steam.js's fetchStoreApi, while steam-store is blocked) are an
   // expected, already-logged consequence of the trip itself — see the one-time
@@ -226,8 +226,7 @@ function routeErrorStatus(route, err) {
   // own share is told to slow down (429); the service itself is fine for everyone else.
   if (err.isClientBudgetExhausted) return 429;
   if (err.isLogged) return 502;
-  // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
-  if (err.isUpstream || err.name === 'SyntaxError') {
+  if (err.isUpstream || unreadable) {
     console.error(`[upstream:${route}]`, err.stack || err.message);
     return 502;
   }
@@ -240,10 +239,12 @@ function routeErrorStatus(route, err) {
 }
 
 // The log keeps the detail: a bug's message shows internals, a parse error's quotes the upstream's body.
+const INTERNAL_ERROR = 'Internal error';
 function sendRouteError(res, route, err) {
-  const status = routeErrorStatus(route, err);
-  const error =
-    status === 500 ? 'Internal error' : err.name === 'SyntaxError' ? 'Unreadable reply from upstream' : err.message;
+  // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
+  const unreadable = err.name === 'SyntaxError';
+  const status = routeErrorStatus(route, err, unreadable);
+  const error = status === 500 ? INTERNAL_ERROR : unreadable ? 'Unreadable reply from upstream' : err.message;
   res.status(status).json({ error });
 }
 
@@ -1475,7 +1476,7 @@ app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   const status = err.status >= 400 && err.status < 500 ? err.status : 500;
   if (status === 500) console.error(`[server] ${req.method} ${req.path}`, err);
-  res.status(status).json({ error: status === 500 ? 'Internal server error' : err.message });
+  res.status(status).json({ error: status === 500 ? INTERNAL_ERROR : err.message });
 });
 
 if (require.main === module) {
