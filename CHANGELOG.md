@@ -57,6 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A game whose store name is only a trademark sign no longer counts against the details budget on every load
 - Bundles: a page request with an infinite offset or a fractional limit is read as the first page, or one bundle, instead of an empty or 20-bundle page
 - Bundles: the empty page past the end of the list no longer counts against the per-minute request limit
+- Expired sign-in sessions are cleared from the server hourly, not only when it restarts
 
 ### Development
 
