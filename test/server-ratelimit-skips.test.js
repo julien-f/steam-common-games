@@ -49,15 +49,17 @@ function mockUpstreams(t) {
   return calls;
 }
 
-// Each miss succeeds within budget, `over` is then rate limited, and each hit is still served
-// without any upstream call.
-async function assertMissesCountHitsDont(calls, { misses, over, hits }) {
+// Each miss succeeds within budget, `over` and `refresh` (a forced refresh of a cached key) are
+// then rate limited, and each hit is still served without any upstream call.
+async function assertMissesCountHitsDont(calls, { misses, over, refresh, hits }) {
   for (const [label, send] of Object.entries(misses)) {
     const res = await send();
     assert.equal(res.status, 200, `miss "${label}" should succeed within budget`);
   }
   const rejected = await over();
   assert.equal(rejected.status, 429, 'a cache miss past the budget should be rate limited');
+  const refreshed = await refresh();
+  assert.equal(refreshed.status, 429, 'a forced refresh of a cached key past the budget should be rate limited');
   for (const [label, send] of Object.entries(hits)) {
     const before = calls.length;
     const res = await send();
@@ -74,13 +76,17 @@ test('search limiter: a cached vanity name skips it like a cached Steam64 id', a
   setCache(`games:${CACHED}`, []);
   setCache('resolve:cachedvanity', CACHED);
 
-  const commonGames = (members) => () => api.post('/api/common-games').send({ members });
+  const commonGames =
+    (members, refresh = false) =>
+    () =>
+      api.post('/api/common-games').send({ members, refresh });
   await assertMissesCountHitsDont(calls, {
     misses: {
       'uncached Steam64': commonGames(['76561198000000001']),
       'unresolved vanity': commonGames(['newvanity']),
     },
     over: commonGames(['76561198000000002']),
+    refresh: commonGames([CACHED], true),
     hits: {
       'cached Steam64': commonGames([CACHED]),
       'cached vanity': commonGames(['cachedvanity']),
@@ -95,13 +101,17 @@ test('friends limiter: counts cache misses but never counts cache hits', async (
   setCache(`friends:${CACHED}`, []);
   setCache('resolve:cachedvanity', CACHED);
 
-  const friends = (members) => () => api.post('/api/friends').send({ members });
+  const friends =
+    (members, refresh = false) =>
+    () =>
+      api.post('/api/friends').send({ members, refresh });
   await assertMissesCountHitsDont(calls, {
     misses: {
       'uncached Steam64': friends(['76561198000000001']),
       'unresolved vanity': friends(['newvanity']),
     },
     over: friends(['76561198000000002']),
+    refresh: friends([CACHED], true),
     hits: {
       'cached Steam64': friends([CACHED]),
       'cached vanity': friends(['cachedvanity']),
@@ -114,10 +124,11 @@ test('news limiter: counts cache misses but never counts cache hits', async (t) 
   const calls = mockUpstreams(t);
   setCache('news:410', []);
 
-  const news = (appid) => () => api.get(`/api/game-news/${appid}`);
+  const news = (path) => () => api.get(`/api/game-news/${path}`);
   await assertMissesCountHitsDont(calls, {
     misses: { 400: news(400), 401: news(401) },
     over: news(402),
+    refresh: news('410?refresh=1'),
     hits: { 410: news(410) },
   });
 });
@@ -145,6 +156,7 @@ test('achievements limiter: counts cache misses but never counts cache hits', as
       'cached schema, uncached player': achievements(510, '76561198000000001'),
     },
     over: achievements(502),
+    refresh: achievements('510', `${PLAYER}&refresh=1`),
     hits: {
       'schema, rarity and player cached': achievements(510, PLAYER),
       'cached vanity': achievements(510, 'cachedvanity'),
@@ -162,13 +174,17 @@ test('prices limiter: counts cache misses but never counts cache hits, for gids 
   setCache('itad-gid:601', null); // not on ITAD: nothing left to price
   setCache('itad-gid:602', 'unpriced-gid');
 
-  const prices = (body) => () => api.post('/api/prices').send(body);
+  const prices =
+    (body, query = '') =>
+    () =>
+      api.post(`/api/prices${query}`).send(body);
   await assertMissesCountHitsDont(calls, {
     misses: {
       'uncached gid': prices({ gids: ['new-gid'] }),
       'unresolved appid': prices({ appids: [650] }),
     },
     over: prices({ appids: [602] }),
+    refresh: prices({ gids: ['cached-gid'] }, '?refresh=1'),
     hits: {
       'cached gid': prices({ gids: ['cached-gid'] }),
       'appids with cached price and null gid': prices({ appids: [600, 601] }),
@@ -185,10 +201,11 @@ test('game bundles limiter: counts cache misses but never counts cache hits', as
   setCache('itad-gid:711', null);
   setCache('itad-gid:701', 'unbundled-gid');
 
-  const gameBundles = (appid) => () => api.get(`/api/game-bundles/${appid}`);
+  const gameBundles = (path) => () => api.get(`/api/game-bundles/${path}`);
   await assertMissesCountHitsDont(calls, {
     misses: { 'unresolved appid': gameBundles(700), 'uncached bundles': gameBundles(701) },
     over: gameBundles(702),
+    refresh: gameBundles('710?refresh=1'),
     hits: { 'cached bundles': gameBundles(710), 'null gid': gameBundles(711) },
   });
 });
@@ -209,6 +226,7 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
   await assertMissesCountHitsDont(calls, {
     misses: { 'uncached market': gamePass('country=US'), 'another market': gamePass('country=DE') },
     over: gamePass('country=JP'),
+    refresh: gamePass('country=fr&refresh=1'),
     hits: { 'cached market': gamePass('country=fr') },
   });
 });

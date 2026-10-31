@@ -90,6 +90,8 @@ test('details limiter: counts cache misses but never counts cache hits', async (
   // A fourth cache miss is over budget → 429.
   const over = await api.get('/api/game-details/804');
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+  const refresh = await api.get('/api/game-details/800?refresh=1');
+  assert.equal(refresh.status, 429, 'a forced refresh of a cached key past the budget should be rate limited');
 
   // The cached appid is still served even though the budget is exhausted,
   // and crucially does NOT trigger any upstream fetch.
@@ -144,6 +146,8 @@ test('creator games limiter: counts cache misses but never counts cache hits', a
   }
   const caseVariant = await api.get('/api/creator-games?role=developer&name=cached');
   assert.equal(caseVariant.status, 429, 'another case is another name, so a miss');
+  const refresh = await api.get('/api/creator-games?role=developer&name=Cached&refresh=1');
+  assert.equal(refresh.status, 429, 'a forced refresh of a cached key past the budget should be rate limited');
 
   const cached = await api.get('/api/creator-games?role=developer&name=Cached');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
@@ -185,6 +189,8 @@ test('search limiter: counts cache misses but never counts cache hits (common-ga
   // A third uncached search, on either route, is over budget → 429.
   const over = await api.post('/api/common-games').send({ members: ['76561198000000003'] });
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+  const refresh = await api.post('/api/wishlist').send({ members: [CACHED_WISHLIST], refresh: true });
+  assert.equal(refresh.status, 429, 'a forced refresh of a cached key past the budget should be rate limited');
 
   // The fully-cached accounts are still served even though the budget is exhausted, and make no
   // upstream call at all.
@@ -215,6 +221,8 @@ test('bundles list limiter: counts cache misses but never counts cache hits', as
 
   const over = await api.get('/api/bundles?offset=40');
   assert.equal(over.status, 429, 'a cache miss past the budget should be rate limited');
+  const refresh = await api.get('/api/bundles?offset=100&refresh=1');
+  assert.equal(refresh.status, 429, 'a forced refresh of a cached key past the budget should be rate limited');
 
   const cached = await api.get('/api/bundles?offset=100');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
