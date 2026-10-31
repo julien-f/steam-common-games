@@ -1319,7 +1319,7 @@ function ssePost(port, path, body) {
 }
 
 // The stream is the one large response (a whole library's details), so it is gzipped for
-// clients that accept it, flushed per event so rows still arrive as each game resolves.
+// clients that accept it, flushed once per event-loop turn so rows still arrive as each game resolves.
 for (const encoding of ['gzip', 'identity']) {
   test(`POST /api/game-details/stream: ${encoding === 'gzip' ? 'gzipped' : 'plain'} for Accept-Encoding: ${encoding}`, async (t) => {
     _reset();
@@ -1355,6 +1355,59 @@ for (const encoding of ['gzip', 'identity']) {
     assert.equal(events.at(-1).done, true);
   });
 }
+
+// Flushes are batched per event-loop turn: a game's event must still reach the client while
+// another game is pending, else this deadlocks (the slow game only answers once the first arrives).
+test(
+  'POST /api/game-details/stream: a gzipped event arrives while other games are pending',
+  { timeout: 20_000 },
+  async (t) => {
+    _reset();
+    _resetAuth();
+    const SLOW = 777777;
+    let release;
+    const released = new Promise((r) => {
+      release = r;
+    });
+    t.after(() => release()); // on failure, so the server can close
+    const fetchDetails = makeDetailsFetch();
+    t.mock.method(globalThis, 'fetch', async (url, opts) => {
+      if (String(url).includes(String(SLOW))) await released;
+      return fetchDetails(url, opts);
+    });
+    const server = app.listen(0);
+    t.after(() => new Promise((r) => server.close(r)));
+    await new Promise((r) => server.once('listening', r));
+
+    const text = await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          host: '127.0.0.1',
+          port: server.address().port,
+          path: '/api/game-details/stream',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' },
+        },
+        (r) => {
+          let body = '';
+          r.pipe(zlib.createGunzip())
+            .on('data', (c) => {
+              body += c;
+              if (body.includes('"appid":400')) release();
+            })
+            .on('end', () => resolve(body))
+            .on('error', reject);
+        },
+      );
+      req.on('error', reject);
+      req.end(JSON.stringify({ games: [{ appid: 400 }, { appid: SLOW }] }));
+    });
+    assert.deepEqual(
+      parseSseEvents(text).map((e) => e.appid),
+      [400, SLOW, undefined],
+    );
+  },
+);
 
 test('POST /api/game-details/stream: 400 for empty games list', async () => {
   const res = await api.post('/api/game-details/stream').send({ games: [] });

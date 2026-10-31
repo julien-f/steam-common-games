@@ -1212,8 +1212,8 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Vary', 'Accept-Encoding');
   // Gzipped (its size: docs/dev/architecture.md), as no reverse proxy is assumed to compress
-  // text/event-stream (nginx doesn't by default). Flushed per event, so each row still arrives as
-  // soon as it resolves.
+  // text/event-stream (nginx doesn't by default). Flushed once per event-loop turn (`send` below), so each row
+  // still arrives as soon as it resolves.
   const gzip = /\bgzip\b/.test(req.get('accept-encoding') ?? '');
   let out = res;
   if (gzip) {
@@ -1228,10 +1228,19 @@ app.post('/api/game-details/stream', detailsLimit, async (req, res) => {
     closed = true;
   });
 
+  // One flush per event-loop turn: a flush per event costs bytes and CPU while cached games resolve in a burst.
+  let flushQueued = false;
+  const flush = () => {
+    flushQueued = false;
+    if (!out.writableEnded) out.flush(zlib.constants.Z_SYNC_FLUSH);
+  };
   const send = (data) => {
     if (closed || res.writableEnded) return;
     out.write(`data: ${JSON.stringify(data)}\n\n`);
-    if (gzip) out.flush(zlib.constants.Z_SYNC_FLUSH);
+    if (gzip && !flushQueued) {
+      flushQueued = true;
+      setImmediate(flush);
+    }
   };
 
   // A bounded worker pool, not `validated.map(...)`. Mapping dispatched every appid
