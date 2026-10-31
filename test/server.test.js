@@ -983,10 +983,11 @@ test('GET /api/game-details/:appid: only fetches sources not already cached', as
 // A browser refresh fires the same /api/game-details/:appid requests again.
 // These tests verify the server does NOT re-fetch upstream when it shouldn't.
 
-// fetch mock that tallies how many times each upstream source is hit.
-function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
+// fetch mock that tallies how many times each upstream source is hit; `gate` holds every call until it resolves.
+function makeCountingDetailsFetch(counts, { gate } = {}) {
   return async (url) => {
-    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
+    counts.started = (counts.started ?? 0) + 1;
+    await gate;
     if (url.includes('GetAppReviews')) {
       counts.rating++;
       return {
@@ -1034,6 +1035,8 @@ function makeCountingDetailsFetch(counts, { delayMs = 0 } = {}) {
   };
 }
 
+const dedupHits = (name) => getMetrics().sinceRestart.dedupHits[name] ?? 0;
+
 // #1 — sequential refresh: second request must be served entirely from cache.
 test('GET /api/game-details/:appid: a repeated request is served from cache, no re-fetch', async (t) => {
   _reset();
@@ -1064,10 +1067,14 @@ test('GET /api/game-details/:appid: concurrent requests for the same appid dedup
   _reset();
   _resetAuth();
   const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
-  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
+  const { promise: gate, resolve: release } = Promise.withResolvers();
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { gate }));
 
-  // Fire both without awaiting the first — they overlap in flight.
-  const [res1, res2] = await Promise.all([api.get('/api/game-details/501'), api.get('/api/game-details/501')]);
+  const hits = dedupHits('details');
+  const both = Promise.all([api.get('/api/game-details/501'), api.get('/api/game-details/501')]);
+  await until(() => dedupHits('details') > hits, 'the second request joining the first');
+  release();
+  const [res1, res2] = await both;
 
   assert.equal(res1.status, 200);
   assert.equal(res2.status, 200);
@@ -1085,12 +1092,14 @@ test('GET /api/game-details/:appid: ?refresh=1 alongside a normal request shares
   _resetAuth();
   t.mock.method(console, 'warn', () => {});
   const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
-  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 50 }));
+  const { promise: gate, resolve: release } = Promise.withResolvers();
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { gate }));
 
-  const [normal, forced] = await Promise.all([
-    api.get('/api/game-details/503'),
-    api.get('/api/game-details/503?refresh=1'),
-  ]);
+  const hits = dedupHits('steam');
+  const both = Promise.all([api.get('/api/game-details/503'), api.get('/api/game-details/503?refresh=1')]);
+  await until(() => dedupHits('steam') >= hits + 2, 'the forced rating and meta calls joining the normal ones');
+  release();
+  const [normal, forced] = await both;
   assert.equal(normal.status, 200);
   assert.equal(forced.status, 200);
   assert.equal(forced.body.rating.score, normal.body.rating.score);
@@ -1199,31 +1208,31 @@ test('GET /api/game-meta/:appid: 400 for an invalid appid, 502 when the store fa
 // Question: when the client disconnects before setCache runs, does the server
 // still complete the upstream work and cache it (so the refresh is a cache hit),
 // or is the work stranded (forcing the refresh to re-fetch)?
-function abortedGet(port, path, abortAfterMs) {
-  return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port, path }, (res) => res.resume());
-    req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
-    setTimeout(() => {
-      req.destroy();
-      resolve();
-    }, abortAfterMs);
-  });
+async function abortedGet(port, path, abortOnce) {
+  const req = http.get({ host: '127.0.0.1', port, path }, (res) => res.resume());
+  req.on('error', () => {}); // destroy() surfaces ECONNRESET — expected, ignore
+  await abortOnce();
+  req.destroy();
 }
 
 test('GET /api/game-details/:appid: a request aborted mid-flight still caches, so refresh does not re-fetch', async (t) => {
   _reset();
   _resetAuth();
   const counts = { rating: 0, hltb: 0, hltbInit: 0, meta: 0, tags: 0 };
-  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { delayMs: 100 }));
+  const { promise: gate, resolve: release } = Promise.withResolvers();
+  t.mock.method(globalThis, 'fetch', makeCountingDetailsFetch(counts, { gate }));
 
   const server = app.listen(0);
   t.after(() => new Promise((r) => server.close(r)));
+  let sockets = 0;
+  server.on('connection', (socket) => (sockets++, socket.once('close', () => sockets--)));
   await new Promise((r) => server.once('listening', r));
   const port = server.address().port;
 
-  // Fire and kill the socket after 20ms — the handler has started upstream
-  // fetches (~100ms each) but no response has been sent yet.
-  await abortedGet(port, '/api/game-details/600', 20);
+  // Killed once the handler has started its upstream fetches, held until the server sees the disconnect.
+  await abortedGet(port, '/api/game-details/600', () => until(() => counts.started, 'the first upstream fetch'));
+  await until(() => sockets === 0, 'the server seeing the disconnect');
+  release();
 
   // The stranded handler's upstream work done (meta → HLTB's search is its longest chain), then its setCache.
   await until(() => counts.rating && counts.hltb && counts.meta && counts.tags === 2, 'the stranded fetches');
@@ -1471,8 +1480,9 @@ test('POST /api/game-details/stream: a GET /api/game-details sharing its fetch k
 
   const single = api.get('/api/game-details/400').then((r) => r);
   await until(() => storeCalls === 1, "the GET's store fetch"); // under way first
+  const hits = dedupHits('details');
   const stream = ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 400 }] });
-  await new Promise((r) => setTimeout(r, 20)); // the stream's lookup under way too: no signal to wait on; late, it reads the cache and passes anyway
+  await until(() => dedupHits('details') > hits, "the stream joining the GET's lookup");
   release();
   const [one, streamed] = await Promise.all([single, stream]);
   assert.equal(storeCalls, 1); // one fetch, shared
@@ -2754,7 +2764,8 @@ test('POST /api/game-details/stream: caps in-flight appids and stops fetching on
   await until(() => sockets === 0, 'the server seeing the disconnect');
   const startedAtDisconnect = started;
   release();
-  await new Promise((r) => setTimeout(r, 100)); // room for a pool that kept going to show it: can only miss, not flake
+  await until(() => inFlight === 0, 'the held reviews answered');
+  await new Promise((r) => setImmediate(r)); // a pool that kept going starts its next games here
   // A disconnect stops the pool within roughly one appid per worker, rather than working
   // through the remaining 190-odd games for a client that has gone.
   assert.ok(
