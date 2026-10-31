@@ -42,8 +42,8 @@ function takeSharedView(): TableViewState | null {
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-// Saves every future view change — the only ongoing side effect table interaction has; the URL
-// stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
+// Writes every future view change to `store` (a layout draft) — the only ongoing side effect table
+// interaction has; the URL stays untouched until explicitly shared. An effect re-reading getViewState() (tracking every
 // signal it touches), in its own root since a route can bind it from an async load. `paused`:
 // while a shared link's layout is on screen (SharedViewBanner); un-pausing saves it.
 // `onPausedEdit`: whether that shared layout now differs from the link's (page/search aside).
@@ -75,7 +75,7 @@ export function bindViewPersistence(
 // clipboard — deliberately does NOT write it to the page's own address bar (no
 // `history.replaceState`): a param left sitting in the visible URL goes stale the moment the
 // user makes one more change to the table, silently showing a snapshot that no longer matches
-// what's on screen. The stored pref (bindViewPersistence above) already captures live state on
+// what's on screen. The layout draft (bindViewPersistence above) already captures live state on
 // every change; this link is only for handing the *current* view to someone else.
 // `extraParams` are added only where the URL doesn't already set them; `dropParams` mean nothing to the recipient.
 export function shareTableView(
@@ -137,6 +137,11 @@ function layoutOf(view: TableViewState, temporaryCols: readonly string[], defaul
   };
   for (const [field, value] of Object.entries(fields) as [keyof TableViewState, unknown][]) {
     if (value === undefined) continue;
+    // Emptied by the filter: it held only temporary columns, over the default.
+    if (Array.isArray(value) && !value.length && (v[field] as unknown[]).length) {
+      delete v[field];
+      continue;
+    }
     const empty = Array.isArray(value) ? [] : {};
     const isDefault = JSON.stringify(value) === JSON.stringify(defaults[field] ?? empty);
     if (isDefault) delete v[field];
@@ -197,7 +202,8 @@ export function layoutDraft(
     },
     discard() {
       writeDraft(id, null);
-      table.setViewState(stored.load());
+      const { page, searchQuery } = untrack(() => table.getViewState());
+      table.setViewState({ ...stored.load(), ...(page && { page }), ...(searchQuery && { searchQuery }) });
       capture();
     },
   };

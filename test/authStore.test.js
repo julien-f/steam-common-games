@@ -236,6 +236,22 @@ test('syncPrefsWithServer (ongoing): a newer server entry with the same value ta
   assert.deepEqual(prefs().getAllPrefEntries().region, { value: 'DE', updatedAt: 900 });
 });
 
+test("syncPrefsWithServer (ongoing): a same-value adoption storage can't keep is warned, like any other", async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 3, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  global.localStorage.setItem = () => {
+    throw new DOMException('full', 'QuotaExceededError');
+  };
+  const warn = t.mock.method(console, 'warn', () => {});
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 900 } });
+
+  assert.equal(adopted, false);
+  assert.match(warn.mock.calls[0]?.arguments[0] ?? '', /^\[auth\]/);
+});
+
 // ── syncPrefsWithServer: table-view keys ─────────────────────────────────────────
 
 test('syncPrefsWithServer (ongoing): a table-view key merges like any other: a newer server view is adopted', async (t) => {

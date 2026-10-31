@@ -79,12 +79,9 @@ export async function syncPrefsWithServer(steamid: string, serverEntries: Record
     const server = serverEntries[key];
     if (server && (!local || firstSync || server.updatedAt > local.updatedAt)) {
       // The same value under a newer time (a push from another device): nothing on screen changes, so no reload.
-      if (local && JSON.stringify(local.value) === JSON.stringify(server.value)) {
-        adoptPrefEntry(key, server.value, server.updatedAt);
-        continue;
-      }
+      const sameValue = !!local && JSON.stringify(local.value) === JSON.stringify(server.value);
       // Counted only once persisted: a reload re-reads storage, so an unkept adoption would reload forever.
-      if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted = true;
+      if (adoptPrefEntry(key, server.value, server.updatedAt)) adopted ||= !sameValue;
       else {
         unkept = true;
         console.warn(

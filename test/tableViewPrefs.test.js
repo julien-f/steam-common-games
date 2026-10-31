@@ -203,6 +203,29 @@ test('layoutDraft: compares against the stored layout as the table applies it, t
   });
 });
 
+test('layoutDraft: Discard keeps the search and page, which were never part of the change', () => {
+  withLocation('', () => {
+    const table = fakeTable();
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'));
+    layout.restore();
+    table.setViewState({ pageSize: 25, page: 2, searchQuery: 'portal' });
+    layout.discard();
+    assert.deepEqual(table.getViewState(), { page: 2, searchQuery: 'portal' });
+  });
+});
+
+test('layoutDraft: a sort holding only a temporary column is the default sort, not a change', () => {
+  withLocation('', () => {
+    const table = fakeTable();
+    const layout = layoutDraft(table, 'libraryView', prefViewStore('libraryView'), ['similarity'], {
+      sorts: [{ key: 'rating', dir: 'desc' }],
+    });
+    layout.restore();
+    table.setViewState({ sorts: [{ key: 'similarity', dir: 'desc' }] });
+    assert.deepEqual(layout.changes(), []);
+  });
+});
+
 test('shareTableView: copies a link with the view snapshotted into the param, without touching the live URL', async () => {
   const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   try {

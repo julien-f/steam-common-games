@@ -2090,7 +2090,7 @@ export default function ListRoute() {
     }),
   );
 
-  // Unused for kind === 'user' (its view lives on the list itself, see viewStore below) —
+  // Unused for kind === 'user' (its view lives on the list itself, see storedLayout below) —
   // kept total anyway so a stray call never returns undefined.
   function viewPrefKey(): string {
     if (kind === 'wishlist') return 'wishlistListView';
@@ -2160,13 +2160,13 @@ export default function ListRoute() {
     creator: 'developer and publisher list',
     'game-pass': 'Game Pass',
   };
-  const exploringSomeoneElse = () => !!viewKind && !!getAccountOverride() && !showingMyAccount() && !activeView();
+  const exploringSomeoneElse = () => !!viewKind && !showingMyAccount() && !activeView();
   function layoutName(): string {
     const saved = activeView();
     if (saved) return saved.name;
     const list = userList();
     if (list) return `the layout of “${list.name}”`;
-    return exploringSomeoneElse() ? 'this table' : `your ${LAYOUT_NAMES[kind] ?? ''} layout`;
+    return exploringSomeoneElse() ? 'this table' : `your ${LAYOUT_NAMES[kind] ?? 'list'} layout`;
   }
   function layoutNote(): string {
     return exploringSomeoneElse()
