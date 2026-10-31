@@ -35,6 +35,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 - **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
 - **Error handling**: routes catch and map through `routeErrorStatus` (client error → 400, upstream → 502, timeout → 504) and reply `{ error }`. An optional source (HLTB, ProtonDB, reviews) that fails logs a `[tag]`-prefixed `console.warn` and degrades instead of failing the request; the UI then says the source didn't answer rather than showing no data.
 - **Lint**: `eslint public --max-warnings=0`, via eslint-plugin-solid; stays at 0 problems (a warning fails it), and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
+- **Upstream workarounds**: the comment ends `Remove once <Bugzilla or GitHub issue URL> is fixed` (`id=TODO` until filed), so `node scripts/upstream-bugs.js` lists them with each bug's state.
 - **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies. Let it format instead of hand-formatting, and don't fight its output.
 
 ## Working style
@@ -65,7 +66,7 @@ The user-level rules apply; here:
 
 - **Message format**: a plain imperative subject, no Conventional Commits prefix — the `feat:`/`fix:` prefixes in older history were dropped; don't reintroduce them.
 - Ordinary changes commit directly to `main` — this is a solo repo with no PR/review process. A complex feature (multiple concerns, significant refactoring, a new subsystem) spanning more than one commit gets a dedicated branch instead, worked in its own worktree (`node scripts/worktree.js <branch>`: adds it and runs `npm ci`): other agents share the main checkout, so never switch its branch. A worktree's e2e and mock servers get their own ports (`node scripts/ports.js e2e|mock`).
-- Before closing a session, or when asked what's left: `node scripts/session-end.js` lists unpushed commits, uncommitted changes, merged worktrees and branches, and running servers.
+- Before closing a session, or when asked what's left: `node scripts/session-end.js` lists unpushed commits, uncommitted changes, merged worktrees and branches, running servers, and workarounds whose upstream bug closed or isn't filed yet.
 - Chasing a CI-only failure: experiment on a branch and run CI there (`gh workflow run CI --ref <branch>`), never by pushing to `main`.
 - A parallel fix batch ([BATCH.md](.claude/skills/code-fix/BATCH.md)) works the same way, one branch per lane, each closed with `git merge --no-ff`.
 
