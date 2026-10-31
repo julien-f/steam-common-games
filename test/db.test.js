@@ -7,7 +7,7 @@ const os = require('node:os');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { migrate, MIGRATIONS } = require('../lib/db');
+const { db: appDb, migrate, MIGRATIONS } = require('../lib/db');
 
 test('migrate: a fresh database ends up at the latest version with every table', () => {
   const db = new DatabaseSync(':memory:');
@@ -138,4 +138,8 @@ test("requiring lib/db picks up default.env's DB_FILE even without a shell-level
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+test('lib/db opens the database with a busy timeout', () => {
+  assert.ok(appDb.prepare('PRAGMA busy_timeout').get().timeout > 0);
 });

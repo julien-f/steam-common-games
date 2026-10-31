@@ -2,7 +2,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 
-require('../lib/config'); // loads .env + default.env as a side effect
+const { DB_BUSY_TIMEOUT_MS } = require('../lib/config'); // also loads .env + default.env
 
 const DB_PATH = process.env.DB_FILE;
 
@@ -11,7 +11,8 @@ if (!DB_PATH) {
   process.exit(0);
 }
 
-const db = new DatabaseSync(DB_PATH);
+// Its own connection rather than lib/db's, which would run migrations on the live database.
+const db = new DatabaseSync(DB_PATH, { timeout: DB_BUSY_TIMEOUT_MS });
 
 const cacheTables = db
   .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'cache\\_%' ESCAPE '\\'")
