@@ -487,13 +487,15 @@ test('getOwnedGames: throws user error when library is private', async (t) => {
 test('resolveSteamId and getOwnedGames: a reply of another shape is an upstream error, not cached', async (t) => {
   _reset();
   let calls = 0;
-  const bodies = [{}, { response: { success: 1 } }, {}, { response: { games: {} } }];
+  // ResolveVanityURL documents 1 (found) and 42 (no match); any other code is a failure.
+  const bodies = [{}, { response: { success: 1 } }, { response: { success: 2 } }, {}, { response: { games: {} } }];
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => bodies[calls++] }));
   await assert.rejects(() => resolveSteamId('shape'), { isUpstream: true });
   await assert.rejects(() => resolveSteamId('shape'), { isUpstream: true });
+  await assert.rejects(() => resolveSteamId('shape'), { isUpstream: true });
   await assert.rejects(() => getOwnedGames('76561198000000011'), { isUpstream: true });
   await assert.rejects(() => getOwnedGames('76561198000000011'), { isUpstream: true });
-  assert.equal(calls, 4);
+  assert.equal(calls, 5);
 });
 
 // ── getWishlist ───────────────────────────────────────────────────────────────
@@ -701,6 +703,23 @@ test('getPlayerSummaries: sends its chunks 3 at a time, the same number of calls
   const ids = Array.from({ length: 500 }, (_, i) => String(76561198000002000n + BigInt(i)));
   await getPlayerSummaries(ids);
   assert.deepEqual({ calls, maxActive }, { calls: 5, maxActive: 3 });
+});
+
+test('getPlayerSummaries: a chunk refused by a spent budget keeps the names its sibling chunks fetch', async (t) => {
+  _reset();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (calls++ === 1) throw Object.assign(new Error('budget'), { isBudgetExhausted: true });
+    await new Promise(setImmediate);
+    const ids = new URL(url).searchParams.get('steamids').split(',');
+    return {
+      ok: true,
+      json: async () => ({ response: { players: ids.map((steamid) => ({ steamid, personaname: 'n' })) } }),
+    };
+  });
+  const ids = Array.from({ length: 300 }, (_, i) => String(76561198000003000n + BigInt(i)));
+  const players = await getPlayerSummaries(ids);
+  assert.equal(players.filter((p) => p.personaname === 'n').length, 200);
 });
 
 test('getPlayerSummaries: returns placeholder players when API fails, does not cache', async (t) => {
