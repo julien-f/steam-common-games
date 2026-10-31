@@ -245,6 +245,16 @@ test('resolveItadIds: a failed chunk keeps the chunks that succeeded', async (t)
   assert.equal(stats.calls, 1, 'only the failed chunk is sent again');
 });
 
+test('resolveSteamAppIds: a failed chunk keeps the chunks that succeeded', async (t) => {
+  _reset();
+  const reply = (gids) => Object.fromEntries(gids.map((g) => [g, ['app/1']]));
+  let stats = mockBatchConcurrency(t, reply, { fail: (n) => n === 3 });
+  await assert.rejects(() => resolveSteamAppIds(ids1000('gid-')), { isUpstream: true });
+  stats = mockBatchConcurrency(t, reply);
+  assert.equal((await resolveSteamAppIds(ids1000('gid-'))).size, 1000);
+  assert.equal(stats.calls, 1, 'only the failed chunk is sent again');
+});
+
 test('getPrices and the id lookups: a reply of another shape is an upstream error', async (t) => {
   const cases = [
     ['getPrices', () => getPrices(['g'], { country: 'US' }), [null, { error: 'x' }]],
