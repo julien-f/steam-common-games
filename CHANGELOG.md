@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The lightbox loads the picture on screen before preloading its neighbours
 - Menus, the game panel, its sections, table rows, banners, cards and hero counts now animate their changes
 - Update dependencies
+- Settings and lists are read faster, and an unchanged setting is no longer re-synced to your account
 
 ### Fixed
 
