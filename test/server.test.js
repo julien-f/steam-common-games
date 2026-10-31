@@ -10,7 +10,7 @@ process.env.NODE_ENV = 'test';
 // wipe the real cache.
 process.env.DB_FILE = '';
 
-const { test } = require('node:test');
+const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { until } = require('./until');
 const http = require('node:http');
@@ -23,9 +23,13 @@ const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { PREFS_MAX_BYTES, SYNCED_PREF_KEYS, getUserPrefs, setUserPref } = require('../lib/auth');
 const { _resetAuth } = require('../lib/hltb');
+const { _resetTagNameMap } = require('../lib/steam');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
 const { getMetrics } = require('../lib/metrics');
+
+// The tag-name map's failure hold-off outlives _reset(), which only empties the cache.
+beforeEach(_resetTagNameMap);
 
 const api = supertest(app);
 
@@ -1133,7 +1137,8 @@ for (const comingSoon of [true, false]) {
       if (url.includes('search/site')) return { ok: true, json: async () => ({ data: [] }) };
       if (url.includes('IStoreBrowseService'))
         return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [] }] } }) };
-      if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+      if (url.includes('ajaxgetstoretags'))
+        return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
       throw new Error(`Unexpected fetch: ${url}`);
     });
     await api.get('/api/game-details/777').expect(200);
@@ -1640,7 +1645,8 @@ for (const [what, hltbFetch, line] of [
           ok: true,
           json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }),
         };
-      if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+      if (url.includes('ajaxgetstoretags'))
+        return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
       if (url.includes('protondb.com')) return { ok: false, status: 404 };
       throw new Error(`Unexpected fetch: ${url}`);
     });
