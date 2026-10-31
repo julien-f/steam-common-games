@@ -229,6 +229,18 @@ test('syncPrefsWithServer (ongoing): equal timestamps on both sides are left alo
   assert.equal(called, false);
 });
 
+test('syncPrefsWithServer (ongoing): a newer server entry with the same value takes its time without a reload', async (t) => {
+  markAlreadySynced();
+  const entries = { schemaVersion: 2, region: { value: 'DE', updatedAt: 500 } };
+  global.localStorage.setItem('steam.isonoe.net:prefs', JSON.stringify(entries));
+  withFetch(t, async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+  const adopted = await auth().syncPrefsWithServer(STEAMID, { region: { value: 'DE', updatedAt: 900 } });
+
+  assert.equal(adopted, false);
+  assert.deepEqual(prefs().getAllPrefEntries().region, { value: 'DE', updatedAt: 900 });
+});
+
 // ── syncPrefsWithServer: table-view keys (baseline tracking, never adopted or pushed) ────
 
 test('syncPrefsWithServer: a table-view key is never adopted or pushed, regardless of what either side has', async (t) => {
