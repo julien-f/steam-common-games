@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Phone lightbox e2e tests no longer fail now and then under load
 - Rate-limiter tests check that a forced refresh of a cached key counts against the budget
 - An HLTB outage logs one throttled [HLTB] warning instead of one line per game
+- Tests check that a coalesced lookup passes on another client's upstream failure, and that a failed metrics write never fails the call it counts
 
 ## [0.12.0] - 2026-10-30
 

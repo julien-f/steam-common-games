@@ -145,6 +145,21 @@ test('clients coalescing onto another client’s refused call retry it once betw
   assert.equal(loads, 2);
 });
 
+test('a client coalescing onto another client’s upstream failure gets that failure, not a retry', async (t) => {
+  setup(t);
+  const withDedup = createDedup();
+  let loads = 0;
+  const load = () => {
+    loads++;
+    return Promise.reject(Object.assign(new Error('upstream down'), { isUpstream: true }));
+  };
+  const a = runAsClient('a', () => refusal(() => withDedup('k', load)));
+  const b = runAsClient('b', () => refusal(() => withDedup('k', load)));
+  assert.equal((await a)?.message, 'upstream down');
+  assert.equal((await b)?.message, 'upstream down');
+  assert.equal(loads, 1);
+});
+
 test('one client’s refused HLTB login doesn’t hold off another client’s', async (t) => {
   setup(t, async (url) => {
     if (url.includes('search/site/init'))
