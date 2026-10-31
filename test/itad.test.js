@@ -259,6 +259,22 @@ test("resolveSteamAppIds: falls back to games/info/v2's own appid when the Steam
   assert.equal(result.get('gid-sub-only'), 292030);
 });
 
+test('resolveSteamAppIds: the games/info/v2 fallback sends the gid encoded', async (t) => {
+  _reset();
+  const gid = 'gid&id=other';
+  t.mock.method(
+    globalThis,
+    'fetch',
+    makeResolveFetch({
+      shopEntries: { [gid]: ['sub/1234'] },
+      steam: { 'sub/1234': { success: false } },
+      info: { [gid]: { appid: 292030 } },
+    }),
+  );
+  const result = await resolveSteamAppIds([gid]);
+  assert.equal(result.get(gid), 292030);
+});
+
 test('resolveSteamAppIds: still resolves to null when neither the Steam expansion nor the games/info/v2 fallback has an appid', async (t) => {
   _reset();
   t.mock.method(
