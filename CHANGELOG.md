@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - For large lists, prices, bundle games and friend names are requested three batches at a time instead of one after another
 - The server clears expired cached data every hour instead of only when it restarts
 - Game lists load with less data and server work: the details stream is compressed in larger pieces
+- Requires Node.js 22.15 or later.
 
 ### Fixed
 

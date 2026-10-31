@@ -91,7 +91,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 - **Symptom**: `require('../public/gameColumns.ts')` (or any module importing `@vates/data-table-solid`) throws `ReferenceError: window is not defined` under `node:test`.
 - **Cause**: `@vates/data-table-solid` touches `window` when it loads.
-- **Fix**: resolve it to `@vates/data-table-core`, which provides the helpers, with a `module.registerHooks` resolve hook in the test (see `test/gameColumns.test.js`; needs Node ≥ 22.15).
+- **Fix**: resolve it to `@vates/data-table-core`, which provides the helpers, with a `module.registerHooks` resolve hook in the test (see `test/gameColumns.test.js`).
 
 ## A unit test's effect never re-runs on a module's signal
 
