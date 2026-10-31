@@ -95,7 +95,7 @@ test('steam-store circuit breaker: requests already queued when it trips never r
   assert.ok(fetchMock.mock.callCount() <= 3, `${fetchMock.mock.callCount()} requests`);
 });
 
-test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers can skip re-logging it', async (t) => {
+test('fetchStoreApi: the circuit-open error is marked isLogged so callers can skip re-logging it', async (t) => {
   _reset();
   _resetCircuitBreakers();
   t.after(_resetCircuitBreakers);
@@ -105,7 +105,7 @@ test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers c
   await assert.rejects(() => getAppDetails(421)); // trips it
   await assert.rejects(
     () => getAppDetails(422),
-    (err) => err.isCircuitOpen === true && err.isUpstream === true,
+    (err) => /circuit open/.test(err.message) && err.isLogged === true && err.isUpstream === true,
   );
 });
 
@@ -1631,10 +1631,7 @@ test('getProtonDbStatus: two 403s in a row (a blanket bot-block) open the circui
 
   await assert.rejects(() => getProtonDbStatus(400));
   await assert.rejects(() => getProtonDbStatus(401));
-  await assert.rejects(
-    () => getProtonDbStatus(402),
-    (err) => err.isCircuitOpen === true,
-  );
+  await assert.rejects(() => getProtonDbStatus(402), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.ok(getCircuitBreakers().protondb.blockedUntil > Date.now());
 });

@@ -271,10 +271,7 @@ test('getHLTB: two fresh-token 401s in a row open the circuit like 403s', async 
   const calls = fetchMock.mock.callCount();
 
   t.mock.timers.tick(31 * 1000);
-  await assert.rejects(
-    () => getHLTB(3, 'Portal 2'),
-    (err) => err.isCircuitOpen === true,
-  );
+  await assert.rejects(() => getHLTB(3, 'Portal 2'), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), calls, 'no request while the circuit is open');
 });
 
@@ -315,10 +312,7 @@ test('getHLTB: two search 403s in a row open the circuit for 5 minutes, failing 
   const calls = fetchMock.mock.callCount();
 
   t.mock.timers.tick(31 * 1000);
-  await assert.rejects(
-    () => getHLTB(3, 'Portal 2'),
-    (err) => err.isCircuitOpen === true,
-  );
+  await assert.rejects(() => getHLTB(3, 'Portal 2'), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), calls, 'no request while the circuit is open');
 
   t.mock.timers.tick(5 * 60 * 1000);
@@ -599,13 +593,13 @@ test('getHLTB: searches queued on a fresh token that 401s count as one block, no
   );
 
   const batch = ['Portal', 'Half-Life', 'Half-Life 2', 'Portal 2'].map((name, i) => getHLTB(i + 1, name));
-  for (const p of batch) await assert.rejects(p, (err) => !err.isCircuitOpen);
+  for (const p of batch) await assert.rejects(p, (err) => !/circuit open/.test(err.message));
 
   t.mock.timers.tick(31 * 1000);
   const calls = fetchMock.mock.callCount();
   await assert.rejects(
     () => getHLTB(5, 'Quake'),
-    (err) => !err.isCircuitOpen,
+    (err) => !/circuit open/.test(err.message),
   );
   assert.ok(fetchMock.mock.callCount() > calls, 'the circuit stayed closed: a new token is tried');
 });
