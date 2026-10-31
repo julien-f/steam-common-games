@@ -4102,8 +4102,8 @@ test("B1 edge: on a phone, every game's name stays in view while the table scrol
 
 test('B1 edge: figures line up: number columns align to the end, text to the start', async ({ page }) => {
   await asPlayer(page, ALICE);
-  await page.goto('/lists/bundle/90002');
-  await expect(rows(page)).toHaveCount(5);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
   for (const key of ['tierPrice', 'bestDealCut', 'steamdbRating'])
     await expect(page.locator(`.dt-td[data-col-key="${key}"]`).first()).toHaveCSS('text-align', 'end');
   await expect(page.locator('.dt-td[data-col-key="name"]').first()).not.toHaveCSS('text-align', 'end');
@@ -4130,23 +4130,27 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   await expect(rows(page)).toHaveCount(5);
   // USD-only on a EUR region, so each price carries its estimate, as in the bundle list.
   await expect(page.locator('.bundle-tier-chip')).toHaveText([/^1 for \$2\.00 \(≈ €[\d.]+\)$/, /^3 for \$3\.50 \(≈ €/]);
-  await expect(row(page, 'Hades')).toContainText('$2.00/game');
+  // Grouped by what to pick first, the rate (the same on every row) left to the hero and the selection.
+  await expect(page.locator('thead th').filter({ hasText: /^Per pick/ })).toHaveCount(0);
+  // Alice owns all but Don't Starve Together (Hades, owned and wishlisted, goes with the owned).
+  await expect(groupRows(page)).toHaveText([/Not Owned/, /Owned/]);
+  await expect(rows(page).first()).toContainText("Don't Starve Together");
 
   await row(page, 'Portal 2').getByRole('checkbox').check();
   await expect(page.locator('.selection-pick-total')).toHaveText(/^\$2\.00 \(≈ €[\d.]+\)$/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('1 pick · 1-game tier');
-  await expect(page.locator('.selection-pick-savings')).toHaveText(/^(saves .+|.+ more|same as best deals)$/);
+  // Alice owns Portal 2: a pick that saves nothing.
+  await expect(page.locator('.selection-pick-savings')).toHaveText(/^.+ more$/);
+  await expect(page.locator('.selection-pick-owned')).toHaveText('1 you own · not in the saving');
   // Two picks cost less at the 3-game tier than bought one at a time.
   await row(page, 'Hades').getByRole('checkbox').check();
   await expect(page.locator('.selection-pick-total')).toHaveText(/^\$3\.50 \(≈ €/);
   await expect(page.locator('.selection-pick-detail')).toHaveText('2 picks · 3-game tier · 1 more free');
   await expect(page.locator('.bundle-tier-chip--active')).toHaveText(/^3 for \$3\.50/);
-  await expect(row(page, 'Hades')).toContainText('$1.17/game');
 
   // A package's two rows are one pick, ticked and unticked together.
-  const pack = rows(page).filter({ has: page.locator('.tier-package') });
-  await expect(pack).toHaveText([/Hollow Knight/, /Don't Starve Together/]);
-  await expect(pack.filter({ hasText: 'included' })).toHaveCount(1);
+  const pack = rows(page).filter({ hasText: 'package · 2 games' });
+  await expect(pack).toHaveText([/Don't Starve Together/, /Hollow Knight/]);
   await pack.nth(0).getByRole('checkbox').check();
   await expect(pack.nth(1).getByRole('checkbox')).toBeChecked();
   await expect(page.locator('.selection-pick-detail')).toHaveText('3 picks · 3-game tier');
@@ -4156,7 +4160,7 @@ test('B1 edge: a pick-and-mix bundle prices the selected games', async ({ page }
   const buy = page.getByRole('link', { name: 'Buy 3 on Fanatical ↗' });
   const href = new URL((await buy.getAttribute('href')) ?? '');
   expect(href.origin + href.pathname).toBe('https://example.invalid/bundle');
-  expect(JSON.parse(href.searchParams.get('scg') ?? '')).toEqual(['Portal 2', 'Hades', 'Test Survival Pack']);
+  expect(JSON.parse(href.searchParams.get('scg') ?? '')).toEqual(['Test Survival Pack', 'Portal 2', 'Hades']); // in table order
   await expect(page.getByRole('link', { name: 'Add to Fanatical' })).toHaveAttribute('href', /^javascript:/);
   await row(page, 'Terraria').getByRole('checkbox').check();
   await expect(page.locator('.selection-fanatical-by-hand')).toHaveText('1 to pick by hand');

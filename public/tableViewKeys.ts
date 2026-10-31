@@ -6,6 +6,7 @@ export const TABLE_VIEW_PREF_KEYS: readonly string[] = [
   'ownedListView',
   'wishlistListView',
   'bundleListView',
+  'pickBundleListView',
   'recentListView',
   'compareListView',
   'sharedListView',

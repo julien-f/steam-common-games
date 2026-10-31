@@ -13,6 +13,7 @@ test('TABLE_VIEW_PREF_KEYS: covers every shared table-view pref key', () => {
     'creatorListView',
     'gamePassListView',
     'ownedListView',
+    'pickBundleListView',
     'recentListView',
     'sharedListView',
     'wishlistListView',

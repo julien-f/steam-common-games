@@ -100,6 +100,7 @@ import {
   priceTierGroup,
   compareNumMissingLast,
   OWNERSHIP_STATUS_COLUMN,
+  PICK_OWNERSHIP_COLUMN,
   SOURCE_NAMES,
 } from './gameColumns.ts';
 import {
@@ -581,23 +582,16 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
             ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
             : `${formatMoney(Number(v), row.tierCurrency)}${row.tierPerGame ? '/game' : ''}`;
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
-  const rangeTitle = row.tierPriceMax != null ? TIER_RANGE_TITLE : null;
-  if (!pkg) {
-    if (!rangeTitle) return document.createTextNode(price);
-    const span = document.createElement('span');
-    span.title = rangeTitle;
-    span.textContent = price;
-    return span;
-  }
   // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
-  const wrap = document.createElement('span');
-  wrap.className = 'tier-package';
-  wrap.title = `Part of ${pkg.title}: ${pkg.size} games bought together${row.tierPerGame ? ', as one pick' : ''}${rangeTitle ? `. ${rangeTitle}` : ''}`;
-  wrap.append(row.tierPerGame && !pkg.lead ? 'included' : price);
-  const note = document.createElement('small');
-  note.textContent = `package · ${pkg.size} games`;
-  wrap.append(note);
-  return wrap;
+  const included = pkg && row.tierPerGame && !pkg.lead;
+  const title = [included && `Included in the ${pkg.title} pick`, row.tierPriceMax != null && TIER_RANGE_TITLE].filter(
+    Boolean,
+  );
+  if (!title.length) return document.createTextNode(price);
+  const span = document.createElement('span');
+  span.title = title.join('. ');
+  span.textContent = included ? 'included' : price;
+  return span;
 }
 
 const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
@@ -670,6 +664,16 @@ const BUNDLE_DEFAULT_VISIBLE = [
 ];
 const BUNDLE_DEFAULT_SORT: SortEntry[] = [
   { key: 'tierPrice', dir: 'asc' },
+  { key: 'steamdbRating', dir: 'desc' },
+];
+// A pick-and-mix bundle: one rate for every game (in the hero and the selection bar), so no Per pick
+// column; grouped by what to pick first.
+const PICK_BUNDLE_COLUMNS = BUNDLE_COLUMNS.map((c) =>
+  c.key === 'ownershipStatus' ? PICK_OWNERSHIP_COLUMN : c.key === 'tierPrice' ? { ...c, label: 'Per pick' } : c,
+);
+const PICK_BUNDLE_DEFAULT_VISIBLE = BUNDLE_DEFAULT_VISIBLE.filter((key) => key !== 'tierPrice');
+const PICK_BUNDLE_DEFAULT_SORT: SortEntry[] = [
+  { key: 'ownershipStatus', dir: 'asc' },
   { key: 'steamdbRating', dir: 'desc' },
 ];
 
@@ -2113,7 +2117,8 @@ export default function ListRoute() {
     // own to hang a view on" reasoning above applies just as much here, and a link is one-off by
     // nature (a bookmark of *this* view specifically is what "🔗 Share view" is already for).
     if (kind === 'shared') return 'sharedListView';
-    if (kind === 'bundle') return 'bundleListView';
+    // Pick-and-mix bundles share their own layout: grouped and sorted for picking, not by tier.
+    if (kind === 'bundle') return untrack(bundleMeta)?.model === 'pick' ? 'pickBundleListView' : 'bundleListView';
     if (kind === 'recent') return 'recentListView';
     if (kind === 'creator') return 'creatorListView';
     if (kind === 'game-pass') return 'gamePassListView';
@@ -2184,7 +2189,8 @@ export default function ListRoute() {
     if (saved) return saved.name;
     const list = userList();
     if (list) return `the layout of “${list.name}”`;
-    return exploringSomeoneElse() ? 'this table' : `your ${LAYOUT_NAMES[kind] ?? 'list'} layout`;
+    const name = kind === 'bundle' && bundleMeta()?.model === 'pick' ? 'pick & mix bundle' : LAYOUT_NAMES[kind];
+    return exploringSomeoneElse() ? 'this table' : `your ${name ?? 'list'} layout`;
   }
   function layoutNote(): string {
     return exploringSomeoneElse()
@@ -2807,6 +2813,7 @@ export default function ListRoute() {
       setTasteFitSource(tasteSource);
       const priced = kind === 'user' && pricesShown;
       const sharedPriced = (kind === 'shared' || kind === 'creator' || kind === 'game-pass') && pricesShown;
+      const pickBundle = kind === 'bundle' && untrack(bundleMeta)?.model === 'pick';
       const columns = insertColumnsAfter(
         isRanked
           ? priced
@@ -2817,7 +2824,9 @@ export default function ListRoute() {
               ? WISHLIST_COLUMNS
               : WISHLIST_NOPRICE_COLUMNS
             : kind === 'bundle'
-              ? BUNDLE_COLUMNS
+              ? pickBundle
+                ? PICK_BUNDLE_COLUMNS
+                : BUNDLE_COLUMNS
               : kind === 'user'
                 ? priced
                   ? tiered
@@ -2859,7 +2868,9 @@ export default function ListRoute() {
         : kind === 'wishlist'
           ? WISHLIST_DEFAULT_VISIBLE.filter((key) => pricesShown || !PRICE_KEYS.has(key))
           : kind === 'bundle'
-            ? BUNDLE_DEFAULT_VISIBLE
+            ? pickBundle
+              ? PICK_BUNDLE_DEFAULT_VISIBLE
+              : BUNDLE_DEFAULT_VISIBLE
             : (kind === 'user' && priced) || sharedPriced
               ? [...RECENT_DEFAULT_VISIBLE, ...(tiered ? ['tierPrice'] : []), ...PRICED_DEFAULT_VISIBLE]
               : kind === 'recent'
@@ -2874,7 +2885,9 @@ export default function ListRoute() {
       const sort = isRanked
         ? RANKED_DEFAULT_SORT
         : kind === 'bundle'
-          ? BUNDLE_DEFAULT_SORT
+          ? pickBundle
+            ? PICK_BUNDLE_DEFAULT_SORT
+            : BUNDLE_DEFAULT_SORT
           : kind === 'recent'
             ? LOOKED_UP_DEFAULT_SORT
             : DEFAULT_SORT;
@@ -2893,7 +2906,7 @@ export default function ListRoute() {
           pageSize: 50,
           visibleCols: defaultVisible,
           sorts: sort,
-          ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : {}),
+          ...(groups ? { groupBy: [MEMBERSHIP_KEY] } : pickBundle ? { groupBy: ['ownershipStatus'] } : {}),
         };
         const state = createTableState<Game>(tableData, allColumns, {
           initialViewState: tableDefaults,
@@ -3162,6 +3175,25 @@ export default function ListRoute() {
       r.bestDealPrice == null ? null : convert(r.bestDealPrice, r.priceCurrency ?? currency, currency),
     );
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
+  }
+  // The selected picks already owned (a package only when every row of it is): they cost a pick but
+  // add nothing, so the saving leaves them out.
+  function selectedOwnedGids(): Set<string | number> {
+    const owned = new Map<string | number, boolean>();
+    for (const r of selectedRows()) {
+      const key = gidOf(r.appid) ?? r.appid;
+      owned.set(key, (owned.get(key) ?? true) && !!r.inLibrary);
+    }
+    return new Set([...owned].filter(([, all]) => all).map(([key]) => key));
+  }
+  // What the selection's picks not owned are worth at their best deals, in `currency`; boxed, so 0 still shows.
+  function pickDeals(currency: string): { amount: number } | null {
+    const owned = selectedOwnedGids();
+    const amount = sumBestDeals(
+      selectedRows().filter((r) => !owned.has(gidOf(r.appid) ?? r.appid)),
+      currency,
+    );
+    return amount == null ? null : { amount };
   }
 
   // The pressed tier, read back from the filter so the table's own Clear filters unpresses it; a
@@ -4522,14 +4554,21 @@ export default function ListRoute() {
                   </output>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
-                <Show when={sumBestDeals(selectedRows(), plan().currency)}>
+                <Show when={pickDeals(plan().currency)}>
                   {(deals) => (
                     <span
                       class="selection-pick-savings"
-                      style={{ color: pickSavings(plan(), deals()).overpays ? 'var(--bad)' : 'var(--good)' }}
-                      title={`vs ${formatMoney(deals(), plan().currency)} for the same games at their best deals`}
+                      style={{ color: pickSavings(plan(), deals().amount).overpays ? 'var(--bad)' : 'var(--good)' }}
+                      title={`vs ${formatMoney(deals().amount, plan().currency)} for the games you don't own at their best deals`}
                     >
-                      {pickSavings(plan(), deals()).text}
+                      {pickSavings(plan(), deals().amount).text}
+                    </span>
+                  )}
+                </Show>
+                <Show when={selectedOwnedGids().size}>
+                  {(owned) => (
+                    <span class="selection-pick-owned" style={{ color: 'var(--owned)' }}>
+                      {owned()} you own · not in the saving
                     </span>
                   )}
                 </Show>
