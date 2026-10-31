@@ -23,6 +23,7 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C191 · cleanup · S** — `public/combine.ts:62` holds a literal NUL byte inside a string, so editing tools refuse the file (a fix had to move `isCombineOp` to `public/listsStore.ts` instead). Write it as the `\0` escape.
 - **C192 · cleanup · M** — the combine op set is stated three times: `OP_LABELS` (`public/listLabels.ts`), `COMBINE_OPS` in `public/listsStore.ts` (for `isCombineOp`) and a differently shaped `COMBINE_OPS` in `public/CombineForm.tsx`. Move the op table to a small module both stores import (`public/listLabels.ts` importing `public/listsStore.ts` rules out the direct way).
 - **C193 · cleanup · M** — the panel's More links menu hand-rolls window-capture Esc, outside-click and focus-leave closing (`public/panel.tsx`), a second copy of what `bindNavPopover` (`public/navPopover.ts`) does, already diverged. Make it a native popover bound with `bindNavPopover`.
+- **C268 · cleanup · S** — `isGamePassCached` (`lib/gamepass.js`) repeats `getGamePass`'s walk (catalog → `catalogGids` → `splitEntries` → title keys) over the cache; only the key builders are shared, so a change to the walk must be made twice. One walk parameterized by "fetch" vs. "peek the cache" would state it once.
 
 ## Correctness
 
