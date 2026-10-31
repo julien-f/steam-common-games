@@ -1610,6 +1610,53 @@ test('POST /api/game-details/stream: does not log [game-details] for meta blocke
   assert.equal(warnMock.mock.calls.filter((c) => /\[game-details\]/.test(c.arguments[0])).length, 0);
 });
 
+// An HLTB outage warns once from lib/hltb.js (throttled), not once per game from logErr.
+for (const [what, hltbFetch, line] of [
+  ['init', () => ({ ok: false, status: 503 }), /^\[HLTB\] init failed/],
+  [
+    'search',
+    (url) =>
+      url.includes('search/site/init')
+        ? { ok: true, json: async () => ({ token: 'tok', hpKey: 'k', hpVal: 'v' }) }
+        : { ok: false, status: 500 },
+    /^\[HLTB\] search failed/,
+  ],
+]) {
+  test(`GET /api/game-details: a failing HLTB ${what} warns once for a batch, with no [game-details] hltb line`, async (t) => {
+    _reset();
+    _resetAuth();
+    t.after(_resetAuth);
+    const warnMock = t.mock.method(console, 'warn', () => {});
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      if (url.includes('howlongtobeat.com')) return hltbFetch(url);
+      if (url.includes('appdetails')) {
+        const appid = url.match(/appids=(\d+)/)?.[1];
+        return { ok: true, json: async () => ({ [appid]: { success: true, data: { name: `Game ${appid}` } } }) };
+      }
+      if (url.includes('GetAppReviews')) return { ok: true, json: async () => ({ response: {} }) };
+      if (url.includes('IStoreBrowseService'))
+        return {
+          ok: true,
+          json: async () => ({ response: { store_items: [{ success: 1, tagids: [], related_items: {} }] } }),
+        };
+      if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+      if (url.includes('protondb.com')) return { ok: false, status: 404 };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    for (const appid of [911, 912, 913]) {
+      const res = await api.get(`/api/game-details/${appid}`);
+      assert.ok(res.body.failed.includes('hltb'));
+    }
+    const lines = warnMock.mock.calls.map((c) => String(c.arguments[0]));
+    assert.deepEqual(
+      lines.filter((l) => l.startsWith('[game-details]')),
+      [],
+    );
+    assert.equal(lines.filter((l) => line.test(l)).length, 1);
+  });
+}
+
 // ── GET /api/search-games ─────────────────────────────────────────────────────
 
 // ── GET /api/creator-games ────────────────────────────────────────────────────
