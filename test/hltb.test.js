@@ -3,7 +3,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { levenshtein, stringSimilarity, getHLTB, buildSearchTerms, _resetAuth } = require('../lib/hltb');
-const { _reset } = require('../lib/cache');
+const { _reset, getCached, setCache } = require('../lib/cache');
+const { db } = require('../lib/db');
+const { MISS_CACHE_TTL_MS } = require('../lib/config');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 
 // ── levenshtein ───────────────────────────────────────────────────────────
@@ -124,17 +126,34 @@ test('getHLTB: returns null for empty name', async () => {
   assert.equal(result, null);
 });
 
-test('getHLTB: returns null without fetching when name is only stripped symbols', async (t) => {
-  _reset();
-  _resetAuth();
-  let fetchCalled = false;
-  t.mock.method(globalThis, 'fetch', async () => {
-    fetchCalled = true;
+// A skipped game is cached as a miss, so its HLTB source has an age and counts as cached.
+for (const [label, name, type] of [
+  ['no name', undefined, 'game'],
+  ['a name of stripped symbols only', '™', 'game'],
+  ['a type HLTB does not time', 'Portal OST', 'music'],
+]) {
+  test(`getHLTB: caches a short-lived miss without fetching for ${label}`, async (t) => {
+    _reset();
+    _resetAuth();
+    const fetchMock = t.mock.method(globalThis, 'fetch', async () => {
+      throw new Error('unexpected fetch');
+    });
+    assert.equal(await getHLTB(1, name, { type }), null);
+    assert.deepEqual(getCached('hltb:1'), []);
+    const { expires } = db.prepare('SELECT expires FROM cache_meta WHERE key = ?').get('hltb:1');
+    assert.ok(expires - Date.now() <= MISS_CACHE_TTL_MS);
+    assert.equal(fetchMock.mock.callCount(), 0);
   });
+}
 
-  const result = await getHLTB(1, '™®©');
-  assert.equal(result, null);
-  assert.equal(fetchCalled, false);
+test('getHLTB: a skipped game keeps an existing entry, unless forced', async () => {
+  _reset();
+  const real = [{ game_id: 42, game_name: 'Portal OST', comp_main: 3600 }];
+  setCache('hltb:1', real);
+  await getHLTB(1, 'Portal OST', { type: 'music' });
+  assert.deepEqual(getCached('hltb:1'), real);
+  await getHLTB(1, 'Portal OST', { type: 'music', force: true });
+  assert.deepEqual(getCached('hltb:1'), []);
 });
 
 test('getHLTB: returns main and extra hours on match', async (t) => {

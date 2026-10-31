@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Games no longer all show no tags after Steam answers the tag list with an empty reply
 - Refreshing an account while Steam fails keeps its known name and avatar instead of showing its Steam ID
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
+- A game whose store name is only a trademark sign no longer counts against the details budget on every load
 
 ### Development
 
