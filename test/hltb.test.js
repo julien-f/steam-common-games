@@ -585,3 +585,43 @@ test('getHLTB: a search already waiting out a pause waits for a longer one that 
   assert.equal(searches.length, 3);
   await waiting;
 });
+
+test('getHLTB: searches queued on a fresh token that 401s count as one block, not a trip', async (t) => {
+  _reset();
+  _resetAuth();
+  _resetCircuitBreakers();
+  t.after(_resetAuth);
+  t.after(_resetCircuitBreakers);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('search/site/init') ? makeInitResponse() : { ok: false, status: 401 },
+  );
+
+  const batch = ['Portal', 'Half-Life', 'Half-Life 2', 'Portal 2'].map((name, i) => getHLTB(i + 1, name));
+  for (const p of batch) await assert.rejects(p, (err) => !err.isCircuitOpen);
+
+  t.mock.timers.tick(31 * 1000);
+  const calls = fetchMock.mock.callCount();
+  await assert.rejects(
+    () => getHLTB(5, 'Quake'),
+    (err) => !err.isCircuitOpen,
+  );
+  assert.ok(fetchMock.mock.callCount() > calls, 'the circuit stayed closed: a new token is tried');
+});
+
+test("getHLTB: the search warning keeps a network failure's cause", async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    throw new TypeError('fetch failed', { cause: new Error('ECONNRESET') });
+  });
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  const warned = warnMock.mock.calls.map((c) => c.arguments.map(String).join(' ')).find((l) => l.startsWith('[HLTB]'));
+  assert.match(warned, /ECONNRESET/);
+});
