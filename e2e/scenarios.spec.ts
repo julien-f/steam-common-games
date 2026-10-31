@@ -7164,6 +7164,46 @@ test.describe('with motion on', () => {
     expect(await arrivals()).toHaveLength(6);
   });
 
+  test('L3 edge: a sort slides each row to its new place; typing a search moves nothing', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await expect(rows(page)).toHaveCount(6);
+    await expect(page.locator('.dt-tr--arrive')).toHaveCount(0);
+    // Records each row slide's start offset as it begins: a 250 ms slide may be over by the next round trip.
+    await page.evaluate(() => {
+      const w = window as unknown as { slides: string[] };
+      w.slides = [];
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+        const [frames, options] = args as [Keyframe[], KeyframeAnimationOptions];
+        if (options?.id === 'row-slide') w.slides.push(String(frames[0].translate ?? 'fade'));
+        return animate.apply(this, args);
+      };
+    });
+    const slides = () => page.evaluate(() => (window as unknown as { slides: string[] }).slides.splice(0));
+    // Synthetic: the slide's start positions are read on the pointerdown.
+    await page.locator('.dt-th-sort', { hasText: 'Name' }).evaluate((b: HTMLElement) => {
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      b.click();
+    });
+    await expect(rows(page).first()).toContainText('Hades');
+    const started = await slides();
+    expect(started.length).toBeGreaterThan(0);
+    for (const offset of started) expect(offset).toMatch(/^0 -?\d+(\.\d+)?px$/);
+    await page.evaluate(() => document.getAnimations().forEach((a) => a.id === 'row-slide' && a.finish()));
+    expect(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('tr[data-row-key]')].map((r) => {
+          const cs = getComputedStyle(r);
+          return `${cs.translate} ${cs.opacity}`;
+        }),
+      ),
+    ).toEqual(Array(6).fill('none 1'));
+    await page.locator('.dt-toolbar input').first().pressSequentially('hades');
+    await expect(rows(page)).toHaveCount(1);
+    expect(await slides()).toEqual([]);
+  });
+
   test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
     page,
   }) => {

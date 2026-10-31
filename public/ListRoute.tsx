@@ -62,7 +62,7 @@ import { createStore, produce, unwrap } from 'solid-js/store';
 import { render } from 'solid-js/web';
 import { A, useParams, useLocation, useNavigate } from '@solidjs/router';
 import { createTableState, DataTableView, datePartGroup } from '@vates/data-table-solid';
-import { cascadeFirstRows } from './motion.ts';
+import { cascadeFirstRows, slideRowsOnViewChange } from './motion.ts';
 import type { ColumnDef, SortEntry, TableState, TableViewState } from '@vates/data-table-solid';
 import {
   commonGround,
@@ -2902,6 +2902,7 @@ export default function ListRoute() {
             () => state.processedData().length,
             () => tableContainer,
           );
+        slideRowsOnViewChange(state, () => tableContainer);
         return state;
       });
       table = ts;

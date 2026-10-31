@@ -23,7 +23,7 @@ import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } 
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
-import { cascadeFirstRows } from './motion.ts';
+import { cascadeFirstRows, slideRowsOnViewChange } from './motion.ts';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
 import { fadeInOnLoad, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
@@ -309,6 +309,7 @@ export default function BundlesBrowseRoute() {
     () => table.processedData().length,
     () => tableContainer,
   );
+  slideRowsOnViewChange(table, () => tableContainer);
   // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
