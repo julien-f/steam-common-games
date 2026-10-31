@@ -126,11 +126,16 @@ const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh =
 
 // /api/bundles' query, shared with bundlesListLimit's skip so both compute the same cache key.
 const MAX_BUNDLES_OFFSET = 10_000; // 200 "Load more" pages: past it, an empty page ends the list
+// An integer, or `fallback` when missing, zero or not finite: `?limit=0.5` still clamps to 1, not 20.
+function queryInt(value, fallback) {
+  const n = Number(value);
+  return Number.isFinite(n) && n !== 0 ? Math.floor(n) : fallback;
+}
 function parseBundlesQuery(req) {
   return {
     country: parseCountry(req),
-    offset: Math.max(0, Math.floor(Number(req.query.offset)) || 0),
-    limit: Math.min(50, Math.max(1, Math.floor(Number(req.query.limit)) || 20)),
+    offset: Math.max(0, queryInt(req.query.offset, 0)),
+    limit: Math.min(50, Math.max(1, queryInt(req.query.limit, 20))),
     sort: '-publish', // the only order the frontend asks for (BundlesBrowseRoute's FETCH_SORT)
     expired: req.query.expired === '1' || req.query.expired === 'true',
   };

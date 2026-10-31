@@ -2873,6 +2873,21 @@ test('GET /api/bundles: an unknown sort falls back to the default, offset is an 
   assert.equal(urls[0].get('offset'), '50');
 });
 
+test('GET /api/bundles: a non-finite offset reads as 0, a fractional limit clamps to 1', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const urls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(new URL(String(url)).searchParams);
+    return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
+  });
+  const res = await api.get('/api/bundles?offset=Infinity&limit=0.5').expect(200);
+  assert.equal(res.body.offset, 0);
+  assert.equal(res.body.limit, 1);
+  assert.equal(urls[0].get('offset'), '0');
+  assert.equal(urls[0].get('limit'), '1');
+});
+
 // Load more stops at an empty page: a clamped offset would serve the cap's page again and again.
 test('GET /api/bundles: an empty page past the offset cap, without an upstream call', async (t) => {
   _reset();
