@@ -228,6 +228,7 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
     { id: 'A', gid: 'g1' },
     { id: 'B', gid: 'g2' },
     { id: 'C', gid: undefined },
+    { id: 'E', gid: 'g2' }, // another edition of B: the route never fetches its title
   ]);
   // The route still resolves uncached gids and fetches uncached titles behind a cached catalog.
   setCache('gamepass:pc:IT', [{ id: 'A', gid: 'g-unresolved' }]);

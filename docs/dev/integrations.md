@@ -193,7 +193,7 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
 
 ### Rate limiting
 
-- `BUNDLES_RATE_LIMIT_MAX` backs six limiters — `bundlesListLimit`, `bundlesByIdLimit`, `bundlesResolveLimit`, `pricesLimit`, `gameBundlesLimit`, `gamePassLimit` — each `skip`ping a request it can answer from cache by rebuilding that route's cache key (the same pattern as `detailsLimit`). Without the skip, reloading a bundle page a few times would 429 a genuinely new bundle open.
+- `BUNDLES_RATE_LIMIT_MAX` backs six limiters — `bundlesListLimit`, `bundlesByIdLimit`, `bundlesResolveLimit`, `pricesLimit`, `gameBundlesLimit`, `gamePassLimit` — each `skip`ping a request it can answer from cache by checking every cache key that route would read (the same pattern as `detailsLimit`). Without the skip, reloading a bundle page a few times would 429 a genuinely new bundle open.
 - `pricesLimit` checks `itad-price:` for whichever of `gids`/`appids` was sent, plus `itad-gid:` for `appids`.
 - `bundlesByIdLimit` can't skip — `findBundleById` walks a variable number of pages — so it gets twice the budget instead; its pages are still cached underneath.
 
