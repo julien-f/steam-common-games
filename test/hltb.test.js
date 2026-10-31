@@ -119,16 +119,10 @@ function makeSearchResponse(results) {
   return { ok: true, status: 200, json: async () => ({ data: results }) };
 }
 
-test('getHLTB: returns null for empty name', async () => {
-  _reset();
-  _resetAuth();
-  const result = await getHLTB(1, '');
-  assert.equal(result, null);
-});
-
 // A skipped game is cached as a miss, so its HLTB source has an age and counts as cached.
 for (const [label, name, type] of [
   ['no name', undefined, 'game'],
+  ['an empty name', '', 'game'],
   ['a name of stripped symbols only', '™', 'game'],
   ['a type HLTB does not time', 'Portal OST', 'music'],
 ]) {
@@ -141,6 +135,7 @@ for (const [label, name, type] of [
     assert.equal(await getHLTB(1, name, { type }), null);
     assert.deepEqual(getCached('hltb:1'), []);
     const { expires } = db.prepare('SELECT expires FROM cache_meta WHERE key = ?').get('hltb:1');
+    assert.notEqual(expires, null);
     assert.ok(expires - Date.now() <= MISS_CACHE_TTL_MS);
     assert.equal(fetchMock.mock.callCount(), 0);
   });
