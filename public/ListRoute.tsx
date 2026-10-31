@@ -160,7 +160,7 @@ import {
   DEFAULT_COMPARE_OP,
 } from './urlState.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
-import { UnsavedChangesBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { UnsavedChangesBanner, ViewActions } from './TableViewControls.tsx';
 import {
   PLAY_NEXT_MAX_HOURS,
   VIEW_TEMPLATES,

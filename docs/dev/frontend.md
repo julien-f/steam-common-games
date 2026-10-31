@@ -124,7 +124,7 @@ source  ::= "o:" accountId | "w:" accountId | "b:" bundleId | "d:" name | "p:" n
 - `gameSearch.ts` — the combobox/debounce UI for "look up any game" (the shell owns where results go).
 - `urlState.ts` — param parsing, canonical param order, and the `?game=`/`&shot=`/`?u=` writers.
 - `prefs.ts` / `StorageFullBanner.tsx` / `prefsPopover.tsx` / `region.ts` / `navPopover.ts` — the localStorage preference blob; the banner when storage refuses a write of it; the Preferences panel's contents; the region preference and its detection; nav popovers' Escape and positioning.
-- `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `UnsavedViewBanner.tsx` — a table's layout draft, restore/share/reset; the table-view pref keys; what a stored layout leaves out and which parts differ; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
+- `tableViewPrefs.ts` / `tableViewKeys.ts` / `tableViewSync.ts` / `SharedViewBanner.tsx` / `TableViewControls.tsx` — a table's layout draft, restore/share/reset; the table-view pref keys; what a stored layout leaves out and which parts differ; the shared-layout and unsaved-changes banners and the Share/Default view buttons.
 - `listViews.ts` / `ViewTabs.tsx` — Owned/Wishlist's saved views and their templates; the tabs, the active view's ⋯ and the hero's New view menu.
 - `clipboard.ts` / `CopyButton.tsx` — the one copy-then-confirm helper behind every copy button (`copyWithFeedback` for plain DOM buttons, `<CopyButton>` for JSX), with a `window.prompt` fallback where the Clipboard API isn't available (it needs a secure context, and can be permission-denied).
 - `pageTitle.ts` — the two-layer `document.title` (route context, overridden by an open game).

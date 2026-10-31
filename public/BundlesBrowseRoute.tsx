@@ -49,7 +49,7 @@ import { openPrefsPopover } from './prefsPopover.tsx';
 import { shareTableView, resetTableView, bindViewPersistence, prefViewStore, layoutDraft } from './tableViewPrefs.ts';
 import { createStaleGuard } from './staleGuard.ts';
 import { SharedViewBanner } from './SharedViewBanner.tsx';
-import { UnsavedChangesBanner, ViewActions } from './UnsavedViewBanner.tsx';
+import { UnsavedChangesBanner, ViewActions } from './TableViewControls.tsx';
 import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
