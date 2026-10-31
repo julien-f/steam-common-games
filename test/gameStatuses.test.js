@@ -41,24 +41,24 @@ test('setStatus: sets, replaces and clears a status, storing one letter per game
   assert.deepEqual(require('../public/prefs.ts').getPref('gameStatuses'), { 400: 'f' });
 });
 
-test('statusesApply: with no ★ account, the stored current account but not a ?u= link', () => {
+test('showingMyAccount: with no ★ account, the stored current account but not a ?u= link', () => {
   const { setCurrentAccount, setAccountOverride } = accounts();
-  assert.equal(mod().statusesApply(), false);
+  assert.equal(accounts().showingMyAccount(), false);
   setCurrentAccount(slot('1'));
-  assert.equal(mod().statusesApply(), true);
+  assert.equal(accounts().showingMyAccount(), true);
   setAccountOverride(slot('2'));
-  assert.equal(mod().statusesApply(), false);
+  assert.equal(accounts().showingMyAccount(), false);
 });
 
-test('statusesApply: the ★ account, a Family with it, even from a link; not someone else', () => {
+test('showingMyAccount: the ★ account, a Family with it, even from a link; not someone else', () => {
   const { setMyAccount, setCurrentAccount, setAccountOverride } = accounts();
   setMyAccount(slot('1'));
   setCurrentAccount(slot('2'));
-  assert.equal(mod().statusesApply(), false);
+  assert.equal(accounts().showingMyAccount(), false);
   setCurrentAccount(slot('1', '3'));
-  assert.equal(mod().statusesApply(), true);
+  assert.equal(accounts().showingMyAccount(), true);
   setAccountOverride(slot('1'));
-  assert.equal(mod().statusesApply(), true);
+  assert.equal(accounts().showingMyAccount(), true);
   setAccountOverride(slot('2'));
-  assert.equal(mod().statusesApply(), false);
+  assert.equal(accounts().showingMyAccount(), false);
 });

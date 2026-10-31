@@ -168,7 +168,7 @@ import {
   saveListViewTable,
   templateView,
 } from './listViews.ts';
-import { STATUS_LABELS, getStatus, statusesApply } from './gameStatuses.ts';
+import { STATUS_LABELS, getStatus } from './gameStatuses.ts';
 import { NewViewMenu, ViewTabs, viewHref } from './ViewTabs.tsx';
 import { diffViewLabels } from './tableViewSync.ts';
 import { etaSeconds, formatEta, type LoadSample } from './loadProgress.ts';
@@ -186,6 +186,7 @@ import {
   accountDisplayLabel,
   getMyAccount,
   getAccountOverride,
+  showingMyAccount,
   getCurrentAccount,
 } from './accountsStore.ts';
 import { getAccountOverrideState, accountOverrideStatusText } from './accountOverride.ts';
@@ -461,7 +462,7 @@ const STATUS_COLUMN: ColumnDef<Record<string, any>> = {
   label: 'Status',
   groupable: true,
   value: (row) => {
-    const status = statusesApply() ? getStatus(row.appid) : null;
+    const status = showingMyAccount() ? getStatus(row.appid) : null;
     return status && STATUS_LABELS[status];
   },
   format: fmt.str,
@@ -3787,7 +3788,7 @@ export default function ListRoute() {
     return rows ? topPlayedTags(rows, PLAYS_MOSTLY_SHOWN) : { tags: [], played: 0 };
   });
   const playsMostly = () => playsMostlyProfile().tags;
-  const ownStatus = (g: { appid: number }) => (statusesApply() ? getStatus(g.appid) : null);
+  const ownStatus = (g: { appid: number }) => (showingMyAccount() ? getStatus(g.appid) : null);
   // Steam's "keep my playtime private" lists every game at 0 h, which reads like an unplayed library.
   const playtimeHidden = createMemo(() => {
     const rows = profileRows();

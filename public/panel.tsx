@@ -27,10 +27,10 @@ import { buildMediaItems, mediaLabel, resolveShotIndex } from './mediaItems.ts';
 import type { MediaItem } from './mediaItems.ts';
 import { getMyOwnershipStatus, getOwnersFor } from './myOwnership.ts';
 import type { OwnershipStatus } from './myOwnership.ts';
-import { STATUS_LABELS, getStatus, setStatus, statusesApply, type GameStatus } from './gameStatuses.ts';
+import { STATUS_LABELS, getStatus, setStatus, type GameStatus } from './gameStatuses.ts';
 import { sortOwners, ownerMeterPct } from './ownerList.ts';
 import type { GameOwner } from './accountData.ts';
-import { accountDisplayLabel, getEffectiveCurrentAccount } from './accountsStore.ts';
+import { accountDisplayLabel, getEffectiveCurrentAccount, showingMyAccount } from './accountsStore.ts';
 import {
   achievementsAccountKey,
   fetchNews,
@@ -2718,7 +2718,7 @@ function PanelRest(props: { game: ReadonlyGame }): JSX.Element {
   const releaseDate = () => meta()?.releaseDate;
   const hasBaseGame = () => !g.loading && !!meta()?.fullgame;
   // On this line, which has room: the action row below has none on a phone.
-  const statusShown = () => !!panelData.ownership()?.inLibrary && statusesApply();
+  const statusShown = () => !!panelData.ownership()?.inLibrary && showingMyAccount();
 
   return (
     <>

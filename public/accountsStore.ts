@@ -123,6 +123,15 @@ export function getEffectiveCurrentAccount(): AccountSlot | null {
   return accountOverride() ?? getCurrentAccount();
 }
 
+// Whether the account on screen is the person using this browser: their ★ account (or a Family
+// with them in it), or, with none starred, the stored current account but not a `?u=` link's.
+export function showingMyAccount(): boolean {
+  const mine = getMyAccount();
+  const shown = getEffectiveCurrentAccount();
+  if (!mine) return !getAccountOverride() && !!shown;
+  return !!shown?.members.some((id) => mine.members.includes(id));
+}
+
 // ── recentAccounts ───────────────────────────────────────────────────────────────────────────
 
 const byName = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
