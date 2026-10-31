@@ -512,6 +512,15 @@
     border-radius: var(--radius-3);
     background: var(--surface);
     font-size: var(--fs-ui);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      translate var(--dur-2) var(--ease-out);
+  }
+  @starting-style {
+    .storage-full-banner {
+      opacity: 0;
+      translate: 0 8px;
+    }
   }
 
   /* ── A route's hero (ListHero.tsx): a flat section, not a card. Title, chips and actions, then
@@ -1444,6 +1453,16 @@
     gap: 8px;
     margin-bottom: 10px;
     font-size: var(--fs-ui);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      translate var(--dur-2) var(--ease-out);
+  }
+  /* Comes down into place; the content below it moves at once (layout doesn't animate). */
+  @starting-style {
+    .pref-unsaved-banner {
+      opacity: 0;
+      translate: 0 -8px;
+    }
   }
 
   /* Scrolls inside itself on a phone rather than wrapping: one row, the table starts higher. */

@@ -7204,6 +7204,29 @@ test.describe('with motion on', () => {
     expect(await slides()).toEqual([]);
   });
 
+  test('L5 edge: a banner comes down into place from its first frame', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { bannerFirstFrame: number | null };
+      w.bannerFirstFrame = null;
+      new MutationObserver(() => {
+        const banner = document.querySelector('.pref-unsaved-banner');
+        if (!banner || w.bannerFirstFrame !== null) return;
+        w.bannerFirstFrame = -1;
+        // Read in the frame it first paints: its transition has only just started there.
+        requestAnimationFrame(() => (w.bannerFirstFrame = Number(getComputedStyle(banner).opacity)));
+      }).observe(document, { childList: true, subtree: true });
+    });
+    await asPlayer(page, ALICE);
+    const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
+    await page.goto(`/lists/owned?tv=${encodeURIComponent(tv)}`);
+    const banner = page.locator('.pref-unsaved-banner');
+    await expect(banner).toHaveCSS('opacity', '1');
+    await expect(banner).toHaveCSS('translate', 'none');
+    const first = await page.evaluate(() => (window as unknown as { bannerFirstFrame: number }).bannerFirstFrame);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(1);
+  });
+
   test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
     page,
   }) => {
