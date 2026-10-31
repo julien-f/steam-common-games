@@ -34,7 +34,27 @@ test('cache-clear: empties every cache table lib/db.js creates and keeps the res
   db.close();
 });
 
-test('cache-clear: waits for a lock held by another connection instead of failing at once', (t) => {
+test('cache-clear: leaves the schema alone, so a checkout with newer migrations never upgrades the live database', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-clear-'));
+  t.after(() => fs.rmSync(dir, { recursive: true }));
+  const file = path.join(dir, 'db.sqlite');
+  const db = new DatabaseSync(file);
+  db.exec('CREATE TABLE cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, ts INTEGER NOT NULL, expires INTEGER)');
+
+  execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'cache-clear.js')], {
+    env: { ...process.env, DB_FILE: file },
+  });
+
+  assert.strictEqual(db.prepare('PRAGMA user_version').get().user_version, 0);
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
+  assert.deepStrictEqual(
+    tables.map((r) => r.name),
+    ['cache_meta'],
+  );
+  db.close();
+});
+
+test('cache-clear: opens the database with a busy timeout', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cache-clear-'));
   t.after(() => fs.rmSync(dir, { recursive: true }));
   const env = { ...process.env, DB_FILE: path.join(dir, 'db.sqlite') };
