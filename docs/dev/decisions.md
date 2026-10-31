@@ -39,6 +39,12 @@ It is also one dimension (`tier:<tier>`, weight 1) of `tagTaste.ts`'s tag vector
 - Centering it needs a typical player to subtract. The only one available is built from the compared players' own libraries, and players mostly own what they play: with two players it's their midpoint, so any pair comes out opposite (two players sharing 11 of 12 games scored −0.98).
 - A count states a fact the shared tags beside it explain, and needs no calibration. A score could come back once there are enough libraries to calibrate it against.
 
+## Trailers — native HLS where the browser has it
+
+- `playHls` (`public/hlsPlayer.ts`) hands the stream to the browser when `canPlayType('application/vnd.apple.mpegurl')` says it can (Safari, Firefox for Android), and loads hls.js only otherwise.
+- Firefox for Android's own player then picks the quality, and stays low: 480p for a whole 60 s trailer on a Galaxy S10 over Wi-Fi, never climbing (2026-10-31). hls.js reached 1080p from the start on the same phone, landscape lock intact.
+- Kept native anyway: no visible difference on a phone screen, about 4× the data (Steam's 1080p variant is 5.8 Mbit/s vs. 1.4 for 480p, and hls.js buffered up to 140 s ahead vs. ~10 s), hls.js's ~130 KB gzipped on the first trailer, and the fullscreen orientation workaround (`holdLbTrailerForFullscreen`, [lightbox.tsx](../../public/lightbox.tsx)) tested only with native playback across a step.
+
 ## Linting: Babel, not typescript-eslint
 
 - `eslint.config.mjs` parses with `@babel/eslint-parser`: TypeScript 7 (`tsgo`) ships no JavaScript compiler API, so `@typescript-eslint/parser` can't run here, and its peer range refuses `typescript@7`. None of the Solid rules are type-aware, so a syntax-only parser loses nothing.
