@@ -111,11 +111,11 @@ const clientKey = (req) => rateLimit.ipKeyGenerator(req.ip);
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
 // /api/bundles' query, shared with bundlesListLimit's skip so both compute the same cache key.
-const MAX_BUNDLES_OFFSET = 10_000; // 200 "Load more" pages: far past any real browsing
+const MAX_BUNDLES_OFFSET = 10_000; // 200 "Load more" pages: past it, an empty page ends the list
 function parseBundlesQuery(req) {
   return {
     country: parseCountry(req),
-    offset: Math.min(MAX_BUNDLES_OFFSET, Math.max(0, Math.floor(Number(req.query.offset)) || 0)),
+    offset: Math.max(0, Math.floor(Number(req.query.offset)) || 0),
     limit: Math.min(50, Math.max(1, Math.floor(Number(req.query.limit)) || 20)),
     sort: '-publish', // the only order the frontend asks for (BundlesBrowseRoute's FETCH_SORT)
     expired: req.query.expired === '1' || req.query.expired === 'true',
@@ -884,6 +884,7 @@ app.get('/api/creator-games', creatorGamesLimit, async (req, res) => {
 // See lib/itad.js and docs/dev/integrations.md and docs/dev/data.md.
 app.get('/api/bundles', bundlesListLimit, requireItad, async (req, res) => {
   const { country, offset, limit, sort, expired } = parseBundlesQuery(req);
+  if (offset > MAX_BUNDLES_OFFSET) return res.json({ bundles: [], offset, limit, fetchedAt: null });
   try {
     // ?refresh=1 backs the browse page's own "↻ Refresh" — a bundle can go live or expire at any
     // time, so "the list I'm looking at is out of date" needs an answer that isn't "wait out the

@@ -79,7 +79,7 @@ Inputs (`server.js`) — each lands in a cache key, so only what the frontend se
 - `members` (and `/api/achievements`' `steamids`): a Steam64 id, a custom-URL name or a `steamcommunity.com/id|profiles/…` URL holding one (`isSteamIdentifier`); anything else is a 400.
 - `gids`: ITAD game ids (UUIDs); anything else is a 400.
 - `country`: one of `public/regions.json`'s codes (the region picker's list), else US.
-- `/api/bundles`: `sort` is always `-publish`, `offset` an integer up to 10,000, `limit` 1–50.
+- `/api/bundles`: `sort` is always `-publish`; `offset` and `limit` are integers, `limit` clamped, and an `offset` past `MAX_BUNDLES_OFFSET` gets an empty page, which ends Load more.
 
 ## Request flow
 

@@ -2748,19 +2748,28 @@ test('GET /api/bundles: a country outside the region list falls back to US', asy
   assert.match(urls[1], /country=DE/);
 });
 
-test('GET /api/bundles: an unknown sort falls back to the default, offset is a capped integer', async (t) => {
+test('GET /api/bundles: an unknown sort falls back to the default, offset is an integer', async (t) => {
   _reset();
   process.env.ITAD_API_KEY = 'test-itad-key';
   const urls = [];
   t.mock.method(globalThis, 'fetch', async (url) => {
     urls.push(new URL(String(url)).searchParams);
-    return { ok: true, json: async () => [] };
+    return { ok: true, json: async () => [{ id: 1, title: 'B' }] };
   });
-  await api.get('/api/bundles?sort=junk&offset=1e9').expect(200);
-  await api.get('/api/bundles?sort=-publish&offset=50.5').expect(200);
+  await api.get('/api/bundles?sort=junk&offset=50.5').expect(200);
   assert.equal(urls[0].get('sort'), '-publish');
-  assert.ok(Number(urls[0].get('offset')) <= 10_000, urls[0].get('offset'));
-  assert.equal(urls[1].get('offset'), '50');
+  assert.equal(urls[0].get('offset'), '50');
+});
+
+// Load more stops at an empty page: a clamped offset would serve the cap's page again and again.
+test('GET /api/bundles: an empty page past the offset cap, without an upstream call', async (t) => {
+  _reset();
+  process.env.ITAD_API_KEY = 'test-itad-key';
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => [{ id: 1 }] }));
+  const res = await api.get('/api/bundles?offset=1e9').expect(200);
+  assert.deepEqual(res.body.bundles, []);
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(cacheRows(), 0);
 });
 
 // ── fetchedAt (how old the served data is) ────────────────────────────────────
