@@ -56,6 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The server no longer fills its cache with malformed account names, game ids or regions: it rejects them, and an unknown region gets US prices
 - A game whose store name is only a trademark sign no longer counts against the details budget on every load
 - Reopening a bundle after IsThereAnyDeal failed part of its games no longer looks the others up again
+- A malformed price reply from IsThereAnyDeal no longer fails a whole price lookup: the games it garbled show no price
 
 ### Development
 
