@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Saving data no longer fails with "database is locked" while another process (such as npm run cache:clear) is writing to the database
 - Reloading PC Game Pass while Steam matches or game names fail to load now counts against the request limit
 - The server now stops with an error when its port is already in use, instead of reporting it started
+- How Long To Beat lookups back off when HLTB rejects a new login instead of retrying it for every game
 
 ### Development
 
@@ -50,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Drop the dotenv dependency: settings files now load with Node's built-in loader
 - Phone lightbox e2e tests no longer fail now and then under load
 - Rate-limiter tests check that a forced refresh of a cached key counts against the budget
+- An HLTB outage logs one throttled [HLTB] warning instead of one line per game
 
 ## [0.12.0] - 2026-10-30
 

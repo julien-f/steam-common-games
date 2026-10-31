@@ -49,7 +49,7 @@ No auth, same trust level as `GET /api/health`. In memory, reset on restart, exc
 
 ### Live snapshots
 
-- `circuitBreakers` (`lib/circuitBreaker.js`; Steam store, HLTB search, ProtonDB): `blockedUntil` (open while in the future; 0 = never tripped), `tripCount` (lifetime, tells "once long ago" from "every 20 minutes"), `consecutive403s` (one more trips it).
+- `circuitBreakers` (`lib/circuitBreaker.js`; Steam store, HLTB search, ProtonDB): `blockedUntil` (open while in the future; 0 = never tripped), `tripCount` (lifetime, tells "once long ago" from "every 20 minutes"), `consecutive403s` (one more trips it; HLTB also counts a 401 on a fresh token, [integrations.md](integrations.md#hltb--no-npm-package)).
 - `semaphores` (`lib/upstream.js` `getSemaphoreStats`, one per `createSemaphore`): `active`/`queued` now, `maxQueueSeen` (lifetime high-water mark), `rejected` (calls turned away by the `SEMAPHORE_MAX_QUEUE` valve; should stay 0). High latency with low `queued` = slow upstream; high `queued` = our own concurrency cap.
 - `budgets`: current usage per outbound `group`, every one listed from startup (0 used) so the ceilings show before anything spends against them; see below.
 
@@ -76,7 +76,7 @@ Logged at the moment they happen, once per event rather than once per affected r
 - **`[semaphore:<name>] queue saturated …`** — every rejection, unthrottled: it should never fire, so each one matters.
 - **`[HLTB] search failed …`** — throttled to one per `HLTB_SEARCH_WARN_THROTTLE_MS` (30 s); the searches themselves still run and fail normally. `[HLTB] init failed` is throttled by the auth retry backoff.
 
-All are `console.warn`: degraded but recoverable. An error marked `isCircuitOpen` (thrown by `assertClosed` while a breaker is open) or `isBudgetExhausted` (thrown by `chargeBudget` past a budget) is not logged again by `routeErrorStatus` or `fetchGameDetails`, since the trip or the exhaustion already warned; without that, one open breaker or spent budget logs a line per game in a large load.
+All are `console.warn`: degraded but recoverable. An error marked `isCircuitOpen` (thrown by `assertClosed` while a breaker is open) or `isBudgetExhausted` (thrown by `chargeBudget` past a budget) is not logged again by `routeErrorStatus` or `fetchGameDetails`, since the trip or the exhaustion already warned; without that, one open breaker or spent budget logs a line per game in a large load. Likewise `fetchGameDetails` skips HLTB errors marked `isLogged`: a repeat of the failure the last `[HLTB]` line warned about, or an auth hold whose cause was already logged.
 
 Deliberately not done:
 
