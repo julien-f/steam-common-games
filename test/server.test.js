@@ -2697,6 +2697,18 @@ test('POST /api/common-games: 400 for a 90 KB vanity name, nothing fetched or ca
   assert.equal(cacheRows(), 0);
 });
 
+test('GET /api/achievements/:appid: 400 for a steamids value that is no Steam account, nothing fetched or cached', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 42 } }),
+  }));
+  const res = await api.get(`/api/achievements/400?steamids=${ID1},${'x'.repeat(4000)}`);
+  assert.equal(res.status, 400);
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(cacheRows(), 0);
+});
+
 // Every form the frontend sends: a Steam64 id (signed-in user, resolved accounts), a vanity name
 // (Home's normalizeInput), a profile URL (Compare's typed slots and `u=` links pass it through raw).
 for (const member of [

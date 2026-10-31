@@ -76,7 +76,7 @@ Rate limits ([observability.md](observability.md), [data.md](data.md)):
 
 Inputs (`server.js`) — each lands in a cache key, so only what the frontend sends is accepted:
 
-- `members`: a Steam64 id, a custom-URL name (`[A-Za-z0-9_-]{2,32}`) or a `steamcommunity.com/id|profiles/…` URL holding one; anything else is a 400.
+- `members` (and `/api/achievements`' `steamids`): a Steam64 id, a custom-URL name or a `steamcommunity.com/id|profiles/…` URL holding one (`isSteamIdentifier`); anything else is a 400.
 - `gids`: ITAD game ids (UUIDs); anything else is a 400.
 - `country`: one of `public/regions.json`'s codes (the region picker's list), else US.
 - `/api/bundles`: `sort` is always `-publish`, `offset` an integer up to 10,000, `limit` 1–50.

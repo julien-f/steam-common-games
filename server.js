@@ -129,6 +129,11 @@ const STEAM_PROFILE_URL_RE =
 const isSteamIdentifier = (u) =>
   typeof u === 'string' && (STEAM_NAME_RE.test(u.trim()) || STEAM_PROFILE_URL_RE.test(u.trim()));
 const isMemberList = (members) => Array.isArray(members) && members.every(isSteamIdentifier);
+// The 400 message for the first entry of `members` that isn't a Steam account, or null.
+function invalidMemberError(members) {
+  const invalid = members.find((u) => !isSteamIdentifier(u));
+  return invalid === undefined ? null : `Not a Steam account: "${String(invalid).slice(0, 40)}"`;
+}
 
 // ITAD game ids are UUIDs; anything else would only cache a miss under a junk key.
 const ITAD_GID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -307,9 +312,9 @@ function parseMembers(req, res) {
     res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
     return null;
   }
-  const invalid = members.find((u) => !isSteamIdentifier(u));
-  if (invalid !== undefined) {
-    res.status(400).json({ error: `Not a Steam account: "${String(invalid).slice(0, 40)}"` });
+  const error = invalidMemberError(members);
+  if (error) {
+    res.status(400).json({ error });
     return null;
   }
   return members;
@@ -1078,6 +1083,8 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   if (rawIds.length > MAX_USERS) {
     return res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
   }
+  const invalidIds = invalidMemberError(rawIds);
+  if (invalidIds) return res.status(400).json({ error: invalidIds });
 
   const force = isForceRefresh(req);
   try {
