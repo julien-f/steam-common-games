@@ -673,6 +673,24 @@ test("getPlayerSummaries: asks for at most 100 ids per call, Steam's documented 
   );
 });
 
+test('getPlayerSummaries: sends its chunks 3 at a time, the same number of calls', async (t) => {
+  _reset();
+  let calls = 0;
+  let active = 0;
+  let maxActive = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls++;
+    maxActive = Math.max(maxActive, ++active);
+    await new Promise(setImmediate);
+    active--;
+    const ids = new URL(url).searchParams.get('steamids').split(',');
+    return { ok: true, json: async () => ({ response: { players: ids.map((steamid) => ({ steamid })) } }) };
+  });
+  const ids = Array.from({ length: 500 }, (_, i) => String(76561198000002000n + BigInt(i)));
+  await getPlayerSummaries(ids);
+  assert.deepEqual({ calls, maxActive }, { calls: 5, maxActive: 3 });
+});
+
 test('getPlayerSummaries: returns placeholder players when API fails, does not cache', async (t) => {
   _reset();
   let fetchCount = 0;
