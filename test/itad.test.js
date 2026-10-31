@@ -13,12 +13,13 @@ const {
   findBundleById,
   resolveSteamAppIds,
   resolveItadIds,
+  priceCacheKey,
   getPrices,
   extractPriceInfo,
   getGameBundles,
   extractGameBundles,
 } = require('../lib/itad');
-const { _reset } = require('../lib/cache');
+const { _reset, isCached } = require('../lib/cache');
 
 const SHOPS = [
   { id: 2, title: 'AllYouPlay' },
@@ -242,6 +243,16 @@ test('resolveItadIds: a failed chunk keeps the chunks that succeeded', async (t)
   await assert.rejects(() => resolveItadIds(appids), { isUpstream: true });
   stats = mockBatchConcurrency(t, reply);
   assert.equal((await resolveItadIds(appids)).size, 1000);
+  assert.equal(stats.calls, 1, 'only the failed chunk is sent again');
+});
+
+test('resolveSteamAppIds: a failed chunk keeps the chunks that succeeded', async (t) => {
+  _reset();
+  const reply = (gids) => Object.fromEntries(gids.map((g) => [g, ['app/1']]));
+  let stats = mockBatchConcurrency(t, reply, { fail: (n) => n === 3 });
+  await assert.rejects(() => resolveSteamAppIds(ids1000('gid-')), { isUpstream: true });
+  stats = mockBatchConcurrency(t, reply);
+  assert.equal((await resolveSteamAppIds(ids1000('gid-'))).size, 1000);
   assert.equal(stats.calls, 1, 'only the failed chunk is sent again');
 });
 
@@ -556,6 +567,24 @@ test('getPrices: force bypasses the cache read and re-fetches', async (t) => {
   const result = await getPrices(['gid-1'], { country: 'US', force: true });
   assert.equal(priceCalls, 2, 'force should re-fetch even though the entry is cached');
   assert.deepEqual(result.get('gid-1'), PRICE_ENTRY);
+});
+
+test('getPrices: skips a reply entry with no id, leaving its gid absent → null', async (t) => {
+  _reset();
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => [null, { historyLow: PRICE_ENTRY.historyLow }, { id: 7 }, PRICE_ENTRY],
+  }));
+  const result = await getPrices(['gid-1', 'gid-2'], { country: 'US' });
+  assert.deepEqual(
+    [...result],
+    [
+      ['gid-1', PRICE_ENTRY],
+      ['gid-2', null],
+    ],
+  );
+  assert.equal(isCached(priceCacheKey(undefined, 'US')), false);
+  assert.equal(isCached(priceCacheKey(7, 'US')), false);
 });
 
 test('getPrices: throws on upstream error', async (t) => {

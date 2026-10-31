@@ -42,8 +42,9 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 - **Token**: cached in memory for 5 minutes (session-bound, not on disk). A 401/403 from search clears it.
   - A 403, or a 401 on the current fresh token (one no search has accepted yet), is a block: it holds off re-init for 30 s, and two in a row trip the breaker. Searches queued on a token already rejected count once, not each.
   - A 401 on a token searches already accepted is expiry: re-init at once. Assumed, not documented: HLTB's real token lifetime is unknown, so a fresh token idle long enough to expire reads as a block: a 30 s hold.
+  - A 200 counts as a success only with a `data` array: any other body fails that search uncached, without accepting the token or resetting the breaker's streak.
 - **Matching**: Levenshtein similarity (`stringSimilarity`); below 0.35 is discarded.
-- **What's searched**: the store metadata's `type` skips soundtracks, videos, series, episodes, hardware, demos and ads (`NOT_PLAYED_TYPES`, `server.js`), which read as no data rather than failed. Tools are still searched: none of the types the app knows (`TYPE_LABELS`) marks them — an assumption from observed data, not Steam's docs.
+- **What's searched**: the store metadata's `type` skips soundtracks, videos, series, episodes, hardware, demos and ads (`NOT_PLAYED_TYPES`, `lib/hltb.js`), which read as no data rather than failed. Tools are still searched: none of the types the app knows (`TYPE_LABELS`) marks them — an assumption from observed data, not Steam's docs.
 - **Times** (`pickBestMatch`): `main` (`comp_main`), `extra` (`comp_plus`), `completionist` (`comp_100`) and `all` (`comp_all`), seconds converted to hours rounded to the half hour, as HLTB's own site shows them.
   - `all` ("All PlayStyles") is **not** the average of the other three: it pools every submission regardless of category (`comp_all_count` = the sum of the three counts), so it usually lands near Main Story.
   - Being one representative number, it's the default HLTB column (`hltbAll`, "HLTB (h)"), the ranking card's "10.5 h to beat", and the first figure in the panel's How Long To Beat section.
@@ -137,7 +138,7 @@ Documented endpoints whose "no data" answers are error statuses, treated as answ
 Bundle browsing (`/bundles`, `/lists/bundle/:bundleId`) and every price column come from the [IsThereAnyDeal API](https://docs.isthereanydeal.com/) via `lib/itad.js` — free, key-gated, with published (if sparse) OpenAPI docs: sanctioned tier.
 
 - **Optional**: gated on `ITAD_API_KEY`. `isItadConfigured()` (`server.js`) is checked per request; `GET /api/bundles`, `GET /api/bundles/:id`, `POST /api/bundles/resolve`, `POST /api/prices`, `GET /api/game-bundles/:appid` and `GET /api/game-pass` return 503 when unset, and the frontend hides those surfaces (`GET /api/health`'s `itadConfigured`).
-- **Batches of 200 ids** (`BATCH_MAX`) for every multi-id call: documented for `/games/prices/v3` (`gids-200`); an assumption for the two `/lookup/` endpoints, whose docs list no cap.
+- **Batches of 200 ids** (`BATCH_MAX`) for every multi-id call: documented for `/games/prices/v3` (`gids-200`); an assumption for the two `/lookup/` endpoints, whose docs list no cap. A larger set goes out in chunks, 3 at a time (`mapChunks`, `BATCH_CONCURRENCY` in `lib/upstream.js`), each cached as it returns.
 - **Links are passed through unmodified** — ITAD's terms require prices and links as returned. An opened bundle's hero shows "View on IsThereAnyDeal ↗" (`details`) and "Get this bundle ↗" (`url`, the shop/affiliate link with its tracking params). The one addition anywhere is **Buy on Fanatical**'s `scg=…` parameter ([Fanatical](#fanatical--pick-and-mix-tier-prices)), inside that same link; every tracking parameter is left alone.
 
 ### Bundles

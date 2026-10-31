@@ -10,6 +10,7 @@ process.env.DB_FILE = '';
 const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  peekSteamId,
   resolveSteamId,
   getOwnedGames,
   getWishlist,
@@ -439,6 +440,21 @@ test('resolveSteamId: resolves vanity URL via Steam API', async (t) => {
 
   const result = await resolveSteamId('gaben');
   assert.equal(result, '76561198000000001');
+});
+
+test('resolveSteamId: resolves the name or Steam64 id inside a steamcommunity.com profile URL', async (t) => {
+  _reset();
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({
+    ok: true,
+    json: async () => ({ response: { success: 1, steamid: '76561198000000001' } }),
+  }));
+
+  assert.equal(await resolveSteamId('https://steamcommunity.com/id/gaben/'), '76561198000000001');
+  assert.match(String(fetchMock.mock.calls[0].arguments[0]), /vanityurl=gaben$/);
+  assert.equal(peekSteamId('steamcommunity.com/id/gaben'), '76561198000000001', 'shares the name cache entry');
+  assert.equal(await resolveSteamId('https://www.steamcommunity.com/profiles/76561198000000002'), '76561198000000002');
+  assert.equal(peekSteamId('steamcommunity.com/profiles/76561198000000002/'), '76561198000000002');
+  assert.equal(fetchMock.mock.callCount(), 1);
 });
 
 test('resolveSteamId: caches resolved ID — second call skips fetch', async (t) => {

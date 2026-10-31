@@ -119,16 +119,10 @@ function makeSearchResponse(results) {
   return { ok: true, status: 200, json: async () => ({ data: results }) };
 }
 
-test('getHLTB: returns null for empty name', async () => {
-  _reset();
-  _resetAuth();
-  const result = await getHLTB(1, '');
-  assert.equal(result, null);
-});
-
 // A skipped game is cached as a miss, so its HLTB source has an age and counts as cached.
 for (const [label, name, type] of [
   ['no name', undefined, 'game'],
+  ['an empty name', '', 'game'],
   ['a name of stripped symbols only', '™', 'game'],
   ['a type HLTB does not time', 'Portal OST', 'music'],
 ]) {
@@ -141,6 +135,7 @@ for (const [label, name, type] of [
     assert.equal(await getHLTB(1, name, { type }), null);
     assert.deepEqual(getCached('hltb:1'), []);
     const { expires } = db.prepare('SELECT expires FROM cache_meta WHERE key = ?').get('hltb:1');
+    assert.notEqual(expires, null);
     assert.ok(expires - Date.now() <= MISS_CACHE_TTL_MS);
     assert.equal(fetchMock.mock.callCount(), 0);
   });
@@ -211,19 +206,66 @@ test('getHLTB: returns null when best match is below 0.35 similarity', async (t)
   assert.equal(result, null);
 });
 
-test('getHLTB: a non-array `data` fails the search and is not cached', async (t) => {
+for (const [label, body] of [
+  ['a non-array `data`', { data: { game_name: 'Portal' } }],
+  ['no `data`', {}],
+]) {
+  test(`getHLTB: ${label} fails the search and is not cached`, async (t) => {
+    _reset();
+    _resetAuth();
+    t.mock.method(console, 'warn', () => {});
+    let searches = 0;
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      if (url.includes('search/site/init')) return makeInitResponse();
+      searches++;
+      return { ok: true, status: 200, json: async () => body };
+    });
+    await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
+    await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
+    assert.equal(searches, 2);
+  });
+}
+
+const badSearchReply = { ok: true, status: 200, json: async () => ({ data: 'blocked' }) };
+
+test('getHLTB: a 200 with a malformed body does not mark the token accepted', async (t) => {
   _reset();
   _resetAuth();
+  t.after(_resetAuth);
   t.mock.method(console, 'warn', () => {});
-  let searches = 0;
+  let initCalls = 0;
+  const replies = [badSearchReply, { ok: false, status: 401 }];
   t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('search/site/init')) return makeInitResponse();
-    searches++;
-    return makeSearchResponse({ game_name: 'Portal' });
+    if (url.includes('search/site/init')) {
+      initCalls++;
+      return makeInitResponse();
+    }
+    return replies.shift();
   });
-  await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
-  await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
-  assert.equal(searches, 2);
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  await assert.rejects(() => getHLTB(2, 'Half-Life'), /fresh token/);
+  await assert.rejects(() => getHLTB(3, 'Portal 2'), /auth unavailable/);
+  assert.equal(initCalls, 1, 'the 401 holds off re-init like a block');
+});
+
+test('getHLTB: a 200 with a malformed body does not reset the breaker streak', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const replies = [{ ok: false, status: 403 }, badSearchReply, { ok: false, status: 403 }];
+  t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('search/site/init') ? makeInitResponse() : replies.shift(),
+  );
+
+  await assert.rejects(() => getHLTB(1, 'Portal'));
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
+  await assert.rejects(() => getHLTB(3, 'Portal 2'));
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(() => getHLTB(4, 'Left 4 Dead'), /circuit open/);
 });
 
 test('getHLTB: returns null when no results', async (t) => {
