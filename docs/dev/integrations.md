@@ -169,6 +169,7 @@ Bundle games carry only an ITAD id (uuid), slug and title. `resolveSteamAppIds` 
 
 - Still nothing → `null`, as for a game with no Steam listing. A lookup that _failed_ rather than came up empty is left uncached, retried on the next resolve, and listed under `failed` instead of `appids`, so the bundle page says Steam didn't answer rather than "not on Steam".
 - Each gid's resolution is cached individually (`itad-appid:{gid}`), so a game seen in one bundle is never re-resolved for another.
+- `/bundles` resolves every active bundle's gids on each visit with an account (its Wishlist / New to you columns): ~3 ITAD lookups and one Steam package lookup per `sub/`/`bundle/` gid (~1% of them, measured on a dev `db.sqlite`) on a cold cache, none once cached; expired bundles aren't resolved.
 
 ### Prices
 

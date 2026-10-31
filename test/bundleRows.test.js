@@ -8,6 +8,7 @@ const {
   fmtBundleDatePart,
   fmtBundleTimePart,
   toBundleRow,
+  bundleOwnership,
   bundleCovers,
   shopHue,
   bundleUrgency,
@@ -32,6 +33,7 @@ const DAY = 24 * HOUR;
 
 function withBanner(id) {
   return {
+    id,
     assets: {
       boxart: `https://assets.example/${id}/boxart.jpg`,
       banner145: `https://assets.example/${id}/banner145.jpg`,
@@ -325,7 +327,13 @@ test('toBundleRow: flattens every field the table sorts/filters/groups on', () =
     expiry: '2026-09-01T10:00:00+02:00',
     status: 'Active',
     covers: ['https://assets.example/a/banner145.jpg'],
+    gids: ['a'],
   });
+});
+
+test('toBundleRow: gids lists a game once though it sits in several tiers', () => {
+  const tiers = [{ games: [{ id: 'a' }] }, { games: [{ id: 'a' }, { id: 'b' }] }, { games: null }];
+  assert.deepEqual(toBundleRow(bundle({ tiers }), Date.now()).gids, ['a', 'b']);
 });
 
 test('toBundleRow: status is Expired once the expiry is in the past', () => {
@@ -443,4 +451,51 @@ test('wholePackages: ticking or unticking one row of a package does the same to 
   assert.deepEqual(wholePackages(new Set([solo, p1, p2]), [solo, p2], all, gidOf), [solo]);
   assert.equal(wholePackages(new Set(), [solo], all, gidOf), null);
   assert.equal(wholePackages(new Set([solo]), [solo, p1, p2], all, gidOf), null);
+});
+
+// ── bundleOwnership ──────────────────────────────────────────────────────────────────────────
+
+const owns = (owned, wished) => (appid) => ({ inLibrary: owned.includes(appid), onWishlist: wished.includes(appid) });
+
+test('bundleOwnership: counts each Steam game once, a package per appid, a non-Steam game not at all', () => {
+  const appids = new Map([
+    ['a', 1],
+    ['pack', [2, 3]],
+    ['dup', 1],
+    ['course', null],
+  ]);
+  const got = bundleOwnership(['a', 'pack', 'dup', 'course'], appids, new Set(), owns([1], [3]));
+  assert.deepEqual(got, { steam: 3, owned: 1, wishlist: 1 });
+});
+
+test('bundleOwnership: undefined while a gid or the ownership is still loading', () => {
+  assert.equal(bundleOwnership(['a', 'b'], new Map([['a', 1]]), new Set(), owns([], [])), undefined);
+  assert.equal(
+    bundleOwnership(['a'], new Map([['a', 1]]), new Set(), () => null),
+    undefined,
+  );
+});
+
+test('bundleOwnership: null once a gid failed to resolve, never a partial count', () => {
+  assert.equal(bundleOwnership(['a', 'b'], new Map([['a', 1]]), new Set(['b']), owns([1], [])), null);
+});
+
+test('bundleOwnership: a failed wishlist fetch leaves that count unknown, not zero', () => {
+  const status = (appid) => ({ inLibrary: appid === 1, onWishlist: null });
+  assert.deepEqual(
+    bundleOwnership(
+      ['a', 'b'],
+      new Map([
+        ['a', 1],
+        ['b', 2],
+      ]),
+      new Set(),
+      status,
+    ),
+    {
+      steam: 2,
+      owned: 1,
+      wishlist: null,
+    },
+  );
 });

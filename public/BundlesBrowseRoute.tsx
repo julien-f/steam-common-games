@@ -40,8 +40,11 @@ import {
   bundleAge,
   compareBundleAge,
   BUNDLE_AGE,
+  bundleOwnership,
   type BundleListItem,
+  type BundleOwnership,
   type BundleRow,
+  type GidAppids,
 } from './bundleRows.ts';
 import { currentRegion, regionCurrency, regionLabel } from './region.ts';
 import { setBrowsedBundles } from './bundleBrowseStore.ts';
@@ -53,7 +56,9 @@ import { UnsavedChangesBanner, ViewActions } from './TableViewControls.tsx';
 import { useBaseTitle } from './pageTitle.ts';
 import { convert, formatWithEstimate } from './currency.ts';
 import { ListHero, refreshTileValue, type HeroTile } from './ListHero.tsx';
-import { fetchBundlePage, isUnavailable, loadErrorText } from './bundleData.ts';
+import { fetchBundlePage, isUnavailable, loadErrorText, resolveBundleAppids } from './bundleData.ts';
+import { accountDisplayLabel, getEffectiveCurrentAccount } from './accountsStore.ts';
+import { peekMyOwnership } from './myOwnership.ts';
 import { BUNDLES_UNAVAILABLE } from './priceLoading.ts';
 import { isItadOff } from './panelData.ts';
 
@@ -69,6 +74,8 @@ const MAX_AUTO_PAGES = 4;
 const FETCH_SORT = '-publish';
 
 const VIEW_PREF_KEY = 'bundlesBrowseView';
+// /api/bundles/resolve's cap (server.js MAX_BUNDLE_RESOLVE_GAMES).
+const RESOLVE_CHUNK = 500;
 
 // ── Cell rendering ────────────────────────────────────────────────────────────────────────────
 
@@ -273,7 +280,50 @@ const COLUMNS: ColumnDef<BundleRow>[] = [
   },
 ];
 
-const DEFAULT_VISIBLE = ['covers', 'title', 'shop', 'games', 'price', 'publish', 'expiry'];
+// A count against the current account: "…" while loading, "—" when unknown (no account, a failed lookup, an expired bundle).
+function ownershipColumn(
+  key: string,
+  label: string,
+  ownershipOf: (row: BundleRow) => BundleOwnership | null | undefined,
+  count: (o: BundleOwnership) => number | null,
+  text: (n: number) => string,
+  // Said on hover: the cell's base is the bundle's Steam games, not the Games column's count.
+  what: string,
+  color?: string,
+): ColumnDef<BundleRow> {
+  const valueOf = (row: BundleRow) => {
+    const o = ownershipOf(row);
+    return o ? count(o) : null;
+  };
+  const cellText = (row: BundleRow) => {
+    const o = ownershipOf(row);
+    if (o === undefined) return '…';
+    const n = o && count(o);
+    return n == null ? '—' : text(n);
+  };
+  return {
+    key,
+    label,
+    type: 'number',
+    groupable: true,
+    searchable: false,
+    defaultSortDir: 'desc',
+    value: valueOf,
+    format: (v, row) => (row ? cellText(row) : v == null ? '—' : String(v)),
+    render: (_v, row) => {
+      const span = document.createElement('span');
+      span.textContent = cellText(row);
+      const o = ownershipOf(row);
+      const n = valueOf(row);
+      if (o && n != null) span.title = `${n} of ${o.steam} Steam games ${what}`;
+      if (color && n) span.style.color = color;
+      return span;
+    },
+    compare: compareNumMissingLast,
+  };
+}
+
+const DEFAULT_VISIBLE = ['covers', 'title', 'shop', 'games', 'wishlist', 'newToYou', 'price', 'publish', 'expiry'];
 // Newest first. This is a discovery page — "what's new since I last looked" is the browsing
 // question — and a publish date never changes, so the order is stable between visits rather than
 // reshuffling daily the way an ending-soonest sort does as deadlines approach and rows drop off.
@@ -294,9 +344,88 @@ export default function BundlesBrowseRoute() {
   const loadGuard = createStaleGuard();
   let offset = 0;
 
-  const table = createTableState<BundleRow>(rows, COLUMNS, {
-    initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
+  // gid → Steam appid(s), shared by every load: a game's appid doesn't depend on the region or the list.
+  const [appidsByGid, setAppidsByGid] = createSignal<ReadonlyMap<string, GidAppids>>(new Map());
+  const [failedGids, setFailedGids] = createSignal<ReadonlySet<string>>(new Set());
+  const requested = new Set<string>();
+  const account = createMemo(getEffectiveCurrentAccount);
+  // Expired bundles aren't resolved: ITAD's archive is unbounded, each page ~600 lookups on a cold cache.
+  createEffect(
+    on([rows, () => !!account()], async ([list, hasAccount]) => {
+      if (!hasAccount) return;
+      const gids = [...new Set(list.flatMap((r) => (r.status === 'Expired' ? [] : r.gids)))].filter(
+        (g) => !requested.has(g),
+      );
+      for (const g of gids) requested.add(g);
+      for (let i = 0; i < gids.length; i += RESOLVE_CHUNK) {
+        const chunk = gids.slice(i, i + RESOLVE_CHUNK);
+        let failed: string[];
+        try {
+          const res = await resolveBundleAppids(chunk);
+          setAppidsByGid((prev) => new Map([...prev, ...Object.entries(res.appids)]));
+          failed = res.failed;
+        } catch {
+          failed = chunk;
+        }
+        if (failed.length) setFailedGids((prev) => new Set([...prev, ...failed]));
+      }
+    }),
+  );
+  // One ownership peek per pass, as myOwnership.ts asks.
+  const ownership = createMemo(() => {
+    if (!account()) return new Map(rows().map((r) => [r.id, null]));
+    const peek = peekMyOwnership();
+    const map = appidsByGid();
+    const failed = failedGids();
+    return new Map(
+      rows().map((r) => [r.id, r.status === 'Expired' ? null : bundleOwnership(r.gids, map, failed, peek.status)]),
+    );
   });
+  const ownershipOf = (row: BundleRow) => ownership().get(row.id);
+  const ownershipNote = () => {
+    if (!rows().length) return '';
+    if (!account()) return 'Pick an account on Home to see which bundles hold wishlisted or owned games';
+    if (rows().some((r) => ownership().get(r.id) === null && r.status !== 'Expired'))
+      return "Steam didn't answer for some bundles' games: their Wishlist and New to you read —";
+    return '';
+  };
+
+  const table = createTableState<BundleRow>(
+    rows,
+    [
+      ...COLUMNS.slice(0, 4),
+      ownershipColumn(
+        'wishlist',
+        'Wishlist',
+        ownershipOf,
+        (o) => o.wishlist,
+        (n) => (n ? `☆ ${n}` : ''),
+        'on the wishlist',
+        'var(--wishlisted)',
+      ),
+      ownershipColumn(
+        'newToYou',
+        'New to you',
+        ownershipOf,
+        (o) => (o.owned == null ? null : o.steam - o.owned),
+        String,
+        'not owned',
+      ),
+      ownershipColumn(
+        'owned',
+        'Owned',
+        ownershipOf,
+        (o) => o.owned,
+        (n) => (n ? `✓ ${n}` : ''),
+        'owned',
+        'var(--owned)',
+      ),
+      ...COLUMNS.slice(4),
+    ],
+    {
+      initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
+    },
+  );
   let tableContainer: HTMLDivElement | undefined;
   cascadeFirstRows(
     () => table.processedData().length,
@@ -394,6 +523,9 @@ export default function BundlesBrowseRoute() {
   const NEW_WINDOW: string[] = [BUNDLE_AGE.fresh, BUNDLE_AGE.week];
   const newOnly = () => NEW_WINDOW.every((v) => table.filter.include().age?.has(v));
   const toggleNewOnly = () => table.filter.setValues('age', NEW_WINDOW, !newOnly());
+  // A range rather than a value checklist: "at least one", and an unknown count (null) never matches.
+  const wishlistOnly = () => table.filter.ranges().wishlist?.min === '1';
+  const toggleWishlistOnly = () => table.filter.setRange('wishlist', 'min', wishlistOnly() ? '' : '1');
 
   // The same hero card every list route now opens with (ListHero.tsx) — this route is the one you
   // arrive at a bundle *from*, so a loose toolbar here next to a real card there was a visible
@@ -442,6 +574,22 @@ export default function BundlesBrowseRoute() {
     // Counted off processedData rather than the raw list, so it agrees with whatever filter/search
     // is applied — a "3 ending soon" that includes rows the table isn't showing is worse than
     // nothing. Absent at zero rather than showing a reassuring "0" nobody asked about.
+    // Counted off processedData like the tiles around it; absent without an account or wishlisted game.
+    const acct = account();
+    const wished = table.processedData().filter((row) => (ownershipOf(row)?.wishlist ?? 0) > 0).length;
+    if (acct && (wished > 0 || wishlistOnly())) {
+      tiles.push({
+        label: 'Wishlist',
+        value: wished,
+        valueColor: 'var(--wishlisted)',
+        sub: wishlistOnly() ? 'bundles with wishlisted games · only these' : 'bundles with wishlisted games',
+        title: wishlistOnly()
+          ? 'Showing only these — click to clear'
+          : `Show only the bundles holding games on ${accountDisplayLabel(acct)}'s wishlist`,
+        active: wishlistOnly(),
+        onClick: toggleWishlistOnly,
+      });
+    }
     const endingSoon = table.processedData().filter((row) => bundleUrgency(row.expiry)?.tier === 'urgent').length;
     // Kept on screen while its own filter is on even at a count of zero — otherwise the last
     // urgent bundle expiring (or a reload dropping it) leaves the table filtered down to nothing
@@ -515,8 +663,8 @@ export default function BundlesBrowseRoute() {
             onDiscard={() => layout.discard()}
           />
         </Show>
-        <Show when={statusText()}>
-          <div class="bundles-status">{statusText()}</div>
+        <Show when={statusText() || ownershipNote()}>
+          <div class="bundles-status">{statusText() || ownershipNote()}</div>
         </Show>
         <div class="table-container" ref={tableContainer}>
           <DataTableView<BundleRow>

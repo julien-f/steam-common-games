@@ -272,7 +272,7 @@ Tests map to journeys by title: `A1: â€¦` covers A1's built steps, `A1.1,3-4: â€
 - **Who / goal**: judge a bundle by what it adds to my library and how good those games are.
 - **Steps**:
   1. **Bundles**
-  2. narrow with "New" / "Ending soon"
+  2. narrow with "New" / "Ending soon" / "Wishlist", or sort by Wishlist or New to you
   3. open one
   4. check tier price vs. best deals, owned badges, ratings
 - **Done when**: owned games are obvious; games with no Steam listing are listed below the table, not dropped.

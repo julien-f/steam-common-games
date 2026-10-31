@@ -9,6 +9,7 @@
 
 import { compareByOrder, formatMoney, fmtLocalDate, pad2 } from './utils.ts';
 import type { PriceAmount } from './types.ts';
+import type { OwnershipStatus } from './myOwnership.ts';
 
 // ITAD-hosted artwork for one game, as the bundle list itself returns it — `boxart` (300×450
 // portrait) plus banners at 145/300/400/600 wide. Only `banner145` (145×55, ~7KB) is used: it's
@@ -33,7 +34,7 @@ export interface BundleListItem {
   counts: { games?: number } | null;
   publish: string | null;
   expiry: string | null;
-  tiers: { price: PriceAmount | null; games?: { assets?: GameAssets | null }[] | null }[];
+  tiers: { price: PriceAmount | null; games?: { id: string; assets?: GameAssets | null }[] | null }[];
   pickAndMix?: PickAndMixTier[] | null;
 }
 
@@ -172,6 +173,44 @@ export interface BundleRow {
   expiry: string | null;
   status: string;
   covers: string[];
+  // ITAD game ids, once each though ITAD lists a game in every tier above its own.
+  gids: string[];
+}
+
+// What `/api/bundles/resolve` maps a gid to: one appid, a Steam package's several, or null (not on Steam).
+export type GidAppids = number | number[] | null;
+
+// A bundle's Steam games against the current account; a null count is a half whose fetch failed.
+export interface BundleOwnership {
+  steam: number;
+  owned: number | null;
+  wishlist: number | null;
+}
+
+// Counted per appid, as the bundle page's New to you tile counts its rows (resolveBundleGames).
+// `undefined` while a gid or the ownership is still loading; `null` when a gid's lookup failed.
+export function bundleOwnership(
+  gids: readonly string[],
+  appidsByGid: ReadonlyMap<string, GidAppids>,
+  failed: ReadonlySet<string>,
+  status: (appid: number) => OwnershipStatus | null,
+): BundleOwnership | null | undefined {
+  const appids = new Set<number>();
+  for (const gid of gids) {
+    if (failed.has(gid)) return null;
+    if (!appidsByGid.has(gid)) return undefined;
+    const appid = appidsByGid.get(gid);
+    if (appid) for (const id of Array.isArray(appid) ? appid : [appid]) appids.add(id);
+  }
+  let owned: number | null = 0;
+  let wishlist: number | null = 0;
+  for (const appid of appids) {
+    const s = status(appid);
+    if (!s) return undefined;
+    owned = owned == null || s.inLibrary == null ? null : owned + (s.inLibrary ? 1 : 0);
+    wishlist = wishlist == null || s.onWishlist == null ? null : wishlist + (s.onWishlist ? 1 : 0);
+  }
+  return { steam: appids.size, owned, wishlist };
 }
 
 // Cheapest tier that actually has a price — `null` means no tier had one at all (a "Build Your
@@ -400,5 +439,6 @@ export function toBundleRow(bundle: BundleListItem, now: number = Date.now(), cu
     expiry: bundle.expiry,
     status: expired ? 'Expired' : 'Active',
     covers: bundleCovers(bundle),
+    gids: [...new Set((bundle.tiers || []).flatMap((t) => (t.games || []).map((g) => g.id)))],
   };
 }

@@ -142,9 +142,10 @@ test("A1 edge: a pressed stat tile's label still meets AA contrast on the hero",
   await page.mouse.move(0, 0);
   await pressed.evaluate((el) => (el as HTMLElement).blur());
   expect(await heroContrast(label)).toBeGreaterThanOrEqual(4.5);
-  const other = page.locator('.list-stat-btn[aria-pressed="false"]').first();
-  await other.hover();
-  const otherLabel = page.locator('.list-stat', { has: other }).locator('.list-stat-label');
+  // The tile first, then its button: a `has` locator ending in .first() matches every tile holding one.
+  const otherTile = page.locator('.list-stat', { has: page.locator('.list-stat-btn[aria-pressed="false"]') }).first();
+  await otherTile.locator('.list-stat-btn').hover();
+  const otherLabel = otherTile.locator('.list-stat-label');
   expect(await otherLabel.evaluate((el) => getComputedStyle(el).color)).not.toBe(hoveredPressed);
 });
 
@@ -3966,6 +3967,42 @@ test("B3 edge: the link back to a bundle keeps the link's account", async ({ pag
     'href',
     /[?&]u=bob/,
   );
+});
+
+test("B1: /bundles counts each bundle's wishlisted and new games, and filters to the wishlisted ones", async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  const lookup = await gate(page, '**/api/bundles/resolve');
+  await page.goto('/bundles');
+  await expect(row(page, BUNDLE.title)).toContainText('…');
+  lookup.release();
+  // Co-op Pack: 4 Steam games, Portal 2 and Hades owned, Overcooked! 2 and It Takes Two wishlisted.
+  await expect(row(page, BUNDLE.title).getByTitle('2 of 4 Steam games on the wishlist')).toHaveText('☆ 2');
+  await expect(row(page, BUNDLE.title).getByTitle('2 of 4 Steam games not owned')).toHaveText('2');
+  // The pick-and-mix's Steam package counts per game in it, as the bundle's own New to you does.
+  await expect(row(page, PICK_BUNDLE.title).getByTitle('1 of 5 Steam games not owned')).toBeVisible();
+  await page.locator('.list-stat', { hasText: 'Wishlist' }).locator('.list-stat-btn').click();
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page)).toContainText(BUNDLE.title);
+});
+
+test('B1 edge: /bundles without an account says what the counts need instead of showing zeros', async ({ page }) => {
+  await page.goto('/bundles');
+  await expect(page.getByText('Pick an account on Home to see which bundles hold')).toBeVisible();
+  await expect(row(page, BUNDLE.title).getByTitle(/Steam games/)).toHaveCount(0);
+  await expect(page.locator('.list-stat', { hasText: 'Wishlist' })).toHaveCount(0);
+});
+
+test('B1 edge: on /bundles, a bundle whose game failed to resolve reads — rather than a partial count', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await mockApi(page, { states: ['resolve-failed'] }); // registered last, so it answers first
+  await page.goto('/bundles');
+  await expect(page.getByText("Steam didn't answer for some bundles' games")).toBeVisible();
+  await expect(row(page, PICK_BUNDLE.title).getByTitle('1 of 5 Steam games not owned')).toBeVisible();
+  await expect(row(page, BUNDLE.title).getByTitle(/Steam games/)).toHaveCount(0);
 });
 
 test('B1 edge: a bundle game whose Steam lookup failed says so, rather than reading as not on Steam', async ({
