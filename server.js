@@ -54,7 +54,7 @@ const {
 } = require('./lib/itad');
 const { withPickAndMix } = require('./lib/fanatical');
 const { streamEvent } = require('./lib/streamEvent.mjs');
-const { catalogCacheKey, getGamePass } = require('./lib/gamepass');
+const { catalogCacheKey, getGamePass, isGamePassCached } = require('./lib/gamepass');
 const {
   SESSION_COOKIE,
   STATE_COOKIE,
@@ -522,7 +522,7 @@ const bundlesByIdLimit = namedRateLimit('bundlesById', {
 
 const gamePassLimit = namedRateLimit('gamePass', {
   max: BUNDLES_RATE_LIMIT_MAX,
-  skip: (req) => !isForceRefresh(req) && isCached(catalogCacheKey(parseCountry(req))),
+  skip: (req) => !isForceRefresh(req) && isGamePassCached(parseCountry(req)),
 });
 
 const bundlesResolveLimit = namedRateLimit('bundlesResolve', {

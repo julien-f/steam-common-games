@@ -221,12 +221,25 @@ test('game pass limiter: counts cache misses but never counts cache hits', async
   setCache('itad-shop:microsoft store', 48);
   setCache('itad-appid:g1', 10);
   setCache('gamepass:pc:FR', [{ id: 'A', gid: 'g1' }]);
+  setCache('itad-appid:g2', null);
+  setCache('msstore-title:B', 'Not on Steam');
+  setCache('msstore-title:C', 'Not on ITAD');
+  setCache('gamepass:pc:GB', [
+    { id: 'A', gid: 'g1' },
+    { id: 'B', gid: 'g2' },
+    { id: 'C', gid: undefined },
+  ]);
+  // The route still resolves uncached gids and fetches uncached titles behind a cached catalog.
+  setCache('gamepass:pc:IT', [{ id: 'A', gid: 'g-unresolved' }]);
+  setCache('gamepass:pc:ES', [{ id: 'D', gid: undefined }]);
 
   const gamePass = (query) => () => api.get(`/api/game-pass?${query}`);
   await assertMissesCountHitsDont(calls, {
     misses: { 'uncached market': gamePass('country=US'), 'another market': gamePass('country=DE') },
     over: gamePass('country=JP'),
     refresh: gamePass('country=fr&refresh=1'),
-    hits: { 'cached market': gamePass('country=fr') },
+    hits: { 'cached market': gamePass('country=fr'), 'cached titles': gamePass('country=gb') },
   });
+  assert.equal((await gamePass('country=it')()).status, 429, 'an unresolved gid behind a cached catalog counts');
+  assert.equal((await gamePass('country=es')()).status, 429, 'an uncached title behind a cached catalog counts');
 });
