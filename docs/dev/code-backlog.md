@@ -100,6 +100,5 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 ## Docs
 
 - **C262 · minor · S** — `docs/user/configuration.md` and integrations.md still cost a cold game at ~2 `steam-store` calls (≈1,250 games/h, ~4% for a creator list); since the rating moved to `steam-reviews` it's one per game per service. Say so and drop the derived figures, which restate `default.env`.
-- **C263 · minor · S** — observability.md says `blockedUntil` 0 = closed; `lib/circuitBreaker.js` never resets it, so a past timestamp means closed and 0 means never tripped. Say that.
 - **C264 · minor · S** — architecture.md's request flow gives `/api/common-games`' reply without `recentPlaytime` (and `players[].gameCount`). Add them.
 - **C265 · cleanup · S** — data.md's `db.sqlite` contents omit `metrics_daily`, and `default.env`'s comment says it holds only cache tables; `default.env`'s budget-group list misses five groups (point to observability.md instead); configuration.md and pitfalls.md restate `STORE_MIN_INTERVAL_MS`/`UPSTREAM_MIN_INTERVAL_MS` values. Fix the lists, drop the copied numbers.
