@@ -55,10 +55,11 @@ export const TIER_RANGE_TITLE =
 export function flattenBundleGames(bundle: Bundle): FlatGame[] {
   const seen = new Map<string, FlatGame>();
   const tiers = bundle.tiers || [];
-  const lastListed = tiers.findLastIndex((t) => (t.games || []).length > 0);
+  // Add-on tiers are bought apart, so only base tiers can hide a game's real tier.
+  const lastListed = tiers.findLastIndex((t) => !t.addon && (t.games || []).length > 0);
   const emptyAbove = tiers
     .slice(lastListed + 1)
-    .flatMap((t) => (t.price && !(t.games || []).length ? [t.price.amount] : []));
+    .flatMap((t) => (!t.addon && t.price && !(t.games || []).length ? [t.price.amount] : []));
   const rangeMax = emptyAbove.length ? Math.max(...emptyAbove) : null;
   tiers.forEach((tier, i) => {
     for (const g of tier.games || []) {

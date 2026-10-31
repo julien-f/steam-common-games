@@ -306,6 +306,8 @@ export interface BundleTierSummary {
   gameCount: number;
   // Set on a Fanatical pick-and-mix tier: how many of the `gameCount` games this price picks.
   quantity?: number;
+  // Bought on its own, beside the base tiers: not cumulative, and its games aren't in any base tier.
+  addon?: boolean;
 }
 
 // One entry per tier, cheapest first (ITAD's tiers are observed to always be price-ascending), for
@@ -317,14 +319,16 @@ export interface BundleTierSummary {
 // Fanatical's quantity tiers stand in for ITAD's lone null-price tier when `currency` is given and they're known.
 export function bundleTierSummary(
   bundle: {
-    tiers?: { price?: PriceAmount | null; games?: unknown[] | null }[] | null;
+    tiers?: { price?: PriceAmount | null; games?: unknown[] | null; addon?: boolean | null }[] | null;
     pickAndMix?: PickAndMixTier[] | null;
   },
   currency?: string,
 ): BundleTierSummary[] {
+  // An unpriced tier with no games (seen as an empty add-on) prices nothing.
+  const tiers = (bundle.tiers || []).filter((t) => t.price || (t.games || []).length);
   const picks = currency ? pickTiers(bundle.pickAndMix, currency) : [];
-  if (picks.length && (bundle.tiers || []).every((t) => !t.price)) {
-    const pool = Math.max(0, ...(bundle.tiers || []).map((t) => (t.games || []).length));
+  if (picks.length && tiers.every((t) => !t.price)) {
+    const pool = Math.max(0, ...tiers.map((t) => (t.games || []).length));
     return picks.map((t) => ({
       price: t.price.amount,
       currency: t.price.currency,
@@ -332,17 +336,31 @@ export function bundleTierSummary(
       quantity: t.quantity,
     }));
   }
-  return (bundle.tiers || []).map((tier) => ({
+  return tiers.map((tier) => ({
     price: tier.price ? tier.price.amount : null,
     currency: tier.price ? tier.price.currency : null,
     gameCount: (tier.games || []).length,
+    ...(tier.addon && { addon: true }),
   }));
 }
 
-// The tiers that filter the table: a classic bundle's priced ones, when it has two or more.
+// From the base tiers (add-ons are bought apart): `tiered` (several, cumulative), `fixed` (one), or
+// `pick` (Fanatical's pick any N by quantity, its rates unknown when Fanatical's feed lacks it).
+export type BundlePricingModel = 'tiered' | 'fixed' | 'pick';
+
+export function bundlePricingModel(tiers: readonly BundleTierSummary[]): BundlePricingModel {
+  const base = tiers.filter((t) => !t.addon);
+  if (base.some((t) => t.quantity)) return 'pick';
+  const priced = base.filter((t) => t.price != null).length;
+  if (base.length && !priced) return 'pick';
+  return priced > 1 ? 'tiered' : 'fixed';
+}
+
+// The tiers that filter the table: a classic bundle's priced base tiers, when it has two or more.
 export function filterTiers(tiers: readonly BundleTierSummary[]): BundleTierSummary[] {
-  const priced = tiers.filter((t) => t.price != null && !t.quantity);
-  return priced.length > 1 && priced.length === tiers.length ? priced : [];
+  const base = tiers.filter((t) => !t.addon);
+  const priced = base.filter((t) => t.price != null && !t.quantity);
+  return priced.length > 1 && priced.length === base.length ? priced : [];
 }
 
 // The tier price a Tier Price range selects: a max alone, equal to one of `tiers`' prices.
@@ -355,9 +373,9 @@ export function activeTierPrice(
   return filterTiers(tiers).some((t) => t.price === max) ? max : null;
 }
 
-// What paying `price` gets: a pricier tier includes every cheaper one's games.
-export function atTier(row: { tierPrice?: number | null }, price: number): boolean {
-  return row.tierPrice != null && row.tierPrice <= price;
+// What paying `price` gets: a pricier tier includes every cheaper one's games, not an add-on's.
+export function atTier(row: { tierPrice?: number | null; addon?: boolean | null }, price: number): boolean {
+  return !row.addon && row.tierPrice != null && row.tierPrice <= price;
 }
 
 interface BundleUrgency {

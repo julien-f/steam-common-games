@@ -203,6 +203,7 @@ import {
 import {
   activeTierPrice,
   atTier,
+  bundlePricingModel,
   bundleTierSummary,
   bundleUrgency,
   filterTiers,
@@ -217,6 +218,7 @@ import {
   wholePackages,
   pickSavings,
   type BundlePackage,
+  type BundlePricingModel,
   type BundleTierSummary,
   type PickPlan,
   type PickTier,
@@ -611,6 +613,12 @@ const TIER_PRICE_COLUMN: ColumnDef<Record<string, any>> = {
   keepVisibleWhenGrouped: true,
   category: 'Pricing',
 };
+// The hero tile naming how a bundle prices its games.
+const BUNDLE_MODEL_LABELS: Record<BundlePricingModel, string> = {
+  tiered: 'Tiers',
+  fixed: 'Price',
+  pick: 'Pick & mix',
+};
 // A bundle's games' Tier Price fields by appid; with `picks`, pick-and-mix starts at the entry rate (see the effect by pickPlan).
 function bundleTierFields(
   resolved: ResolvedGame[],
@@ -902,6 +910,7 @@ export default function ListRoute() {
     note: string | null;
     itadCount: number | null;
     tiers: BundleTierSummary[];
+    model: BundlePricingModel;
     picks: PickTier[]; // Fanatical pick-and-mix tiers, when known
   } | null>(null);
   // The bundle's games that have no Steam listing at all (a course, an asset pack, a shop-exclusive
@@ -2657,13 +2666,15 @@ export default function ListRoute() {
         setBundleLinks({ details: bundle.details, url: bundle.url, fanaticalNames: bundle.pickAndMixNames ?? null });
         const regionCur = regionCurrency();
         const picks = pickTiers(bundle.pickAndMix, regionCur);
+        const tierSummary = bundleTierSummary(bundle, regionCur);
         setBundleMeta({
           shop: bundle.page?.name || null,
           publish: bundle.publish,
           expiry: bundle.expiry,
           note: bundle.note,
           itadCount: bundle.counts?.games ?? null,
-          tiers: bundleTierSummary(bundle, regionCur),
+          tiers: tierSummary,
+          model: bundlePricingModel(tierSummary),
           picks,
         });
         const { resolved, unresolved, failed } = await resolveBundleGames(bundle);
@@ -3168,16 +3179,27 @@ export default function ListRoute() {
         : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`;
     // Price first, then what it adds, then the deadline: a phone's swipeable row shows only the first few.
     if (meta.tiers.length > 0) {
+      const ratesUnknown = meta.model === 'pick' && !meta.picks.length;
       tiles.push({
-        label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
+        label: BUNDLE_MODEL_LABELS[meta.model],
+        sub:
+          meta.model === 'tiered'
+            ? 'each includes the cheaper ones'
+            : ratesUnknown
+              ? 'priced by how many you pick, on Fanatical'
+              : meta.model === 'pick'
+                ? 'the more you pick, the less each'
+                : undefined,
         chips: meta.tiers.map((tier) => {
-          const text = tierText(tier);
-          if (!toggles.length)
+          const text = tier.addon ? `${tierText(tier)} add-on` : tierText(tier);
+          if (tier.addon || !toggles.length)
             return {
               text,
-              title: tier.quantity
-                ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
-                : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`,
+              title: tier.addon
+                ? `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} bought on their own, apart from any tier`
+                : tier.quantity
+                  ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
+                  : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this price`,
               active: !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
             };
           const price = tier.price!;

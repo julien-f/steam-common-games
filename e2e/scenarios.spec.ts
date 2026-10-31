@@ -3737,6 +3737,8 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await page.getByRole('cell', { name: BUNDLE.title }).click();
   await expect(rows(page)).toHaveCount(4);
   const hero = page.locator('.list-hero');
+  // The tile names the pricing model and its rule, readable without hovering.
+  await expect(hero).toContainText('each includes the cheaper ones');
   const five = hero.getByRole('button', { name: /5\.00.* tier$/ });
   await five.focus();
   await five.press('Enter');
@@ -3768,6 +3770,8 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   await expect(hero.locator('.bundle-tier-chip')).toHaveCount(2);
   await expect(hero.locator('button.bundle-tier-chip')).toHaveCount(0);
+  await expect(hero).toContainText('Pick & mix');
+  await expect(hero).toContainText('the more you pick, the less each');
 });
 
 test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's tier filter", async ({ page }) => {

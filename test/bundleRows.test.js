@@ -19,6 +19,7 @@ const {
   compareBundleAge,
   BUNDLE_AGE,
   bundleTierSummary,
+  bundlePricingModel,
   filterTiers,
   activeTierPrice,
   atTier,
@@ -219,6 +220,38 @@ test('bundleTierSummary: empty for a bundle with no tiers', () => {
   assert.deepEqual(bundleTierSummary(bundle({ tiers: undefined })), []);
 });
 
+test('bundleTierSummary: drops an empty unpriced tier and marks add-ons (bundle 14804)', () => {
+  const b = bundle({
+    tiers: [
+      { price: { amount: 22.07, currency: 'USD' }, games: [{}, {}, {}] },
+      { price: null, games: [], addon: true },
+      { price: { amount: 2, currency: 'USD' }, games: [{}], addon: true },
+    ],
+  });
+  assert.deepEqual(bundleTierSummary(b), [
+    { price: 22.07, currency: 'USD', gameCount: 3 },
+    { price: 2, currency: 'USD', gameCount: 1, addon: true },
+  ]);
+});
+
+// ── bundlePricingModel ───────────────────────────────────────────────────────────────────────
+
+test('bundlePricingModel: tiered, fixed or pick, from the base tiers only', () => {
+  const t = (price, extra = {}) => ({ price, currency: price == null ? null : 'USD', gameCount: 1, ...extra });
+  assert.equal(bundlePricingModel([t(5), t(12)]), 'tiered');
+  assert.equal(bundlePricingModel([t(5), t(10.55), t(18.99, { gameCount: 0 })]), 'tiered', 'empty priced tiers count');
+  // Bundle 16689: five base tiers and two add-ons, one priced like a base tier.
+  assert.equal(
+    bundlePricingModel([t(4), t(6), t(9), t(13), t(16), t(2, { addon: true }), t(4, { addon: true })]),
+    'tiered',
+  );
+  assert.equal(bundlePricingModel([t(22.07), t(2, { addon: true })]), 'fixed', 'one base tier beside an add-on');
+  assert.equal(bundlePricingModel([t(0)]), 'fixed', 'a free tier is a price');
+  assert.equal(bundlePricingModel([t(2, { quantity: 1 }), t(3.5, { quantity: 3 })]), 'pick');
+  assert.equal(bundlePricingModel([t(null, { gameCount: 15 })]), 'pick', 'Build your own with no known rates');
+  assert.equal(bundlePricingModel([]), 'fixed', 'no tiers: nothing to choose');
+});
+
 // ── filterTiers / activeTierPrice / atTier ───────────────────────────────────────────────────
 
 const usd = (price, gameCount = 1) => ({ price, currency: 'USD', gameCount });
@@ -227,6 +260,8 @@ test('filterTiers: two or more priced tiers filter; one tier, a Varies one or pi
   assert.deepEqual(filterTiers([usd(5), usd(12)]), [usd(5), usd(12)]);
   assert.deepEqual(filterTiers([usd(5)]), []);
   assert.deepEqual(filterTiers([usd(5), { price: null, currency: null, gameCount: 3 }]), []);
+  assert.deepEqual(filterTiers([usd(4), usd(6), { ...usd(2), addon: true }]), [usd(4), usd(6)], 'add-ons apart');
+  assert.deepEqual(filterTiers([usd(4), { ...usd(2), addon: true }]), [], 'one base tier');
   assert.deepEqual(
     filterTiers([
       { ...usd(2), quantity: 1 },
@@ -252,6 +287,7 @@ test("atTier: paying a tier gets its games and every cheaper tier's, never a Var
   assert.equal(atTier({ tierPrice: 15 }, 12), false);
   assert.equal(atTier({ tierPrice: 0 }, 12), true, 'a free tier');
   assert.equal(atTier({ tierPrice: null }, 12), false);
+  assert.equal(atTier({ tierPrice: 2, addon: true }, 12), false, 'an add-on is bought apart');
 });
 
 // ── shopHue ──────────────────────────────────────────────────────────────────────────────────
