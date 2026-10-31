@@ -7227,6 +7227,27 @@ test.describe('with motion on', () => {
     expect(first).toBeLessThan(1);
   });
 
+  test('A1 edge: an Explore card lifts under a mouse and stays up at its bottom edge; not under a finger', async ({
+    page,
+  }, testInfo) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/');
+    const card = page
+      .locator('.explore-card')
+      .filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
+    const box = (await card.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 1);
+    if (testInfo.project.name === 'phone') {
+      await expect(card).toHaveCSS('translate', 'none');
+      return;
+    }
+    await expect(card).toHaveCSS('translate', '0px -3px');
+    await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+    // A move re-tests the hover against the lifted card, at once: without the gap filled, it drops.
+    await page.mouse.move(box.x + box.width / 2 + 1, box.y + box.height - 1);
+    expect(await card.evaluate((c) => c.matches(':hover'))).toBe(true);
+  });
+
   test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
     page,
   }) => {

@@ -76,6 +76,7 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 - Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate.
   - One exception: a panel section's body slides open and shut in `height` (`CollapsibleCard`), on a click only. Measured on DLC's 25 items (991 px) at 390 px wide under Chromium's 6× CPU throttle: 0 to 4 frames over 17 ms per opening (33 ms at most, usually one), none closing, over 4 runs.
 - Press feedback: buttons give to `scale: 0.98` while held, clickable rows to `0.995` (a full-width row would jump at 0.98), and both snap back on release, so a menu the click opens measures its trigger at full size.
+- Explore cards and account tiles lift 3 px under a mouse (`hover: hover`), a pseudo-element filling the gap below so a pointer at the bottom edge doesn't drop them; the ranking's picks don't, being clicked in quick succession.
 - A banner comes into place from the edge it sits on (`@starting-style`): down for the view banners, up for the storage-full one at the bottom.
 - A sort, filter or grouping change slides each row from where it was to where it lands (`slideRowsOnViewChange`, positions read on the pointerdown or keydown that starts it); the text search doesn't, as it changes on every key.
 - A table's first rows come in staggered (`cascadeFirstRows`, the first 8, 30 ms apart), once per load: a list's ↻ refresh, a view change and a new search query don't replay it.
