@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The server clears expired cached data every hour instead of only when it restarts
 - Game lists load with less data and server work: the details stream is compressed in larger pieces
 - Bundles: the page names how a bundle is priced; a tiered one is grouped by tier and says what the tier for your new games saves; pick & mix ones list wishlisted games first, owned ones last and out of the saving
+- Requires Node.js 22.15 or later.
 
 ### Fixed
 
@@ -76,6 +77,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An HLTB outage logs one throttled [HLTB] warning instead of one line per game
 - Tests check that a coalesced lookup passes on another client's upstream failure, and that a failed metrics write never fails the call it counts
 - Merging a fix-batch lane no longer stages another session's uncommitted backlog edits.
+- Unit tests run with git's hook variables stripped, so a test can't write to the real repository.
+- An end-to-end run whose port is taken moves to the next free one instead of failing.
+- Claude Code sessions are stopped from killing processes by name and pointed to the server scripts' down command.
 
 ## [0.12.0] - 2026-10-30
 

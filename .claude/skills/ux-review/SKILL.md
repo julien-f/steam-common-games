@@ -28,7 +28,7 @@ Seed before opening _any_ route and restore only on the way out, as in [testing.
 
 ## Walk each scenario
 
-Start the server(s) you need (`up` reuses a running one). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only.
+Start the server(s) you need (`up` reuses a running one). At **1440×900** and **390×844**, following its steps as a user would — mouse first, then keyboard only. The resized browser keeps its mouse: touch-only rules show at 390 px anyway, so judge them in the e2e `phone` project ([testing.md](../../../docs/dev/testing.md#looking-at-the-ui)).
 
 Check at each step:
 
@@ -44,7 +44,7 @@ Check at each step:
 
 - **Layout per route**: `node scripts/ux-measure.js [--state=…] --name=ux-<scenario> /route…`, then `browser_run_code_unsafe` with `filename: .playwright-mcp/measure.js` — first-row position, block heights, overflow, targets under 24 px, unnamed controls and console errors at both widths, with screenshots.
 - **Batch each step in one `browser_run_code_unsafe` call**: act, then measure with `page.evaluate` (focus, bounding boxes, computed styles, accessible names, `scrollWidth > innerWidth`), then screenshot. Far cheaper than click-by-click snapshots.
-- **Screenshots** go to `.playwright-mcp/ux-<scenario>-<what>.png` (gitignored — never `docs/images/`); `Read` them to look, `magick <in> -crop WxH+X+Y <out>` for detail.
+- **Screenshots** go to `.playwright-mcp/ux-<scenario>-<what>.png` (the main checkout's, even from a worktree) (gitignored — never `docs/images/`); `Read` them to look, `magick <in> -crop WxH+X+Y <out>` for detail.
 - **Native dialogs** (`prompt`/`confirm`) block the page: register `page.once('dialog', …)` before the click that opens one.
 - **Copied links**: stub `navigator.clipboard.writeText` in the page to capture them.
 - **A fresh browser** (S3, shared links): `page.context().browser().newContext()` — its own empty storage, so nothing to restore.

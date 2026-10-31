@@ -15,7 +15,7 @@ Combine lists to answer the questions Steam can't: what two friends both own, wh
 
 ## Setup
 
-Requires Node.js 22.13 or later.
+Requires Node.js 22.15 or later.
 
 ```bash
 echo "STEAM_API_KEY=your_key_here" > .env   # only required setting

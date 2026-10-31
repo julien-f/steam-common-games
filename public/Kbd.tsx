@@ -1,5 +1,5 @@
 // A key cap. Its arrows draw as Lucide icons, one size on every platform: system faces lack some or draw
-// ← → far smaller than ↑ ↓ (docs/dev/pitfalls.md). The glyph stays as hidden text.
+// ← → far smaller than ↑ ↓ (docs/dev/ui-guidelines.md, Type). The glyph stays as hidden text.
 import { For, type JSX } from 'solid-js';
 import ArrowLeft from 'lucide-solid/icons/arrow-left';
 import ArrowRight from 'lucide-solid/icons/arrow-right';

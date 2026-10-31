@@ -24,6 +24,19 @@
     ],
     "ask": ["Bash(git push --force*)", "Bash(git push -f*)", "Bash(git reset --hard*)"]
   },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/bash-guard.js\""
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "vflow@vates": false
   }

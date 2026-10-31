@@ -4,7 +4,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 
 ## Project context
 
-- **Stack**: Node >=22.13 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
+- **Stack**: Node >=22.15 + Express 5 backend, Solid + TypeScript frontend bundled by Vite, `node:sqlite` for `db.sqlite`; npm. Setup, dev servers and ports are in [README.md](README.md).
 - **Tests**: `npm test` (no real database), one file with `npm run test:one test/<name>.test.js`; end-to-end `npm run test:e2e` (every `/api` call mocked). Details, the hooks, and the rules for writing reliable tests: [testing.md](docs/dev/testing.md#writing-reliable-tests).
 - **Looking at the UI**: `npm run dev:mock` (or `node scripts/mock-server.js up` from an agent session), not the real dev server — that one writes the user's real prefs, so follow [testing.md](docs/dev/testing.md)'s seed/restore steps before using it.
 
@@ -25,7 +25,7 @@ Working conventions for this repo. Documentation lives in `docs/` — keep it th
 - [docs/dev/setup-backlog.md](docs/dev/setup-backlog.md) — `setup-review` proposals: changes applied and the measure each must move, open ones, declined ones with the reason
 - [docs/dev/decisions.md](docs/dev/decisions.md) — Weighted Rating vs. Wilson score, the Production Tier heuristic, player likeness as a count, native trailer playback, linting with Babel
 - [docs/dev/testing.md](docs/dev/testing.md) — unit and e2e tests, the mocked server, the real dev server's prefs seed/restore, the git hooks
-- [docs/dev/pitfalls.md](docs/dev/pitfalls.md) — surprising behaviors, misleading errors and their fixes; check it when something fails or behaves unexpectedly
+- [docs/dev/pitfalls.md](docs/dev/pitfalls.md) — surprising behaviors, misleading errors and their fixes; on an unexpected error, `grep -ri '<fragment>' docs/ .claude/skills/` first
 - [docs/images/](docs/images) — the screenshots the docs embed; shooting them is the `screenshots` skill
 
 Read the relevant one before changing that area. Two are load-bearing: **frontend.md's reactivity rules** (`npm run lint` enforces the no-reactive-`const` one), and **integrations.md's trust tiers** — several upstreams are undocumented and unsanctioned, so don't scale request volume without revisiting them.
@@ -76,7 +76,7 @@ After making changes:
 
 1. Update or add tests to cover the change: the single-file command while iterating, then `npm run format`. Before committing a UI change, run only `npm run test:e2e -- --project=phone`: the hook runs desktop e2e, pre-push both widths. Fixing a failing or flaky test: search [code-backlog.md](docs/dev/code-backlog.md) for its name first, and close the matching item in the same commit.
 2. Update any affected documentation — see Where things belong above — and `CHANGELOG.md` (see Changelog below).
-3. Record what was surprising, misleading or broken, and its fix: as a comment or test when tied to specific code, otherwise in [pitfalls.md](docs/dev/pitfalls.md); machine-specific ones in Claude's memory. Symptom first (exact error text), then cause and fix. Delete entries once obsolete.
+3. Record what was surprising, misleading or broken, and its fix: as a comment or test when tied to specific code, otherwise as a rule in the doc its reader is in (keeping the exact error text), or in [pitfalls.md](docs/dev/pitfalls.md) when no doc fits; machine-specific ones in Claude's memory. Symptom first (exact error text), then cause and fix. Delete entries once obsolete.
 4. Verify with `npm run check` (its steps: `steps()` in [check.js](scripts/check.js)). When committing, the `pre-commit` hook runs its relevant steps on what's staged (plus desktop e2e on UI changes; fix-batch lanes defer it with `E2E_DEFER=1` and run the suite once before reporting, [BATCH.md](.claude/skills/code-fix/BATCH.md)) and blocks on failure, so don't also run it by hand; the `pre-push` hook runs what CI runs (see [testing.md](docs/dev/testing.md#hooks)). Fix what it reports.
 
 ## Changelog
