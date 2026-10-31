@@ -104,12 +104,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: a run never reuses a server already on its port (it would serve another checkout's build). Each worktree draws its own port from its path (`portOf` in `scripts/ports.js`), so this takes two runs in the same checkout, or two worktree paths landing on the same port.
 - **Fix**: wait for the other run, or pick a port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).
 
-## A column menu opened by an e2e click closes at once on phone, on CI only
-
-- **Symptom**: after `menu.click()`, the next step waits forever for an item of the header menu (`locator.click: Test timeout`); the error context shows the menu closed.
-- **Cause**: the header button sits past the phone's right edge (grouping widens the table; CI's fonts add a few pixels more than local ones). `click()` scrolls `.dt-table-wrap` to reach it, that scroll event fires after the menu opened, and data-table closes a menu on any scroll outside it.
-- **Fix**: `await menu.scrollIntoViewIfNeeded()`, then wait a frame (`page.evaluate(() => new Promise(requestAnimationFrame))`) before the click. To reproduce locally, narrow the viewport until the button straddles the edge (e.g. 370 px).
-
 ## A merge fails the hook in the main checkout, though the branch passed
 
 - **Symptom**: `scripts/check.js` (the hooks, `npm run check`) stops with `✗ node_modules is behind package-lock.json: <package> (…). Run npm ci.` Before that check existed, the same cause showed as `error TS2353: … does not exist in type 'ColumnDef<…>'` or `Rolldown failed to resolve import "lucide-solid/icons/blend"`.

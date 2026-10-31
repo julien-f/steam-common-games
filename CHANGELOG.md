@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Update dependencies
 - Settings and lists are read faster, and an unchanged setting is no longer re-synced to your account
 - A table layout (columns, sort, filters, grouping) now changes only when you Save it, on every table: until then it's kept in the tab with Save and Discard, and saved layouts sync to your account
+- The desktop Filter pane highlights the column it shows
 
 ### Fixed
 
@@ -33,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - When HLTB asks to slow down, the app pauses its HLTB lookups instead of retrying the next game at once
 - In fullscreen on Firefox for Android, a trailer no longer shifts as its controls show and hide
 - On a narrow phone, the game panel's current section tab stays in view when another section's tab appears before it
+- Large libraries no longer stutter while their games load
 
 ### Development
 

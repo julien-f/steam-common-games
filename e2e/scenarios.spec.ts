@@ -537,8 +537,6 @@ test("F3 edge: a column header's filter lists values as the cells write them", a
   await page.goto('/lists/owned');
   await expect(rows(page)).toHaveCount(6);
   const menuButton = page.getByRole('button', { name: 'Genres options' });
-  // the menu closes when the table scrolls, so scroll to it before opening, as a finger would
-  await menuButton.scrollIntoViewIfNeeded();
   await menuButton.click();
   await page.getByRole('dialog', { name: 'Genres options' }).getByRole('button', { name: 'Filter' }).click();
   // innerText, unlike textContent, applies CSS text-transform
@@ -3177,15 +3175,8 @@ test('L3 edge: the column menu undoes the group and filter it set', async ({ pag
   const menu = page.getByRole('button', { name: /^Weighted Rating options/ });
   const dialog = page.getByRole('dialog', { name: /^Weighted Rating options/ });
 
-  // On a phone the button is past the table's edge. The scroll click() does to reach it can land
-  // after the menu opens, and the table closes its menu on scroll: scroll first, here and below.
-  await menu.scrollIntoViewIfNeeded();
-  await page.evaluate(() => new Promise(requestAnimationFrame));
   await menu.click();
   await dialog.getByRole('button', { name: 'Group by this column' }).click();
-  // Grouping widens the table further.
-  await menu.scrollIntoViewIfNeeded();
-  await page.evaluate(() => new Promise(requestAnimationFrame));
   await menu.click();
   await dialog.getByRole('button', { name: 'Remove group' }).click();
   await menu.click();
