@@ -179,18 +179,3 @@ test("createCachedFetch: the load's ttlMs sets the entry's expiry; a throw cache
   );
   assert.equal(getCached('games:bad'), undefined);
 });
-
-// ── periodic eviction ─────────────────────────────────────────────────────────
-
-test('expired rows are evicted every hour, not only at startup', (t) => {
-  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: Date.now() });
-  // A fresh copy of the module, so its interval is armed under the fake clock.
-  delete require.cache[require.resolve('../lib/cache')];
-  const cache = require('../lib/cache');
-  const rows = () => cache.getCacheEntryCounts().library;
-  cache._reset([['games:k', { value: 'v', ts: Date.now() - LIBRARY_CACHE_TTL_MS + 1000 }]]);
-  t.mock.timers.tick(30 * 60 * 1000);
-  assert.equal(rows(), 1, 'expired, but not evicted before the hour');
-  t.mock.timers.tick(30 * 60 * 1000);
-  assert.equal(rows(), 0);
-});

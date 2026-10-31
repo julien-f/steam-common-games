@@ -92,10 +92,7 @@ const isItadConfigured = () => !!process.env.ITAD_API_KEY;
 const ITAD_UNAVAILABLE = "Bundles and prices aren't available on this instance: it isn't connected to IsThereAnyDeal.";
 const requireItad = (_req, res, next) =>
   isItadConfigured() ? next() : res.status(503).json({ error: ITAD_UNAVAILABLE });
-// Shared by every /api/bundles* route that takes a `country` query param — falls back to US
-// for anything outside the frontend's region list rather than rejecting the request outright,
-// same "trust but sanitize" treatment as the rest of this app's query params. Each country is
-// its own cache key and upstream call, hence the list rather than any 2-letter code.
+// Each country is its own cache key and ITAD call: only the region picker's list, else US.
 const REGION_CODES = new Set(require('./public/regions.json').map((r) => r.code));
 const parseCountry = (req) => {
   const code = typeof req.query.country === 'string' ? req.query.country.toUpperCase() : '';
