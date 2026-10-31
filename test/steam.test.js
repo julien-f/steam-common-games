@@ -29,9 +29,10 @@ const {
   getPlayerAchievements,
   getGlobalAchievementPercentages,
   getGameNews,
+  _resetTagNameMap,
 } = require('../lib/steam');
 const { getSemaphoreStats, createSemaphore } = require('../lib/upstream');
-const { _reset, setCache } = require('../lib/cache');
+const { _reset, getCachedAt, setCache } = require('../lib/cache');
 const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { db } = require('../lib/db');
 const { MISS_CACHE_TTL_MS, META_CACHE_TTL_MS } = require('../lib/config');
@@ -1207,7 +1208,12 @@ const gameDemo = async (appid) => extractDemoAppid(await getStoreBrowseItem(appi
 
 // Routes the shared fetch mock by URL: IStoreBrowseService for the per-app store browse item
 // (tagids + related_items), ajaxgetstoretags for the tagid → name map.
-function mockTagEndpoints(t, { tagids = [], tags, nameMap = {}, demoAppid, browseOk = true, namesOk = true } = {}) {
+function mockTagEndpoints(
+  t,
+  { tagids = [], tags, nameMap = { 1: 'Action' }, demoAppid, browseOk = true, namesOk = true } = {},
+) {
+  _resetTagNameMap();
+  t.after(_resetTagNameMap);
   let browseCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1281,7 +1287,7 @@ test('resolveSteamTags: a null weight when the item has no tag weights', async (
 
 test('resolveSteamTags: returns empty array when the app has no tagids', async (t) => {
   _reset();
-  mockTagEndpoints(t, { tagids: [], nameMap: {} });
+  mockTagEndpoints(t, { tagids: [] });
 
   const result = await steamTags(400);
   assert.deepEqual(result, []);
@@ -1293,7 +1299,7 @@ test('resolveSteamTags: returns empty array when the store item lookup is unsucc
     if (String(url).includes('IStoreBrowseService')) {
       return { ok: true, json: async () => ({ response: { store_items: [{ success: 0 }] } }) };
     }
-    return { ok: true, json: async () => ({ tags: [] }) };
+    return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
   });
 
   const result = await steamTags(400);
@@ -1335,6 +1341,7 @@ test('resolveSteamTags: throws isUpstream when the tag name map fetch fails', as
 // caller-recognizable upstream error.
 test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag name map response body is null', async (t) => {
   _reset();
+  t.after(_resetTagNameMap);
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
       return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1] }] } }) };
@@ -1349,6 +1356,43 @@ test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag nam
     () => steamTags(400),
     (err) => err.isUpstream === true,
   );
+});
+
+// A cached `{}` would read as "no tags" on every game for the meta TTL.
+for (const body of [{}, { tags: [] }, { tags: 'x' }]) {
+  test(`resolveSteamTags: throws isUpstream and caches nothing when the tag name map body is ${JSON.stringify(body)}`, async (t) => {
+    _reset();
+    _resetTagNameMap();
+    t.after(_resetTagNameMap);
+    t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => body }));
+
+    await assert.rejects(
+      () => resolveSteamTags(Promise.resolve({ tagids: [1] })),
+      (err) => err.isUpstream === true,
+    );
+    assert.equal(getCachedAt('tagnames:all'), undefined);
+  });
+}
+
+test('resolveSteamTags: holds off refetching the tag name map briefly after a failure', async (t) => {
+  _reset();
+  _resetTagNameMap();
+  t.after(_resetTagNameMap);
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  let ok = false;
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () =>
+    ok ? { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) } : { ok: false, status: 503 },
+  );
+  const tags = () => resolveSteamTags(Promise.resolve({ tagids: [1] }));
+
+  await assert.rejects(tags, (err) => err.isUpstream === true);
+  ok = true;
+  await assert.rejects(tags, (err) => err.isUpstream === true);
+  assert.equal(fetchMock.mock.callCount(), 1, 'no refetch within the hold-off');
+
+  t.mock.timers.tick(31 * 1000);
+  assert.deepEqual(await tags(), [{ name: 'Action', weight: null }]);
+  assert.equal(fetchMock.mock.callCount(), 2);
 });
 
 test('extractDemoAppid: returns the demo appid from related_items.demo_appid', async (t) => {

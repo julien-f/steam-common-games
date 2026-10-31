@@ -23,6 +23,7 @@ const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
 const { PREFS_MAX_BYTES, SYNCED_PREF_KEYS, getUserPrefs, setUserPref } = require('../lib/auth');
 const { _resetAuth } = require('../lib/hltb');
+const { _resetTagNameMap } = require('../lib/steam');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
 const { getMetrics } = require('../lib/metrics');
@@ -922,6 +923,7 @@ test('GET /api/game-details/:appid: 200 with null tags and null demo when the St
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
+  t.after(_resetTagNameMap);
 
   const res = await api.get('/api/game-details/404');
   assert.equal(res.status, 200);
@@ -1133,7 +1135,8 @@ for (const comingSoon of [true, false]) {
       if (url.includes('search/site')) return { ok: true, json: async () => ({ data: [] }) };
       if (url.includes('IStoreBrowseService'))
         return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [] }] } }) };
-      if (url.includes('ajaxgetstoretags')) return { ok: true, json: async () => ({ tags: [] }) };
+      if (url.includes('ajaxgetstoretags'))
+        return { ok: true, json: async () => ({ tags: [{ tagid: 1, name: 'Action' }] }) };
       throw new Error(`Unexpected fetch: ${url}`);
     });
     await api.get('/api/game-details/777').expect(200);
