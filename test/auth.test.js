@@ -3,8 +3,11 @@
 // Force the in-memory DB regardless of how this file is invoked — see steam.test.js's own
 // comment on why this must be set before requiring lib/db (via lib/auth).
 process.env.DB_FILE = '';
+// 0 = no ceiling: the nonce-table test confirms 10,000 sign-ins, past the default hourly budget.
+process.env.OUTBOUND_HOURLY_MAX = '0';
+process.env.OUTBOUND_DAILY_MAX = '0';
 
-const { test } = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { db } = require('../lib/db');
@@ -19,6 +22,7 @@ const {
   destroySession,
   getSessionUser,
   setUserPref,
+  _resetNonces,
 } = require('../lib/auth');
 
 const VALID_CLAIMED_ID = 'https://steamcommunity.com/openid/id/76561198000000001';
@@ -90,6 +94,8 @@ function assertion(overrides = {}) {
   };
 }
 const verify = (query) => verifySteamAssertion(query, { origin: ORIGIN, state: STATE });
+
+beforeEach(() => _resetNonces());
 
 test('verifySteamAssertion: returns the steamid64 when Steam confirms the assertion', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'ns:...\nis_valid:true\n' }));
@@ -178,8 +184,7 @@ test('verifySteamAssertion: of two concurrent replays, only one signs in', async
 // A nonce is remembered for twice its window, so one dated as far ahead as allowed is still
 // remembered, or already stale, at any later replay.
 test('verifySteamAssertion: a nonce dated ahead of this clock is never accepted twice', async (t) => {
-  // Past every nonce the other tests left, so the sweep reaches this one; whole seconds, as nonces.
-  const now = Math.floor(Date.now() / 1000) * 1000 + 24 * 60 * 60 * 1000;
+  const now = Math.floor(Date.now() / 1000) * 1000; // whole seconds, as nonces
   t.mock.timers.enable({ apis: ['Date'], now });
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
   assert.equal(await verify(assertion({ 'openid.response_nonce': freshNonce(now + 5 * 60 * 1000) })), null);
@@ -189,6 +194,18 @@ test('verifySteamAssertion: a nonce dated ahead of this clock is never accepted 
     t.mock.timers.tick(step);
     assert.equal(await verify(query), null);
   }
+});
+
+// A full table refuses new sign-ins rather than forgetting a nonce still inside its window.
+test('verifySteamAssertion: a full nonce table never lets a live nonce be replayed', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const warnMock = t.mock.method(console, 'warn', () => {});
+  const victim = assertion();
+  assert.equal(await verify(victim), '76561198000000001');
+  for (let i = 1; i < 10_000; i++) await verify(assertion());
+  assert.equal(await verify(assertion()), null, 'refused while full');
+  assert.equal(await verify(victim), null, 'the first nonce is still remembered');
+  assert.ok(warnMock.mock.calls.some((c) => String(c.arguments[0]).startsWith('[auth]')));
 });
 
 // ── users & sessions ──────────────────────────────────────────────────────────
