@@ -7093,8 +7093,260 @@ test('F1 edge: under reduced motion the lightbox opens and closes without morphi
   expect(await page.evaluate(() => (window as unknown as { transitions: number }).transitions)).toBe(0);
 });
 
+// Counts the panel's sliding-out copies, and the ids they duplicate while there.
+async function watchPanelGhosts(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { ghosts: number; dupIds: number };
+    w.ghosts = 0;
+    w.dupIds = 0;
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes)
+          if ((n as Element).classList?.contains('panel-ghost')) {
+            w.ghosts++;
+            const ids = [...document.querySelectorAll('[id]')].map((e) => e.id);
+            w.dupIds += ids.length - new Set(ids).size;
+          }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  return () => page.evaluate(() => (window as unknown as { ghosts: number; dupIds: number }).ghosts);
+}
+
+test('I2 edge: under reduced motion, a closed panel leaves no sliding copy', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  await expect(page.locator('#panel-title')).toHaveText('Hades');
+  const ghosts = await watchPanelGhosts(page);
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('#panel-title')).toBeHidden();
+  expect(await ghosts()).toBe(0);
+});
+
+// Clicks a section's toggle and reports, in that same task, its body's state.
+const toggleSectionNow = (toggle: Locator) =>
+  toggle.evaluate((b: HTMLElement) => {
+    b.click();
+    const body = b.closest('.panel-achievements-card')!.querySelector<HTMLElement>('.panel-collapsible-body');
+    return body && { animations: body.getAnimations().length, inert: body.inert };
+  });
+
+test('I2 edge: under reduced motion, a section shuts at once', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/lists/owned?game=1145360');
+  const toggle = page.locator('#panel-section-dlc').getByRole('button', { name: /DLC · 25 available/ });
+  await toggle.click();
+  await expect(page.locator('#panel-section-dlc .panel-collapsible-body')).toBeVisible();
+  expect(await toggleSectionNow(toggle)).toBeNull();
+});
+
 test.describe('with motion on', () => {
   test.use({ reducedMotion: 'no-preference' });
+
+  test("A1 edge: a list's first rows come in staggered, and a refresh doesn't replay it", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { arrivals: string[] };
+      w.arrivals = [];
+      new MutationObserver((records) => {
+        for (const r of records)
+          if ((r.target as Element).classList.contains('dt-tr--arrive'))
+            w.arrivals.push((r.target as HTMLElement).dataset.procIdx!);
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    });
+    const arrivals = () => page.evaluate(() => (window as unknown as { arrivals: string[] }).arrivals);
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await expect(rows(page)).toHaveCount(6);
+    await expect.poll(arrivals).toEqual(['0', '1', '2', '3', '4', '5']);
+    await expect(page.locator('.dt-tr--arrive')).toHaveCount(0);
+    await page.getByRole('button', { name: /^Updated\b/ }).click();
+    await expect(page.locator('.list-stat', { hasText: 'Updated' })).not.toContainText('Refreshing');
+    await expect(rows(page)).toHaveCount(6);
+    expect(await arrivals()).toHaveLength(6);
+  });
+
+  test('L3 edge: a sort slides each row to its new place; typing a search moves nothing', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    await expect(rows(page)).toHaveCount(6);
+    await expect(page.locator('.dt-tr--arrive')).toHaveCount(0);
+    // Records each row slide's start offset as it begins: a 250 ms slide may be over by the next round trip.
+    await page.evaluate(() => {
+      const w = window as unknown as { slides: string[] };
+      w.slides = [];
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
+        const [frames, options] = args as [Keyframe[], KeyframeAnimationOptions];
+        if (options?.id === 'row-slide') w.slides.push(String(frames[0].translate ?? 'fade'));
+        return animate.apply(this, args);
+      };
+    });
+    const slides = () => page.evaluate(() => (window as unknown as { slides: string[] }).slides.splice(0));
+    // Synthetic: the slide's start positions are read on the pointerdown.
+    await page.locator('.dt-th-sort', { hasText: 'Name' }).evaluate((b: HTMLElement) => {
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      b.click();
+    });
+    await expect(rows(page).first()).toContainText('Hades');
+    const started = await slides();
+    expect(started.length).toBeGreaterThan(0);
+    for (const offset of started) expect(offset).toMatch(/^0 -?\d+(\.\d+)?px$/);
+    await page.evaluate(() => document.getAnimations().forEach((a) => a.id === 'row-slide' && a.finish()));
+    expect(
+      await page.evaluate(() =>
+        [...document.querySelectorAll('tr[data-row-key]')].map((r) => {
+          const cs = getComputedStyle(r);
+          return `${cs.translate} ${cs.opacity}`;
+        }),
+      ),
+    ).toEqual(Array(6).fill('none 1'));
+    await page.locator('.dt-toolbar input').first().pressSequentially('hades');
+    await expect(rows(page)).toHaveCount(1);
+    expect(await slides()).toEqual([]);
+  });
+
+  test('L5 edge: a banner comes down into place from its first frame', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { bannerFirstFrame: number | null };
+      w.bannerFirstFrame = null;
+      new MutationObserver(() => {
+        const banner = document.querySelector('.pref-unsaved-banner');
+        if (!banner || w.bannerFirstFrame !== null) return;
+        w.bannerFirstFrame = -1;
+        // Read in the frame it first paints: its transition has only just started there.
+        requestAnimationFrame(() => (w.bannerFirstFrame = Number(getComputedStyle(banner).opacity)));
+      }).observe(document, { childList: true, subtree: true });
+    });
+    await asPlayer(page, ALICE);
+    const tv = JSON.stringify({ sorts: [{ key: 'name', dir: 'desc' }] });
+    await page.goto(`/lists/owned?tv=${encodeURIComponent(tv)}`);
+    const banner = page.locator('.pref-unsaved-banner');
+    await expect(banner).toHaveCSS('opacity', '1');
+    await expect(banner).toHaveCSS('translate', 'none');
+    const first = await page.evaluate(() => (window as unknown as { bannerFirstFrame: number }).bannerFirstFrame);
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(1);
+  });
+
+  test('A1 edge: an Explore card lifts under a mouse and stays up at its bottom edge; not under a finger', async ({
+    page,
+  }, testInfo) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/');
+    const card = page
+      .locator('.explore-card')
+      .filter({ has: page.getByRole('link', { name: 'Wishlist', exact: true }) });
+    const box = (await card.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 1);
+    if (testInfo.project.name === 'phone') {
+      await expect(card).toHaveCSS('translate', 'none');
+      return;
+    }
+    await expect(card).toHaveCSS('translate', '0px -3px');
+    await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+    // A move re-tests the hover against the lifted card, at once: without the gap filled, it drops.
+    await page.mouse.move(box.x + box.width / 2 + 1, box.y + box.height - 1);
+    expect(await card.evaluate((c) => c.matches(':hover'))).toBe(true);
+  });
+
+  test('B1 edge: a hero count counts to its new value, the final value what is read out throughout', async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/bundles');
+    const fresh = page.getByRole('button', { name: /^New \d/ });
+    await expect(fresh).toHaveAccessibleName(/^New 2\b/);
+    // Showing only the bundle ending soon leaves one of the two new ones. Read in the click's own
+    // task: the count is over 400 ms later.
+    const mid = await page.getByRole('button', { name: /^Ending soon \d/ }).evaluate((b: HTMLElement) => {
+      b.click();
+      const drawn = document.querySelector('.list-stat-count');
+      return { drawn: drawn?.textContent, hidden: drawn?.ariaHidden, read: drawn?.nextElementSibling?.textContent };
+    });
+    expect(mid).toEqual({ drawn: '2', hidden: 'true', read: '1' });
+    await expect(page.locator('.list-stat-count')).toHaveCount(0);
+    await expect(fresh).toHaveAccessibleName(/^New 1\b/);
+    await expect(fresh.locator('.list-stat-value')).toHaveText('1');
+  });
+
+  test('I2 edge: a click slides a section open and shut, its body inert on the way out; a reopened game just shows it', async ({
+    page,
+  }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    const card = page.locator('#panel-section-dlc');
+    const toggle = card.getByRole('button', { name: /DLC · 25 available/ });
+    const body = card.locator('.panel-collapsible-body');
+    // Not the loading shimmer's endless loop, which can't be finished.
+    const finishAll = () =>
+      page.evaluate(() =>
+        document.getAnimations().forEach((a) => a.effect?.getComputedTiming().endTime !== Infinity && a.finish()),
+      );
+    expect(await toggleSectionNow(toggle)).toEqual({ animations: 1, inert: false });
+    await finishAll();
+    await expect(body).toBeVisible();
+    expect(await toggleSectionNow(toggle)).toEqual({ animations: 1, inert: true });
+    await finishAll();
+    await expect(body).toHaveCount(0);
+    await toggle.click();
+    await finishAll();
+    await page.getByRole('button', { name: 'Next game' }).click();
+    await expect(page.locator('#panel-title')).not.toHaveText('Hades');
+    await page.getByRole('button', { name: 'Previous game' }).click();
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    await expect(body).toBeVisible();
+    expect(await body.evaluate((b) => b.getAnimations().length)).toBe(0);
+  });
+
+  test('I2 edge: a closed panel slides out as a copy without ids, which then goes', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    await page.getByRole('button', { name: 'Close' }).click();
+    await expect.poll(ghosts).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { dupIds: number }).dupIds)).toBe(0);
+    await expect(page.locator('.panel-ghost')).toHaveCount(0);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    await expect(row(page, 'Hades')).toBeFocused();
+  });
+
+  test('I2 edge: leaving the route closes the panel without a sliding copy', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    // A DOM click: on a phone the panel covers the nav.
+    await page.getByRole('link', { name: 'Home', exact: true }).evaluate((a: HTMLElement) => a.click());
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    expect(await ghosts()).toBe(0);
+  });
+
+  test('I2 edge: on a phone, a swiped-away panel leaves no second, sliding copy', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'touch only');
+    await page.clock.install();
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned?game=1145360');
+    await expect(page.locator('#panel-title')).toHaveText('Hades');
+    const ghosts = await watchPanelGhosts(page);
+    // Synthetic events: Chromium holds back real touchmoves within its slop.
+    await page.locator('#panel-title').evaluate((title) => {
+      const y = title.getBoundingClientRect().top + 5;
+      const fire = (type: string, x: number) => {
+        const touch = new Touch({ identifier: 1, target: title, clientX: x, clientY: y });
+        const touches = type === 'touchend' ? [] : [touch];
+        title.dispatchEvent(
+          new TouchEvent(type, { bubbles: true, cancelable: true, touches, changedTouches: [touch] }),
+        );
+      };
+      fire('touchstart', 40);
+      for (const x of [50, 100, 160, 220]) fire('touchmove', x);
+      fire('touchend', 220);
+    });
+    await page.clock.runFor(500);
+    await expect(page.locator('#panel-title')).toBeHidden();
+    expect(await ghosts()).toBe(0);
+  });
 
   test('I2 edge: the panel slides in to rest, focus on its hero', async ({ page }) => {
     await asPlayer(page, ALICE);
@@ -7285,6 +7537,23 @@ test.describe('with motion on', () => {
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(prefs).toBeFocused();
+  });
+
+  test('L3 edge: a table menu fades in from its first frame to rest', async ({ page }) => {
+    await asPlayer(page, ALICE);
+    await page.goto('/lists/owned');
+    const columns = page.getByRole('button', { name: 'Columns', exact: true });
+    await columns.waitFor();
+    // Read in the frame the menu first paints: its transition has only just started there.
+    const firstFrame = await columns.evaluate(async (b: HTMLElement) => {
+      b.click();
+      await new Promise(requestAnimationFrame);
+      return Number(getComputedStyle(document.querySelector('.dt-dd')!).opacity);
+    });
+    expect(firstFrame).toBeLessThan(1);
+    const menu = page.locator('.dt-dd');
+    await expect(menu).toHaveCSS('opacity', '1');
+    await expect(menu).toHaveCSS('scale', 'none');
   });
 });
 

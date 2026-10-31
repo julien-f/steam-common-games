@@ -74,10 +74,17 @@ How the UI should behave where [journeys.md](journeys.md) and the feature docs a
 
 - Durations and easing from the `--dur-*` / `--ease-out` tokens in `styles/tokens.css` (`--dur-4`: the TV's room-paced fades); motion explains a change (something opening, arriving, pressed), never decorates.
 - Only `opacity` and `transform` (or `translate`/`scale`) move; layout properties never animate.
+  - One exception: a panel section's body slides open and shut in `height` (`CollapsibleCard`), on a click only. Measured on DLC's 25 items (991 px) at 390 px wide under Chromium's 6× CPU throttle: 0 to 4 frames over 17 ms per opening (33 ms at most, usually one), none closing, over 4 runs; smooth on a Galaxy S10 (Firefox for Android).
 - Press feedback: buttons give to `scale: 0.98` while held, clickable rows to `0.995` (a full-width row would jump at 0.98), and both snap back on release, so a menu the click opens measures its trigger at full size.
+- Explore cards and account tiles lift 3 px under a mouse (`hover: hover`), a pseudo-element filling the gap below so a pointer at the bottom edge doesn't drop them; the ranking's picks don't, being clicked in quick succession.
+- A hero tile's number counts to its new value over 400 ms (`createCountUp`), from its last non-zero value: a list empties out before each reload, so a count from or to 0 would only replay it. The drawn steps are `aria-hidden` and unselectable; the final value beside them is what's read out and copied.
+- A banner comes into place from the edge it sits on (`@starting-style`): down for the view banners, up for the storage-full one at the bottom.
+- A sort, filter or grouping change slides each row from where it was to where it lands (`slideRowsOnViewChange`, positions read on the pointerdown or keydown that starts it); the text search doesn't, as it changes on every key.
+- A table's first rows come in staggered (`cascadeFirstRows`, the first 8, 30 ms apart), once per load: a list's ↻ refresh, a view change and a new search query don't replay it.
 - An image fades in once loaded (`fadeInOnLoad`), so a row or the panel never flashes a half-drawn picture; a cached one shows at once.
 - View Transitions only for a shared element (row thumbnail → panel hero, hero → lightbox), through `viewTransition.ts`'s `morph`: feature-detected, skipped under reduced motion or while another top-layer popover or dialog is open (the lightbox's own dialog morphs: the snapshots paint above it), its `view-transition-name` set on the two elements only for the transition's length, the root cross-fade off, focus moved after `updateCallbackDone`. Not for route changes: the router has no hook, and a lazy route would freeze the screen while its chunk loads.
-- Reduced motion: `styles/base.css` sets every transition to `0s` and every animation to a near-instant single run, so end states are reached at once; JS smooth scrolls go through `smoothScroll()`.
+- CSS first; JS only where CSS can't (measuring positions or heights). Web Animations go through `motion.ts`'s `animate`, which resolves even when it skips or is cancelled, so cleanup waiting on it always runs.
+- Reduced motion: `styles/base.css` sets every transition to `0s` and every animation to a near-instant single run, so end states are reached at once; it doesn't reach the Web Animations API, hence `animate` skipping under it; JS smooth scrolls go through `smoothScroll()`.
 
 ## Checklist for a new UI feature
 

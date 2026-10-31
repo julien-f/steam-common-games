@@ -512,6 +512,15 @@
     border-radius: var(--radius-3);
     background: var(--surface);
     font-size: var(--fs-ui);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      translate var(--dur-2) var(--ease-out);
+  }
+  @starting-style {
+    .storage-full-banner {
+      opacity: 0;
+      translate: 0 8px;
+    }
   }
 
   /* ── A route's hero (ListHero.tsx): a flat section, not a card. Title, chips and actions, then
@@ -614,6 +623,10 @@
     cursor: pointer;
   }
   /* Tables' figures line up; a value can't be told numeric from CSS, so the text face with tabular figures. */
+  /* A count's drawn steps (ListHero.tsx): the final value beside it is what a copy takes. */
+  .list-stat-count {
+    user-select: none;
+  }
   .list-stat-value {
     color: var(--text);
     font-size: var(--fs-body);
@@ -1444,6 +1457,16 @@
     gap: 8px;
     margin-bottom: 10px;
     font-size: var(--fs-ui);
+    transition:
+      opacity var(--dur-2) var(--ease-out),
+      translate var(--dur-2) var(--ease-out);
+  }
+  /* Comes down into place; the content below it moves at once (layout doesn't animate). */
+  @starting-style {
+    .pref-unsaved-banner {
+      opacity: 0;
+      translate: 0 -8px;
+    }
   }
 
   /* Scrolls inside itself on a phone rather than wrapping: one row, the table starts higher. */
@@ -1661,15 +1684,16 @@
   }
 
   /* ── The side panel (panel.tsx): a dark column on a hairline, its hero full-bleed. ── */
-  .game-panel {
+  .game-panel,
+  .panel-ghost {
     --panel-pad: 20px;
     /* A trace of the game's art (artTint.ts); --surface itself until it's read, or if it can't be. */
     --panel-ground: color-mix(in oklch, var(--surface), var(--panel-tint, var(--surface)) 12%);
     border-left: 1px solid var(--line-strong);
     background: var(--panel-ground);
   }
-  /* Slides in: from the right beside the content, from the bottom over a phone's screen. Its
-     content goes on close, so it leaves at once. */
+  /* Slides in: from the right beside the content, from the bottom over a phone's screen; its copy
+     (panel.tsx's leavePanelGhost) slides back out the same way. */
   .game-panel.open {
     transition:
       opacity var(--dur-3) var(--ease-out),
@@ -1679,6 +1703,22 @@
     .game-panel.open {
       opacity: 0;
       translate: 24px 0;
+    }
+  }
+  .panel-ghost {
+    pointer-events: none;
+    animation: panel-leave var(--dur-2) var(--ease-out) forwards;
+  }
+  @keyframes panel-leave {
+    to {
+      opacity: 0;
+      translate: 24px 0;
+    }
+  }
+  @keyframes panel-leave-down {
+    to {
+      opacity: 0;
+      translate: 0 32px;
     }
   }
   /* A row click morphs its thumbnail into the hero instead (panel.tsx's openPanelFromRow): the
@@ -1705,7 +1745,8 @@
     object-fit: cover;
   }
   @media (max-width: 768px) {
-    .game-panel {
+    .game-panel,
+    .panel-ghost {
       --panel-pad: var(--gutter);
       border-left: 0;
     }
@@ -1713,6 +1754,9 @@
       .game-panel.open {
         translate: 0 32px;
       }
+    }
+    .panel-ghost {
+      animation-name: panel-leave-down;
     }
   }
 
@@ -4387,6 +4431,29 @@
   }
   .explore-card:hover {
     border-color: var(--line-control);
+  }
+  /* Cards one picks from lift under a mouse, to say they're one click away; not the ranking's
+     picks, clicked in quick succession. */
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .explore-card,
+    .account-tile {
+      position: relative;
+      transition:
+        background-color var(--dur-1) var(--ease-out),
+        border-color var(--dur-1) var(--ease-out),
+        translate var(--dur-2) var(--ease-out),
+        box-shadow var(--dur-2) var(--ease-out);
+    }
+    :is(.explore-card, .account-tile):hover {
+      translate: 0 -3px;
+      box-shadow: 0 10px 24px rgb(0 0 0 / 0.35);
+    }
+    /* Fills the gap the lift opens under it, border and rounding included, so a pointer at its bottom edge doesn't drop it. */
+    :is(.explore-card, .account-tile)::before {
+      content: '';
+      position: absolute;
+      inset: 100% 0 -6px;
+    }
   }
   .explore-card:has(h3 a:focus-visible) {
     outline: 2px solid var(--text);

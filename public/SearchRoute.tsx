@@ -8,6 +8,7 @@ import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show, u
 import { createStore } from 'solid-js/store';
 import { useLocation } from '@solidjs/router';
 import { createTableState, DataTableView } from '@vates/data-table-solid';
+import { cascadeFirstRows } from './motion.ts';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { useBaseTitle } from './pageTitle.ts';
 import { ListHero } from './ListHero.tsx';
@@ -130,6 +131,12 @@ export default function SearchRoute() {
 
   const hasImages = createMemo(() => results().some((r) => r.tinyImage));
   const table = createTableState<GameSearchResult>(results, () => (hasImages() ? SEARCH_COLUMNS : NAME_ONLY_COLUMNS));
+  // The first results only: a cascade on every query would flicker as one types.
+  let tableContainer: HTMLDivElement | undefined;
+  cascadeFirstRows(
+    () => table.processedData().length,
+    () => tableContainer,
+  );
 
   // The minimal Game[] shape panelNav.ts's stepGameList/renderPanelNav and panel.tsx's
   // pickRandomFrom need — unrelated to what backs the visible table (GameSearchResult is enough
@@ -313,6 +320,7 @@ export default function SearchRoute() {
             >
               <div
                 class="table-container search-table"
+                ref={tableContainer}
                 // `on:keydown`, not `onKeyDown` — see the search input's own comment on why:
                 // same reasoning, and this one additionally needs to fire before the table
                 // library's own internal row-focus handling can act on ArrowUp at row 0 (e.g.

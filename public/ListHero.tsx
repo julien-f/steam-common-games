@@ -20,6 +20,7 @@
 // array and the button the user was on would be replaced mid-interaction, dropping keyboard
 // focus. `<Index>` keys by position and patches each tile's contents in place instead.
 import { createSignal, createUniqueId, Index, Show, type JSX } from 'solid-js';
+import { createCountUp } from './motion.ts';
 import Ellipsis from 'lucide-solid/icons/ellipsis';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 
@@ -27,6 +28,8 @@ export interface HeroTile {
   // Uppercased by CSS — write it in sentence case ("Ends", "Best deal"), not shouting.
   label: string;
   value: JSX.Element;
+  // A number `value` counts to its new value as it changes (motion.ts's createCountUp); its colour, if any.
+  valueColor?: string;
   // A second, smaller line under the value (a qualifier, not a second fact — "on Steam",
   // "Updated 2h ago").
   sub?: JSX.Element;
@@ -99,6 +102,28 @@ export function ListHero(props: ListHeroProps): JSX.Element {
             {(tile, i) => {
               const id = `${uid}-${i}`;
               const isButton = () => !!tile().onClick && !tile().subOnClick;
+              const counting = createCountUp(
+                () => tile().value,
+                () => tile().label,
+              );
+              const colored = (v: JSX.Element) => (
+                <Show when={tile().valueColor} fallback={v}>
+                  {(color) => <span style={{ color: color() }}>{v}</span>}
+                </Show>
+              );
+              // Mid-count, the final value stays the text read out and copied; the steps are only drawn.
+              const value = () => (
+                <Show when={counting()} fallback={colored(tile().value)}>
+                  {(n) => (
+                    <>
+                      <span class="list-stat-count" aria-hidden="true">
+                        {colored(n())}
+                      </span>
+                      <span class="visually-hidden">{tile().value}</span>
+                    </>
+                  )}
+                </Show>
+              );
               return (
                 <div class="list-stat">
                   <dt class="list-stat-label" id={`${id}-label`}>
@@ -114,7 +139,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                             when={tile().onClick && tile().subOnClick}
                             fallback={
                               <span class="list-stat-value" title={tile().title}>
-                                {tile().value}
+                                {value()}
                               </span>
                             }
                           >
@@ -127,7 +152,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                               aria-disabled={tile().disabled ? 'true' : undefined}
                               onClick={() => !tile().disabled && tile().onClick?.()}
                             >
-                              {tile().value}
+                              {value()}
                             </button>
                           </Show>
                           <Show when={tile().sub}>
@@ -158,7 +183,7 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                         onClick={() => !tile().disabled && tile().onClick?.()}
                       >
                         <span class="list-stat-value" title={tile().title}>
-                          {tile().value}
+                          {value()}
                         </span>
                         <Show when={tile().sub}>
                           <span class="list-stat-sub">{tile().sub}</span>

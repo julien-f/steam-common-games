@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Holding an arrow key through the lightbox no longer loads each trailer it passes; the one you stop on starts once you stop
 - Holding ↑ or ↓ in the lightbox on a phone is smoother: the side panel behind it no longer redraws on each step
 - The lightbox loads the picture on screen before preloading its neighbours
+- Menus, the game panel, its sections, table rows, banners, cards and hero counts now animate their changes
 
 ### Fixed
 

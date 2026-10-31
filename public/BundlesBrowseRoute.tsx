@@ -23,6 +23,7 @@ import { createSignal, createEffect, createMemo, on, onMount, onCleanup, Show } 
 import { useNavigate } from '@solidjs/router';
 import { withAccountParam } from './urlState.ts';
 import { createTableState, DataTableView, datePartGroup, numericRangeGroup } from '@vates/data-table-solid';
+import { cascadeFirstRows, slideRowsOnViewChange } from './motion.ts';
 import type { ColumnDef } from '@vates/data-table-solid';
 import { fmt, compareDateMissingLast, compareNumMissingLast, priceTierGroup } from './gameColumns.ts';
 import { fadeInOnLoad, fmtAge, formatMoney, oldestFetchedAt, scoreColor } from './utils.ts';
@@ -303,6 +304,12 @@ export default function BundlesBrowseRoute() {
   const table = createTableState<BundleRow>(rows, COLUMNS, {
     initialViewState: { pageSize: 50, visibleCols: DEFAULT_VISIBLE, sorts: DEFAULT_SORT },
   });
+  let tableContainer: HTMLDivElement | undefined;
+  cascadeFirstRows(
+    () => table.processedData().length,
+    () => tableContainer,
+  );
+  slideRowsOnViewChange(table, () => tableContainer);
   // A 🔗 Share view link's layout is shown but not saved until kept (see restoreTableView).
   const [viewingShared, setViewingShared] = createSignal(restoreTableView(table, viewStore));
   const [sharedViewEdited, setSharedViewEdited] = createSignal(false);
@@ -427,7 +434,8 @@ export default function BundlesBrowseRoute() {
     if (fresh > 0 || newOnly()) {
       tiles.push({
         label: 'New',
-        value: <span style={{ color: scoreColor(80) }}>{fresh}</span>,
+        value: fresh,
+        valueColor: scoreColor(80),
         sub: newOnly() ? 'in the last 7 days · only these' : 'in the last 7 days',
         title: newOnly() ? 'Showing only these — click to clear' : 'Show only the bundles published in the last 7 days',
         active: newOnly(),
@@ -447,7 +455,8 @@ export default function BundlesBrowseRoute() {
     if (endingSoon > 0 || endingSoonOnly()) {
       tiles.push({
         label: 'Ending soon',
-        value: <span style={{ color: scoreColor(20) }}>{endingSoon}</span>,
+        value: endingSoon,
+        valueColor: scoreColor(20),
         sub: endingSoonOnly() ? 'within 48h · only these' : 'within 48h',
         title: endingSoonOnly() ? 'Showing only these — click to clear' : 'Show only the bundles ending within 48h',
         active: endingSoonOnly(),
@@ -504,7 +513,7 @@ export default function BundlesBrowseRoute() {
         <Show when={statusText()}>
           <div class="bundles-status">{statusText()}</div>
         </Show>
-        <div class="table-container">
+        <div class="table-container" ref={tableContainer}>
           <DataTableView<BundleRow>
             table={table}
             rowKey="id"

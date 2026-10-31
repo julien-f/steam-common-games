@@ -1,3 +1,5 @@
+import { prefersReducedMotion } from './motion.ts';
+
 // Shared-element morphs (ui-guidelines.md's Motion). Not with the top layer in use: it paints over
 // every snapshot, so the morph would run under it.
 
@@ -24,7 +26,7 @@ const MORPH_WAIT_MS = 150;
 export function canMorph(): boolean {
   return (
     'startViewTransition' in document &&
-    !matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    !prefersReducedMotion() &&
     // The lightbox's own dialog aside: it morphs open and closed (the snapshots paint above it).
     !document.querySelector(':popover-open, dialog[open]:not(#screenshot-lightbox)')
   );

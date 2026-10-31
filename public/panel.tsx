@@ -19,6 +19,7 @@ import {
 } from './utils.ts';
 import { openLightbox, openLightboxFrom, lightboxShot, lightboxOpen } from './lightbox.tsx';
 import { isMorphUpdating, loadedWhen, morph } from './viewTransition.ts';
+import { animate, durationToken, easeOut, prefersReducedMotion } from './motion.ts';
 import { sampleArtTint } from './artTint.ts';
 import { decideSwipeAxis, type SwipeAxis } from './lightboxSwipe.ts';
 import { pushOverlayEntry, popOverlayEntry } from './overlayHistory.ts';
@@ -737,6 +738,7 @@ export function panelOpen(game: ReadonlyGame) {
   // open game (see "Per-game async data" above), so setting `panelGame` above is itself what
   // starts whichever of them this game still needs — and what makes a reopen free when it
   // doesn't.
+  for (const ghost of document.querySelectorAll('.panel-ghost')) ghost.remove();
   document.getElementById('game-panel')!.classList.add('open');
   if (!isMorphUpdating()) focusPanel();
 }
@@ -773,9 +775,10 @@ export function openPanelFromRow(event: MouseEvent | KeyboardEvent, open: () => 
 
 // `leavingRoute`: the route is unmounting under a navigation — its host keeps `?game=` on the
 // history entry being left (see `onClose`), so Back to it reopens the game.
-export function panelClose({ leavingRoute = false } = {}) {
+export function panelClose({ leavingRoute = false, animate = true } = {}) {
   const game = panelGame();
   if (!game) return;
+  if (animate && !leavingRoute) leavePanelGhost();
   setPanelGame(null);
   setMoreLinksOpen(false);
   // Closing the panel ends whatever DLC browsing trail was in progress — including a hop that
@@ -795,6 +798,22 @@ export function panelClose({ leavingRoute = false } = {}) {
   // host having to remember to wrap all of those paths itself.
   panelOptions.onClose({ leavingRoute });
   popOverlayEntry('panel');
+}
+
+// Its content goes at once on close, so a copy slides out in its place; one stripped of ids and
+// names, which would otherwise answer the live panel's lookups (and join its radio groups).
+function leavePanelGhost() {
+  if (prefersReducedMotion() || document.body.classList.contains('lb-open')) return;
+  const panel = document.getElementById('game-panel')!;
+  const ghost = panel.cloneNode(true) as HTMLElement;
+  for (const el of [ghost, ...ghost.querySelectorAll('[id], [name], [aria-labelledby]')])
+    for (const attr of ['id', 'name', 'aria-labelledby']) el.removeAttribute(attr);
+  ghost.className = 'panel-ghost';
+  ghost.inert = true;
+  ghost.ariaHidden = 'true';
+  ghost.addEventListener('animationend', () => ghost.remove(), { once: true });
+  panel.after(ghost);
+  ghost.querySelector('.panel-body')!.scrollTop = panel.querySelector('.panel-body')!.scrollTop;
 }
 
 // Scrolls #panel-body so `target` (a section id, or the literal 'top') sits just below the
@@ -1132,6 +1151,33 @@ function CollapsibleCard(props: {
   linkTitle: string;
 }): JSX.Element {
   const expanded = () => isSectionExpanded(props.appid, props.section);
+  // A click (only: a section opened by itself or reopened on ↑/↓ just shows) slides the body open
+  // or shut; it stays mounted, inert, until a collapse ends, and a click mid-way turns it around.
+  const [closing, setClosing] = createSignal(false);
+  let body: HTMLDivElement | undefined;
+  let slides = 0;
+  const onToggle = () => {
+    const opening = !expanded();
+    const live = body?.isConnected ? body : undefined;
+    const from = live?.getBoundingClientRect().height ?? 0;
+    for (const a of live?.getAnimations() ?? []) a.cancel();
+    setClosing(!opening && !prefersReducedMotion());
+    toggleSection(props.appid, props.section);
+    const el = body?.isConnected ? body : undefined;
+    if (!el) return;
+    el.inert = !opening;
+    const slide = ++slides;
+    const to = opening ? el.getBoundingClientRect().height : 0;
+    const frames = [
+      { height: `${from}px`, overflow: 'clip' },
+      { height: `${to}px`, overflow: 'clip' },
+    ];
+    void animate(el, frames, { duration: durationToken('--dur-3'), easing: easeOut() }).then(() => {
+      if (slide !== slides) return;
+      if (!opening) setClosing(false);
+      updateSubnavScrollSpy();
+    });
+  };
   const numSpan = () =>
     props.num != null ? (
       <span class="panel-glance-num" style={props.numColor ? { color: props.numColor } : undefined}>
@@ -1148,7 +1194,7 @@ function CollapsibleCard(props: {
             type="button"
             class="panel-achievements-chip panel-collapsible-chip"
             aria-expanded={expanded() ? 'true' : 'false'}
-            onClick={() => toggleSection(props.appid, props.section)}
+            onClick={onToggle}
           >
             {numSpan()}
             <span class="panel-glance-val">{props.val}</span>
@@ -1170,8 +1216,10 @@ function CollapsibleCard(props: {
           )}
         </Show>
       </div>
-      <Show when={expanded()}>
-        <div class="panel-achievements-list">{props.body}</div>
+      <Show when={expanded() || closing()}>
+        <div class="panel-collapsible-body" ref={body}>
+          <div class="panel-achievements-list">{props.body}</div>
+        </div>
       </Show>
     </div>
   );
@@ -2902,7 +2950,7 @@ function initPanelSwipe() {
       panel.style.transition = 'transform 0.2s ease';
       panel.style.transform = 'translateX(100%)';
       setTimeout(() => {
-        panelClose();
+        panelClose({ animate: false }); // the swipe already slid it out
         panel.style.transition = '';
         panel.style.transform = '';
       }, 200);
