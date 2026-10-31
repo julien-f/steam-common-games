@@ -37,6 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - On a narrow phone, the game panel's current section tab stays in view when another section's tab appears before it
 - Large libraries no longer stutter while their games load
 - The lightbox no longer offers Zoom on a picture already shown at full size
+- How Long To Beat lookups back off when HLTB rejects a new login instead of retrying it for every game
 
 ### Development
 

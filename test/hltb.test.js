@@ -204,24 +204,78 @@ test('getHLTB: returns null when no results', async (t) => {
   assert.equal(result, null);
 });
 
-test('getHLTB: 401 does not set retry cooldown — init is retried immediately', async (t) => {
+test('getHLTB: a 401 on a token searches already accepted (expired) re-inits at once, no cooldown', async (t) => {
   _reset();
   _resetAuth();
+  t.after(_resetAuth);
+  t.mock.method(console, 'warn', () => {});
   let initCalls = 0;
+  let searchStatus = 200;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (url.includes('search/site/init')) {
       initCalls++;
       return makeInitResponse();
     }
+    return searchStatus === 200 ? makeSearchResponse([]) : { ok: false, status: searchStatus };
+  });
+
+  await getHLTB(1, 'Portal');
+  searchStatus = 401;
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
+  assert.equal(initCalls, 1);
+
+  await assert.rejects(() => getHLTB(3, 'Portal 2'));
+  assert.equal(initCalls, 2, 'init should be retried immediately after an expired-token 401');
+});
+
+test('getHLTB: a 401 on a fresh token (no search accepted it) holds off re-init like a 403', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  let initCalls = 0;
+  let searchCalls = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) {
+      initCalls++;
+      return makeInitResponse();
+    }
+    searchCalls++;
     return { ok: false, status: 401 };
   });
 
   await assert.rejects(() => getHLTB(1, 'Portal'));
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
   assert.equal(initCalls, 1);
+  assert.equal(searchCalls, 1);
 
-  // 401 clears the token but must not set the failure cooldown — init must be called again
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(() => getHLTB(3, 'Portal 2'));
+  assert.equal(initCalls, 2, 're-init resumes after the retry window');
+});
+
+test('getHLTB: two fresh-token 401s in a row open the circuit like 403s', async (t) => {
+  _reset();
+  _resetAuth();
+  t.after(_resetAuth);
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async (url) =>
+    url.includes('search/site/init') ? makeInitResponse() : { ok: false, status: 401 },
+  );
+
   await assert.rejects(() => getHLTB(1, 'Portal'));
-  assert.equal(initCalls, 2, 'init should be retried immediately after a 401, no cooldown');
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(() => getHLTB(2, 'Half-Life'));
+  const calls = fetchMock.mock.callCount();
+
+  t.mock.timers.tick(31 * 1000);
+  await assert.rejects(
+    () => getHLTB(3, 'Portal 2'),
+    (err) => err.isCircuitOpen === true,
+  );
+  assert.equal(fetchMock.mock.callCount(), calls, 'no request while the circuit is open');
 });
 
 test('getHLTB: a search 403 (a block, unlike an expired-token 401) holds off re-init for the retry window', async (t) => {
@@ -301,32 +355,6 @@ test('getHLTB: searches already queued when the circuit opens never reach HLTB',
   const results = await Promise.allSettled(names.map((name, i) => getHLTB(i + 1, name)));
   assert.ok(results.every((r) => r.status === 'rejected'));
   assert.ok(searchCalls <= 4, `${searchCalls} searches`);
-});
-
-test('getHLTB: throws and clears auth on 401', async (t) => {
-  _reset();
-  _resetAuth();
-  let initCalls = 0;
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('search/site/init')) {
-      initCalls++;
-      return makeInitResponse();
-    }
-    return { ok: false, status: 401 };
-  });
-
-  await assert.rejects(() => getHLTB(1, 'Portal'));
-
-  // On the next call, auth should have been cleared so init is called again
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    if (url.includes('search/site/init')) {
-      initCalls++;
-      return makeInitResponse();
-    }
-    return makeSearchResponse([{ game_name: 'Portal', comp_main: 7200, comp_plus: 18000 }]);
-  });
-  await getHLTB(1, 'Portal');
-  assert.equal(initCalls, 2, 'expected init to be called again after 401');
 });
 
 test('getHLTB: throttles the "[HLTB] search failed" warning to once per 30s window', async (t) => {
