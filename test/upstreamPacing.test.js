@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { getProtonDbStatus, getStoreBrowseItem } = require('../lib/steam');
 const { getHLTB, _resetAuth } = require('../lib/hltb');
 const { _reset } = require('../lib/cache');
+const { createRetryingFetch } = require('../lib/upstream');
 
 const flush = () => new Promise((r) => setImmediate(r));
 
@@ -75,3 +76,22 @@ for (const [name, call, respond] of [
     });
   }
 }
+
+test('createRetryingFetch: without a retry count, a 429 fails instead of being retried', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  let calls = 0;
+  const retryingFetch = createRetryingFetch({
+    trackedFetch: async () => (++calls === 1 ? { status: 429, headers: new Headers() } : { status: 200 }),
+    name: 'Test',
+  });
+  let settled;
+  retryingFetch('label', 'https://example.test/').then(
+    () => (settled = 'fulfilled'),
+    () => (settled = 'rejected'),
+  );
+  for (let i = 0; i < 10; i++) await flush();
+  t.mock.timers.tick(60 * 1000);
+  for (let i = 0; i < 10; i++) await flush();
+  assert.equal(settled, 'rejected');
+  assert.equal(calls, 1);
+});
