@@ -7,7 +7,7 @@
 // wipe the real cache. Must be set before requiring lib/cache.
 process.env.DB_FILE = '';
 
-const { test } = require('node:test');
+const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   resolveSteamId,
@@ -36,6 +36,9 @@ const { _reset, getCachedAt, setCache } = require('../lib/cache');
 const { getCircuitBreakers, _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { db } = require('../lib/db');
 const { MISS_CACHE_TTL_MS, META_CACHE_TTL_MS } = require('../lib/config');
+
+// The tag-name map's failure hold-off outlives _reset(), which only empties the cache.
+beforeEach(_resetTagNameMap);
 
 function makeReviewResponse(total, positive, desc = 'Very Positive') {
   return {
@@ -1222,8 +1225,6 @@ function mockTagEndpoints(
   t,
   { tagids = [], tags, nameMap = { 1: 'Action' }, demoAppid, browseOk = true, namesOk = true } = {},
 ) {
-  _resetTagNameMap();
-  t.after(_resetTagNameMap);
   let browseCalls = 0;
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
@@ -1351,7 +1352,6 @@ test('resolveSteamTags: throws isUpstream when the tag name map fetch fails', as
 // caller-recognizable upstream error.
 test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag name map response body is null', async (t) => {
   _reset();
-  t.after(_resetTagNameMap);
   t.mock.method(globalThis, 'fetch', async (url) => {
     if (String(url).includes('IStoreBrowseService')) {
       return { ok: true, json: async () => ({ response: { store_items: [{ success: 1, tagids: [1] }] } }) };
@@ -1372,8 +1372,6 @@ test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag nam
 for (const body of [{}, { tags: [] }, { tags: 'x' }, { tags: [null] }, { tags: [{}] }]) {
   test(`resolveSteamTags: throws isUpstream and caches nothing when the tag name map body is ${JSON.stringify(body)}`, async (t) => {
     _reset();
-    _resetTagNameMap();
-    t.after(_resetTagNameMap);
     t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => body }));
 
     await assert.rejects(
@@ -1386,8 +1384,6 @@ for (const body of [{}, { tags: [] }, { tags: 'x' }, { tags: [null] }, { tags: [
 
 test('resolveSteamTags: holds off refetching the tag name map briefly after a failure', async (t) => {
   _reset();
-  _resetTagNameMap();
-  t.after(_resetTagNameMap);
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   let ok = false;
   const fetchMock = t.mock.method(globalThis, 'fetch', async () =>

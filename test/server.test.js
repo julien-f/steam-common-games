@@ -10,7 +10,7 @@ process.env.NODE_ENV = 'test';
 // wipe the real cache.
 process.env.DB_FILE = '';
 
-const { test } = require('node:test');
+const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { until } = require('./until');
 const http = require('node:http');
@@ -27,6 +27,9 @@ const { _resetTagNameMap } = require('../lib/steam');
 const { _resetCircuitBreakers } = require('../lib/circuitBreaker');
 const { SESSION_TTL_MS, MISS_CACHE_TTL_MS } = require('../lib/config');
 const { getMetrics } = require('../lib/metrics');
+
+// The tag-name map's failure hold-off outlives _reset(), which only empties the cache.
+beforeEach(_resetTagNameMap);
 
 const api = supertest(app);
 
@@ -923,7 +926,6 @@ test('GET /api/game-details/:appid: 200 with null tags and null demo when the St
   _reset();
   _resetAuth();
   t.mock.method(globalThis, 'fetch', makeDetailsFetch({ tagsOk: false }));
-  t.after(_resetTagNameMap);
 
   const res = await api.get('/api/game-details/404');
   assert.equal(res.status, 200);
