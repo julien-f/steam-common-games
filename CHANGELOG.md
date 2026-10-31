@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A table layout (columns, sort, filters, grouping) now changes only when you Save it, on every table: until then it's kept in the tab with Save and Discard, and saved layouts sync to your account
 - The desktop Filter pane highlights the column it shows
 - Sessions are stored hashed on the server, so everyone is signed out once and needs to sign in with Steam again
-- Prices, bundle games and friend names load faster for large lists
+- For large lists, prices, bundle games and friend names are requested three batches at a time instead of one after another
 - The server clears expired cached data every hour instead of only when it restarts
 - Game lists load with less data and server work: the details stream is compressed in larger pieces
 
