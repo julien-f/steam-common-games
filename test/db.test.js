@@ -139,3 +139,8 @@ test("requiring lib/db picks up default.env's DB_FILE even without a shell-level
     fs.rmSync(cwd, { recursive: true, force: true });
   }
 });
+
+test('lib/db waits for a lock held by another connection instead of failing at once', () => {
+  const { db } = require('../lib/db');
+  assert.ok(db.prepare('PRAGMA busy_timeout').get().timeout > 0);
+});

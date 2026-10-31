@@ -1,7 +1,5 @@
 'use strict';
 
-const { DatabaseSync } = require('node:sqlite');
-
 require('../lib/config'); // loads .env + default.env as a side effect
 
 const DB_PATH = process.env.DB_FILE;
@@ -11,7 +9,7 @@ if (!DB_PATH) {
   process.exit(0);
 }
 
-const db = new DatabaseSync(DB_PATH);
+const { db } = require('../lib/db');
 
 const cacheTables = db
   .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'cache\\_%' ESCAPE '\\'")
