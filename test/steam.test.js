@@ -1369,7 +1369,7 @@ test('resolveSteamTags: throws isUpstream (not a raw TypeError) when the tag nam
 });
 
 // A cached `{}` would read as "no tags" on every game for the meta TTL.
-for (const body of [{}, { tags: [] }, { tags: 'x' }]) {
+for (const body of [{}, { tags: [] }, { tags: 'x' }, { tags: [null] }, { tags: [{}] }]) {
   test(`resolveSteamTags: throws isUpstream and caches nothing when the tag name map body is ${JSON.stringify(body)}`, async (t) => {
     _reset();
     _resetTagNameMap();
