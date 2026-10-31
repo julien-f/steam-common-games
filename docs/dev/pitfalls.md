@@ -99,12 +99,6 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: `require` loads solid-js's CommonJS build, while the `.ts` modules `import` its ESM build: two Solid instances that don't see each other's signals.
 - **Fix**: `await import('solid-js')` in the test (see `test/authStore.test.js`).
 
-## The e2e run fails at start while agents run in parallel
-
-- **Symptom**: `npm run test:e2e` (or the pre-commit hook's e2e step) fails at start with `http://localhost:28992 is already used, make sure that nothing is running on the port/url`.
-- **Cause**: a run never reuses a server already on its port (it would serve another checkout's build). Each worktree draws its own port from its path (`portOf` in `scripts/ports.js`), so this takes two runs in the same checkout, or two worktree paths landing on the same port.
-- **Fix**: wait for the other run, or pick a port: `E2E_PORT=<free port> git commit …` (or `npm run test:e2e`).
-
 ## A merge fails the hook in the main checkout, though the branch passed
 
 - **Symptom**: `scripts/check.js` (the hooks, `npm run check`) stops with `✗ node_modules is behind package-lock.json: <package> (…). Run npm ci.` Before that check existed, the same cause showed as `error TS2353: … does not exist in type 'ColumnDef<…>'` or `Rolldown failed to resolve import "lucide-solid/icons/blend"`.
@@ -115,7 +109,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 - **Symptom**: `git log --graph` shows someone else's commit with a branch as second parent, but its tree lacks that branch's changes, which are still staged.
 - **Cause**: a merge left pending in the main checkout (`--no-commit`, or a hook that blocked the merge commit) keeps `MERGE_HEAD`; the next `git commit` there, by any agent, becomes the merge and takes only what that agent staged.
-- **Fix**: never leave a merge pending in the main checkout: on a blocked merge commit, retry at once (another run on the e2e port: `E2E_PORT=<free port>`, above) or `git merge --abort`. Once absorbed, commit the staged changes on top, naming the absorbing commit in the message.
+- **Fix**: never leave a merge pending in the main checkout: on a blocked merge commit, retry at once or `git merge --abort`. Once absorbed, commit the staged changes on top, naming the absorbing commit in the message.
 
 ## A worktree agent's branch lacks the latest commits
 
