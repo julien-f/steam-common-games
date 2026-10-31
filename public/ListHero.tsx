@@ -24,10 +24,21 @@ import { createCountUp } from './motion.ts';
 import Ellipsis from 'lucide-solid/icons/ellipsis';
 import RefreshCw from 'lucide-solid/icons/refresh-cw';
 
+// One of a tile's chips (a bundle's tiers): a toggle with `onClick`, else plain text.
+export interface HeroChip {
+  text: string;
+  title: string;
+  ariaLabel?: string;
+  active?: boolean;
+  onClick?: () => void;
+}
+
 export interface HeroTile {
   // Uppercased by CSS — write it in sentence case ("Ends", "Best deal"), not shouting.
   label: string;
-  value: JSX.Element;
+  value?: JSX.Element;
+  // In place of `value`, rendered here so a chip's button keeps its node (and focus) as the tiles recompute.
+  chips?: HeroChip[];
   // A number `value` counts to its new value as it changes (motion.ts's createCountUp); its colour, if any.
   valueColor?: string;
   // A second, smaller line under the value (a qualifier, not a second fact — "on Steam",
@@ -111,17 +122,50 @@ export function ListHero(props: ListHeroProps): JSX.Element {
                   {(color) => <span style={{ color: color() }}>{v}</span>}
                 </Show>
               );
+              const chips = () => (
+                <span class="bundle-tier-chips">
+                  <Index each={tile().chips}>
+                    {(chip) => (
+                      <Show
+                        when={chip().onClick}
+                        fallback={
+                          <span
+                            class="bundle-tier-chip"
+                            classList={{ 'bundle-tier-chip--active': !!chip().active }}
+                            title={chip().title}
+                          >
+                            {chip().text}
+                          </span>
+                        }
+                      >
+                        <button
+                          type="button"
+                          class="bundle-tier-chip list-stat-btn"
+                          title={chip().title}
+                          aria-label={chip().ariaLabel}
+                          aria-pressed={!!chip().active}
+                          onClick={() => chip().onClick?.()}
+                        >
+                          {chip().text}
+                        </button>
+                      </Show>
+                    )}
+                  </Index>
+                </span>
+              );
               // Mid-count, the final value stays the text read out and copied; the steps are only drawn.
               const value = () => (
-                <Show when={counting()} fallback={colored(tile().value)}>
-                  {(n) => (
-                    <>
-                      <span class="list-stat-count" aria-hidden="true">
-                        {colored(n())}
-                      </span>
-                      <span class="visually-hidden">{tile().value}</span>
-                    </>
-                  )}
+                <Show when={!tile().chips} fallback={chips()}>
+                  <Show when={counting()} fallback={colored(tile().value)}>
+                    {(n) => (
+                      <>
+                        <span class="list-stat-count" aria-hidden="true">
+                          {colored(n())}
+                        </span>
+                        <span class="visually-hidden">{tile().value}</span>
+                      </>
+                    )}
+                  </Show>
                 </Show>
               );
               return (

@@ -3731,6 +3731,68 @@ test('B1.1,3-4: a bundle, then what it adds to my library', async ({ page }) => 
   await expect(rows(page)).toHaveCount(2);
 });
 
+test('B1.4: a tier shows what paying it gets, and what of that is new to me', async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto('/bundles');
+  await page.getByRole('cell', { name: BUNDLE.title }).click();
+  await expect(rows(page)).toHaveCount(4);
+  const hero = page.locator('.list-hero');
+  const five = hero.getByRole('button', { name: /5\.00.* tier$/ });
+  await five.focus();
+  await five.press('Enter');
+  // Its own games only: a pricier tier's would include these too. Alice owns both.
+  await expect(rows(page)).toHaveCount(2);
+  await expect(five).toHaveAttribute('aria-pressed', 'true');
+  await expect(five).toBeFocused();
+  await expect(hero).toContainText(/New at .*5\.00.*0 of 2/i);
+  const twelve = hero.getByRole('button', { name: /12\.00.* tier$/ });
+  await twelve.click();
+  await expect(rows(page)).toHaveCount(4);
+  await expect(five).toHaveAttribute('aria-pressed', 'false');
+  await expect(hero).toContainText(/New at .*12\.00.*2 of 4\s*≈ .+ at best deals/i);
+  await twelve.click();
+  await expect(twelve).toHaveAttribute('aria-pressed', 'false');
+  await expect(hero).toContainText(/New to you\s*2 of 4/i);
+
+  // The table's own Clear filters unpresses it.
+  await five.click();
+  await expect(rows(page)).toHaveCount(2);
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(rows(page)).toHaveCount(4);
+  await expect(five).toHaveAttribute('aria-pressed', 'false');
+
+  // A tier filter stays with its bundle; a pick-and-mix's tiers aren't filters.
+  await five.click();
+  await page.getByRole('button', { name: 'Next bundle' }).click();
+  await expect(page.getByRole('heading', { name: PICK_BUNDLE.title })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+  await expect(hero.locator('.bundle-tier-chip')).toHaveCount(2);
+  await expect(hero.locator('button.bundle-tier-chip')).toHaveCount(0);
+});
+
+test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's tier filter", async ({ page }) => {
+  await asPlayer(page, ALICE);
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(4);
+  await page
+    .locator('.list-hero')
+    .getByRole('button', { name: /5\.00.* tier$/ })
+    .click();
+  await expect(rows(page)).toHaveCount(2);
+  // The draft the press left, made a range no tier would set: min 6, max 12.
+  await page.evaluate(() => {
+    for (const key of Object.keys(sessionStorage).filter((k) => k.includes(':layout-draft:'))) {
+      const view = JSON.parse(sessionStorage.getItem(key)!);
+      if (view.rangeFilters?.tierPrice) view.rangeFilters.tierPrice = { min: '6', max: '12' };
+      sessionStorage.setItem(key, JSON.stringify(view));
+    }
+  });
+  await page.reload();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
+  await expect(page.locator('.list-hero button.bundle-tier-chip[aria-pressed="true"]')).toHaveCount(0);
+});
+
 test("B1 edge: a bundle's hero keeps All bundles by its previous/next buttons, and one primary action among ghost ones", async ({
   page,
 }) => {

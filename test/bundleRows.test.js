@@ -19,6 +19,9 @@ const {
   compareBundleAge,
   BUNDLE_AGE,
   bundleTierSummary,
+  filterTiers,
+  activeTierPrice,
+  atTier,
   pickTiers,
   pickRate,
   cheapestPicks,
@@ -214,6 +217,41 @@ test('bundleTierSummary: a real zero-amount tier is a price, not a missing one',
 test('bundleTierSummary: empty for a bundle with no tiers', () => {
   assert.deepEqual(bundleTierSummary(bundle({ tiers: [] })), []);
   assert.deepEqual(bundleTierSummary(bundle({ tiers: undefined })), []);
+});
+
+// ── filterTiers / activeTierPrice / atTier ───────────────────────────────────────────────────
+
+const usd = (price, gameCount = 1) => ({ price, currency: 'USD', gameCount });
+
+test('filterTiers: two or more priced tiers filter; one tier, a Varies one or pick-and-mix do not', () => {
+  assert.deepEqual(filterTiers([usd(5), usd(12)]), [usd(5), usd(12)]);
+  assert.deepEqual(filterTiers([usd(5)]), []);
+  assert.deepEqual(filterTiers([usd(5), { price: null, currency: null, gameCount: 3 }]), []);
+  assert.deepEqual(
+    filterTiers([
+      { ...usd(2), quantity: 1 },
+      { ...usd(3.5), quantity: 3 },
+    ]),
+    [],
+  );
+});
+
+test("activeTierPrice: a max alone equal to a tier's price selects it", () => {
+  const tiers = [usd(1), usd(10.99), usd(15)];
+  assert.equal(activeTierPrice({ min: '', max: String(10.99) }, tiers), 10.99);
+  assert.equal(activeTierPrice({ min: '', max: '7' }, tiers), null, 'no tier at that price');
+  assert.equal(activeTierPrice({ min: '1', max: '15' }, tiers), null, 'a min set by hand');
+  assert.equal(activeTierPrice({ min: '', max: '' }, tiers), null);
+  assert.equal(activeTierPrice(undefined, tiers), null);
+  assert.equal(activeTierPrice({ min: '', max: '15' }, [usd(15)]), null, 'a lone tier filters nothing');
+});
+
+test("atTier: paying a tier gets its games and every cheaper tier's, never a Varies one", () => {
+  assert.equal(atTier({ tierPrice: 5 }, 12), true);
+  assert.equal(atTier({ tierPrice: 12 }, 12), true);
+  assert.equal(atTier({ tierPrice: 15 }, 12), false);
+  assert.equal(atTier({ tierPrice: 0 }, 12), true, 'a free tier');
+  assert.equal(atTier({ tierPrice: null }, 12), false);
 });
 
 // ── shopHue ──────────────────────────────────────────────────────────────────────────────────

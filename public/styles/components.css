@@ -714,6 +714,10 @@
     font-size: var(--fs-meta);
     white-space: nowrap;
   }
+  /* A classic bundle's tier as a filter toggle: the tile toggles' outline chip, centered at 24px. */
+  .bundle-tier-chip.list-stat-btn {
+    justify-content: center;
+  }
   /* The pick-and-mix tier the selection would be bought at. */
   .bundle-tier-chip--active {
     padding: 0 7px;

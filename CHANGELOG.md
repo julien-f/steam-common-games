@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mark a game you own Finished or Abandoned from its panel: Play next and Short games leave it out, and the story games tile takes your word over the hours
 - Compare shows what each player has been playing lately, from their last two weeks on Steam
 - Bundles: Wishlist and New to you columns count each bundle's games on your wishlist and not in your library, and a Wishlist tile shows only the bundles holding wishlisted games
+- On a bundle's page, clicking a tier narrows the table to what that tier gets, and New to you counts those games only
 
 ### Changed
 

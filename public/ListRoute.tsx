@@ -201,8 +201,11 @@ import {
   type FlatGame,
 } from './bundleData.ts';
 import {
+  activeTierPrice,
+  atTier,
   bundleTierSummary,
   bundleUrgency,
+  filterTiers,
   fmtBundleDatePart,
   fmtBundleDateTime,
   shopHue,
@@ -2939,6 +2942,15 @@ export default function ListRoute() {
         disposeTableState();
       };
       bindLayout();
+      // A tier filter (a max alone) restored from another bundle's draft or view, matching none of this one's tiers, goes.
+      const tierRange = table.filter.ranges().tierPrice;
+      if (
+        kind === 'bundle' &&
+        tierRange?.min === '' &&
+        tierRange.max !== '' &&
+        activeTierPrice(tierRange, untrack(bundleMeta)?.tiers ?? []) == null
+      )
+        table.filter.clearColumn('tierPrice', 'range');
       // A similarity sort isn't kept: its target was this table's predecessor's.
       setSimilarTo(null);
       syncLeadColumn(table, SIMILARITY_KEY, false);
@@ -3135,37 +3147,52 @@ export default function ListRoute() {
     return deals.every((d) => d != null) ? deals.reduce((sum, d) => sum! + d!, 0)! : null;
   }
 
+  // The pressed tier, read back from the filter so the table's own Clear filters unpresses it; a
+  // memo, so another column's range doesn't rebuild the hero.
+  const activeTier = createMemo(() => {
+    const meta = bundleMeta();
+    const t = tableReady() ? filterTable() : null;
+    return meta && t ? activeTierPrice(t.filter.ranges().tierPrice, meta.tiers) : null;
+  });
   function bundleHeroTiles(): HeroTile[] {
     const meta = bundleMeta();
     if (!meta) return [];
     const tiles: HeroTile[] = [];
+    // Until this bundle's table is ready, a chip would act on the previous one's (or none).
+    const t = tableReady() ? filterTable() : null;
+    const toggles = t ? filterTiers(meta.tiers) : [];
+    const tierPrice = activeTier();
+    const tierText = (tier: BundleTierSummary) =>
+      tier.price == null
+        ? 'Varies'
+        : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`;
     // Price first, then what it adds, then the deadline: a phone's swipeable row shows only the first few.
     if (meta.tiers.length > 0) {
       tiles.push({
         label: meta.tiers.length === 1 ? 'Tier' : 'Tiers',
-        value: (
-          <span class="bundle-tier-chips">
-            <For each={meta.tiers}>
-              {(tier) => (
-                <span
-                  class="bundle-tier-chip"
-                  classList={{
-                    'bundle-tier-chip--active': !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
-                  }}
-                  title={
-                    tier.quantity
-                      ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
-                      : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`
-                  }
-                >
-                  {tier.price == null
-                    ? 'Varies'
-                    : `${tier.quantity ? `${tier.quantity} for ` : ''}${formatWithEstimate(tier.price, tier.currency ?? regionCurrency(), regionCurrency())}`}
-                </span>
-              )}
-            </For>
-          </span>
-        ),
+        chips: meta.tiers.map((tier) => {
+          const text = tierText(tier);
+          if (!toggles.length)
+            return {
+              text,
+              title: tier.quantity
+                ? `Pick any ${tier.quantity} of the ${tier.gameCount} games`
+                : `${tier.gameCount} game${tier.gameCount === 1 ? '' : 's'} at this tier`,
+              active: !!tier.quantity && pickPlan()?.tier.quantity === tier.quantity,
+            };
+          const price = tier.price!;
+          return {
+            text,
+            title: `Show only what the ${text} tier gets: its games and every cheaper tier's`,
+            ariaLabel: `${text} tier`,
+            active: tierPrice === price,
+            onClick: () =>
+              batch(() => {
+                t?.filter.clearColumn('tierPrice', 'range');
+                if (tierPrice !== price) t?.filter.setRange('tierPrice', 'max', String(price));
+              }),
+          };
+        }),
       });
     }
     // What the bundle adds for the current account: its Steam games not in the library, and what
@@ -3173,12 +3200,15 @@ export default function ListRoute() {
     // the "is it worth it" sum the table otherwise leaves to the reader. Once ownership is known.
     const account = getEffectiveCurrentAccount();
     if (account && rowsStore.length > 0 && rowsStore.every((r) => r.inLibrary != null)) {
-      const fresh = rowsStore.filter((r) => !r.inLibrary);
+      // Scoped to the pressed tier, so it answers "is this tier worth it" too.
+      const rows = tierPrice == null ? rowsStore : rowsStore.filter((r) => atTier(r, tierPrice));
+      const fresh = rows.filter((r) => !r.inLibrary);
       const target = regionCurrency();
       const total = sumBestDeals(fresh, target);
+      const tier = tierPrice == null ? null : meta.tiers.find((x) => x.price === tierPrice);
       tiles.push({
-        label: 'New to you',
-        value: `${fresh.length} of ${rowsStore.length}`,
+        label: tier ? `New at ${tierText(tier)}` : 'New to you',
+        value: `${fresh.length} of ${rows.length}`,
         sub: fresh.length && total != null ? `≈ ${formatMoney(total, target)} at best deals` : undefined,
         title: `Games here that aren't in ${accountDisplayLabel(account)}'s library — the ones that are carry a ✓ in the table`,
       });

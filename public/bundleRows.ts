@@ -339,6 +339,27 @@ export function bundleTierSummary(
   }));
 }
 
+// The tiers that filter the table: a classic bundle's priced ones, when it has two or more.
+export function filterTiers(tiers: readonly BundleTierSummary[]): BundleTierSummary[] {
+  const priced = tiers.filter((t) => t.price != null && !t.quantity);
+  return priced.length > 1 && priced.length === tiers.length ? priced : [];
+}
+
+// The tier price a Tier Price range selects: a max alone, equal to one of `tiers`' prices.
+export function activeTierPrice(
+  range: { min: string; max: string } | undefined,
+  tiers: readonly BundleTierSummary[],
+): number | null {
+  if (!range || range.min !== '' || range.max === '') return null;
+  const max = Number(range.max);
+  return filterTiers(tiers).some((t) => t.price === max) ? max : null;
+}
+
+// What paying `price` gets: a pricier tier includes every cheaper one's games.
+export function atTier(row: { tierPrice?: number | null }, price: number): boolean {
+  return row.tierPrice != null && row.tierPrice <= price;
+}
+
 interface BundleUrgency {
   tier: 'ended' | 'urgent' | 'soon' | 'later';
   label: string;
