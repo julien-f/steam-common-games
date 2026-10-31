@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Compare shows what each player has been playing lately, from their last two weeks on Steam
 - Bundles: Wishlist and New to you columns count each bundle's games on your wishlist and not in your library, and a Wishlist tile shows only the bundles holding wishlisted games
 - On a bundle's page, clicking a tier narrows the table to what that tier gets, and New to you counts those games only
+- GET /api/metrics counts game-details lookups that join one already in flight, under dedupHits.details
 
 ### Changed
 
@@ -62,6 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Phone lightbox e2e tests no longer fail now and then under load
 - Rate-limiter tests check that a forced refresh of a cached key counts against the budget
 - An HLTB outage logs one throttled [HLTB] warning instead of one line per game
+- Tests check that a coalesced lookup passes on another client's upstream failure, and that a failed metrics write never fails the call it counts
 
 ## [0.12.0] - 2026-10-30
 

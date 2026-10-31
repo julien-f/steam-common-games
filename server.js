@@ -755,7 +755,7 @@ app.post('/api/friends', friendsLimit, async (req, res) => {
 });
 
 // A result that one client's spent share left short (`limited`) is fetched again for another client.
-const dedupDetails = createDedup(undefined, { isRefused: (details) => !!details.limited });
+const dedupDetails = createDedup('details', { isRefused: (details) => !!details.limited });
 // Steam app types HLTB doesn't time, so searching for them would only spend requests on a miss.
 // `dlc` and `mod` stay: HLTB lists some.
 const NOT_PLAYED_TYPES = new Set(['music', 'video', 'series', 'episode', 'hardware', 'demo', 'advertising']);

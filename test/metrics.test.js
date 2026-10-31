@@ -446,6 +446,18 @@ test('getMetrics: daily counts each status, and network failures, per UTC day, g
   );
 });
 
+test('trackedFetch: a failed daily-count write still returns the response', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, status: 200, marker: 'res' }));
+  const warn = t.mock.method(console, 'warn', () => {});
+  db.exec("CREATE TEMP TRIGGER fail_daily BEFORE INSERT ON metrics_daily BEGIN SELECT RAISE(FAIL, 'disk full'); END");
+  t.after(() => db.exec('DROP TRIGGER fail_daily'));
+  assert.equal((await createTrackedFetch('grp')('getA', 'https://example.com/')).marker, 'res');
+  assert.deepEqual(
+    warn.mock.calls.map((c) => c.arguments.join(' ')),
+    ['[metrics] daily count not saved: disk full'],
+  );
+});
+
 test('getMetrics: daily drops days older than 30 at the first call of a day', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => ({ ok: true, status: 200 }));
   const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

@@ -13,6 +13,7 @@ process.env.OUTBOUND_CLIENT_SHARE_PERCENT = '25';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const supertest = require('supertest');
+const { until } = require('./until');
 const { app } = require('../server');
 const { _reset, getCached, setCache } = require('../lib/cache');
 const { createTrackedFetch, getMetrics, runAsClient, _reset: _resetMetrics } = require('../lib/metrics');
@@ -143,6 +144,21 @@ test('clients coalescing onto another client’s refused call retry it once betw
   await a;
   assert.deepEqual(await Promise.all(others), ['answer', 'answer', 'answer']);
   assert.equal(loads, 2);
+});
+
+test('a client coalescing onto another client’s upstream failure gets that failure, not a retry', async (t) => {
+  setup(t);
+  const withDedup = createDedup();
+  let loads = 0;
+  const load = () => {
+    loads++;
+    return Promise.reject(Object.assign(new Error('upstream down'), { isUpstream: true }));
+  };
+  const a = runAsClient('a', () => refusal(() => withDedup('k', load)));
+  const b = runAsClient('b', () => refusal(() => withDedup('k', load)));
+  assert.equal((await a)?.message, 'upstream down');
+  assert.equal((await b)?.message, 'upstream down');
+  assert.equal(loads, 1);
 });
 
 test('one client’s refused HLTB login doesn’t hold off another client’s', async (t) => {
@@ -377,7 +393,7 @@ test('a client coalescing onto another client’s refused game details gets its 
     .get('/api/game-details/40')
     .set('X-Forwarded-For', '203.0.113.7')
     .then((r) => r);
-  await new Promise((r) => setTimeout(r, 50)); // b reaches the dedup while a is still in flight
+  await until(() => getMetrics().sinceRestart.dedupHits.details === 1, 'b joining a’s lookup');
   open();
   assert.ok((await a).body.failed.includes('meta'));
   const other = await b;

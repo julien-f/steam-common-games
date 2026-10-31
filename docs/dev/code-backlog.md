@@ -76,8 +76,6 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 - **C202 · minor · M** — the presentation window's own 10 s close (a main-window reload keeps it; a `bye` without `main` closes it, `PresentationView.tsx`'s `mainGone`) is untested: its clock is real, so the e2e can't wait it out cheaply. Install fake timers in the popup through `e2e/presentationHooks.ts` and test both.
 - **C198 · minor · S** — no mock game has the Steam Workshop category (`e2e/mockApi.ts`), so the panel's Workshop link is untested. Give one fixture game that category and assert the link.
 - **C259 · minor · S** — untested limiter paths: `metaLimit`'s skip, `authLimit`, `bundlesByIdLimit`, and the prices skip for a confirmed no-ITAD game (`gid === null`) (`server.js`). Add them to `test/server-ratelimit-skips.test.js`.
-- **C260 · minor · S** — untested guards: a cross-client dedup waiter rethrowing a real upstream failure rather than retrying (`lib/dedup.js`), and `recordDaily`'s catch keeping a failed metrics write from failing `trackedFetch` (`lib/metrics.js`). One test each in `test/clientBudget.test.js` and `test/metrics.test.js`.
-- **C261 · minor · S** — real-time windows in tests: `test/streamCap.test.js` races the third stream against a 1000 ms timer; `abortedGet` (`test/server.test.js`) destroys its socket after 20 ms; 20–100 ms sleeps in `test/clientBudget.test.js` and `test/server.test.js` let a dedup or disconnect test pass without exercising its path under load. Await the state instead (the request itself, the fetch mock's first call, a dedup-hit metric, in-flight count 0).
 
 ## Docs
 
