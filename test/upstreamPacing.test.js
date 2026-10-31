@@ -41,27 +41,37 @@ for (const [name, call, respond] of [
       _resetAuth();
       t.mock.timers.enable({ apis: ['setTimeout'] });
       const urls = [];
-      const paced = () => urls.filter((url) => !url.includes('search/site/init')).length;
+      const isPaced = (url) => !url.includes('search/site/init');
+      const paced = () => urls.filter(isPaced).length;
       t.mock.method(globalThis, 'fetch', async (url) => {
         urls.push(url);
-        if (fails && !url.includes('search/site/init')) throw new TypeError('fetch failed');
+        if (fails && isPaced(url)) throw new TypeError('fetch failed');
         return respond(url);
       });
 
       const calls = Promise.allSettled(Array.from({ length: 6 }, (_, i) => call(i)));
-      for (let i = 0; i < 5; i++) await flush();
-      assert.equal(paced(), 3, 'only 3 in flight before any slot frees up');
+      try {
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 3, 'only 3 in flight before any slot frees up');
 
-      t.mock.timers.tick(999);
-      for (let i = 0; i < 5; i++) await flush();
-      assert.equal(paced(), 3, 'a slot stays busy for the whole interval');
+        t.mock.timers.tick(999);
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 3, 'a slot stays busy for the whole interval');
 
-      t.mock.timers.tick(1);
-      for (let i = 0; i < 5; i++) await flush();
-      assert.equal(paced(), 6);
-      assert.ok((await calls).every(({ status }) => status === (fails ? 'rejected' : 'fulfilled')));
-      // Frees the last slots: the next variant shares this semaphore.
-      t.mock.timers.tick(1000);
+        t.mock.timers.tick(1);
+        for (let i = 0; i < 5; i++) await flush();
+        assert.equal(paced(), 6);
+        assert.deepEqual(
+          (await calls).map(({ status }) => status),
+          Array(6).fill(fails ? 'rejected' : 'fulfilled'),
+        );
+      } finally {
+        // Frees every slot, even after a failed assertion: the next variant shares this semaphore.
+        for (let round = 0; round < 2; round++) {
+          t.mock.timers.tick(1000);
+          for (let i = 0; i < 5; i++) await flush();
+        }
+      }
     });
   }
 }
