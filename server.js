@@ -567,8 +567,10 @@ app.get('/api/metrics', (_req, res) => {
 const bundlesListLimit = namedRateLimit('bundlesList', {
   max: BUNDLES_RATE_LIMIT_MAX,
   skip: (req) => {
+    const query = parseBundlesQuery(req);
+    if (query.offset > MAX_BUNDLES_OFFSET) return true; // answered empty without calling ITAD
     if (isForceRefresh(req)) return false; // force-refresh always re-fetches, so it must always count
-    return isCached(bundlesCacheKey(parseBundlesQuery(req)));
+    return isCached(bundlesCacheKey(query));
   },
 });
 

@@ -227,6 +227,16 @@ test('bundles list limiter: counts cache misses but never counts cache hits', as
   const cached = await api.get('/api/bundles?offset=100');
   assert.equal(cached.status, 200, 'a cache hit must bypass the limiter');
   assert.deepEqual(cached.body.bundles, [{ id: 99, title: 'Pre-cached Page' }]);
+
+  for (const query of ['offset=20000', 'offset=20000&refresh=1']) {
+    const pastCap = await api.get(`/api/bundles?${query}`);
+    assert.equal(
+      pastCap.status,
+      200,
+      `a page past the offset cap never calls ITAD, so must bypass the limiter (${query})`,
+    );
+    assert.deepEqual(pastCap.body.bundles, []);
+  }
 });
 
 test('bundles resolve limiter: counts cache misses but never counts fully-cached gid batches', async (t) => {
