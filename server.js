@@ -54,7 +54,7 @@ const {
 } = require('./lib/itad');
 const { withPickAndMix } = require('./lib/fanatical');
 const { streamEvent } = require('./lib/streamEvent.mjs');
-const { catalogCacheKey, getGamePass } = require('./lib/gamepass');
+const { catalogCacheKey, getGamePass, isGamePassCached } = require('./lib/gamepass');
 const {
   SESSION_COOKIE,
   STATE_COOKIE,
@@ -522,7 +522,7 @@ const bundlesByIdLimit = namedRateLimit('bundlesById', {
 
 const gamePassLimit = namedRateLimit('gamePass', {
   max: BUNDLES_RATE_LIMIT_MAX,
-  skip: (req) => !isForceRefresh(req) && isCached(catalogCacheKey(parseCountry(req))),
+  skip: (req) => !isForceRefresh(req) && isGamePassCached(parseCountry(req)),
 });
 
 const bundlesResolveLimit = namedRateLimit('bundlesResolve', {
@@ -1425,7 +1425,11 @@ if (require.main === module) {
     process.exit(1);
   }
   if (!isItadConfigured()) console.warn('ITAD_API_KEY is not set: bundles and prices are off (see default.env).');
-  app.listen(PORT, HOST, () => {
+  app.listen(PORT, HOST, (err) => {
+    if (err) {
+      console.error(`Error: cannot listen on ${HOST}:${PORT}: ${err.message}`);
+      process.exit(1);
+    }
     console.log(`\nPlayshelf → http://${HOST}:${PORT}\n`);
   });
 }

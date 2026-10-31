@@ -64,7 +64,7 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 
 ## A new `/api` route answers `Cannot GET` (404) under `npm run dev`
 
-- **Symptom**: the page says a source "didn't answer"; `curl localhost:3000/api/<route>` returns Express's `Cannot GET /api/<route>` HTML.
+- **Symptom**: the page says a source "didn't answer"; `curl localhost:3000/api/<route>` returns Express's `Cannot GET /api/<route>` HTML; the `backend` log says `Error: cannot listen on <host>:3000: listen EADDRINUSE`.
 - **Cause**: another worktree's dev server already holds port 3000, so this checkout's backend never binds and Vite proxies `/api` to the other one, which runs older code.
 - **Fix**: `node scripts/session-end.js` lists running servers; start this one on a free port with `PORT=3001 npm run dev` (Vite's proxy reads the same `PORT`), or stop the other.
 

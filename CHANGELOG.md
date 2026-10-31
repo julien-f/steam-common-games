@@ -39,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Large libraries no longer stutter while their games load
 - The lightbox no longer offers Zoom on a picture already shown at full size
 - Saving data no longer fails with "database is locked" while another process (such as npm run cache:clear) is writing to the database
+- Reloading PC Game Pass while Steam matches or game names fail to load now counts against the request limit
+- The server now stops with an error when its port is already in use, instead of reporting it started
 
 ### Development
 
@@ -47,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `node scripts/upstream-bugs.js` lists the workarounds waiting on a browser or library fix, and `session-end.js` flags those ready to remove
 - Drop the dotenv dependency: settings files now load with Node's built-in loader
 - Phone lightbox e2e tests no longer fail now and then under load
+- Rate-limiter tests check that a forced refresh of a cached key counts against the budget
 
 ## [0.12.0] - 2026-10-30
 
