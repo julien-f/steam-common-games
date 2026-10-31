@@ -14,7 +14,7 @@ const BY_CODE: Record<string, GameStatus> = { f: 'finished', a: 'abandoned' };
 
 export const STATUS_LABELS: Record<GameStatus, string> = { finished: 'Finished', abandoned: 'Abandoned' };
 
-// One parse per change, not per row: getPref re-reads the whole blob.
+// One copy per change, not per row: getPref hands out a fresh copy of the whole map.
 const statusMap = createRoot(() => createMemo(() => getPref<Record<string, string>>(GAME_STATUSES_KEY, {})));
 
 export function getStatus(appid: number): GameStatus | null {

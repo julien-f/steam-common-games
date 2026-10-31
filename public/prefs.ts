@@ -26,15 +26,14 @@ export interface PrefEntry {
 // migrateEntries below for the one-time upgrade of an existing v1 blob.
 const SCHEMA_VERSION = 2;
 
-function readRawBlob(): Record<string, unknown> {
+function readRawBlob(raw: string | null): Record<string, unknown> {
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
     if (!raw) return {};
     const parsed: unknown = JSON.parse(raw);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
-  } // unavailable storage, or a corrupted/foreign value
+  } // a corrupted/foreign value
 }
 
 function isPrefEntry(value: unknown): value is PrefEntry {
@@ -45,14 +44,39 @@ function isPrefEntry(value: unknown): value is PrefEntry {
 // pref values happen to have both those keys), so schemaVersion alone is enough to tell the two
 // formats apart. `updatedAt: 0` for everything migrated this way — v1 never tracked write times,
 // so it's treated as older than literally anything with a real one, local or server-side.
-function readEntries(): Record<string, PrefEntry> {
-  const raw = readRawBlob();
-  const { schemaVersion, ...rest } = raw;
+function parseEntries(raw: string | null): Record<string, PrefEntry> {
+  const { schemaVersion, ...rest } = readRawBlob(raw);
   const entries: Record<string, PrefEntry> = {};
   for (const [key, value] of Object.entries(rest)) {
     entries[key] = schemaVersion === SCHEMA_VERSION && isPrefEntry(value) ? value : { value, updatedAt: 0 };
   }
   return entries;
+}
+
+// The last parse, reused while storage holds the same string: any write (this tab, another, a seed) changes it.
+// Never handed out: readers get a copy (`json`, each key's value serialized once), writers a new map.
+let cache: { raw: string | null; entries: Record<string, PrefEntry>; json: Map<string, string> } | null = null;
+
+function readCache(): NonNullable<typeof cache> {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(PREFS_STORAGE_KEY);
+  } catch {
+    return { raw: null, entries: {}, json: new Map() }; // unavailable storage
+  }
+  if (cache?.raw !== raw) cache = { raw, entries: parseEntries(raw), json: new Map() };
+  return cache;
+}
+
+// A key's stored value as JSON, serialized once per parse.
+function storedJson(c: NonNullable<typeof cache>, key: string): string {
+  let json = c.json.get(key);
+  if (json === undefined) c.json.set(key, (json = JSON.stringify(c.entries[key].value)));
+  return json;
+}
+
+function readEntries(): Record<string, PrefEntry> {
+  return { ...readCache().entries };
 }
 
 // False when not persisted: private browsing, storage unavailable, or full even without the cached tastes.
@@ -87,8 +111,9 @@ export function getPref<T = unknown>(key: string): T | undefined;
 export function getPref<T>(key: string, fallback: T): T;
 export function getPref<T = unknown>(key: string, fallback?: T): T | undefined {
   version(key).track();
-  const entries = readEntries();
-  return key in entries ? (entries[key].value as T) : (fallback as T);
+  const c = readCache();
+  if (!(key in c.entries)) return fallback as T;
+  return JSON.parse(storedJson(c, key)) as T;
 }
 
 export function setPref(key: string, value: unknown): void {
@@ -162,6 +187,7 @@ export function setSignedInSteamid(steamid: string | null): void {
 // naming convention as lib/cache.js/lib/metrics.js's own test-only resets.
 export function _resetPrefsState(): void {
   signedInSteamid = null;
+  cache = null;
   setWriteFailing(false);
   setDismissed(false);
 }
@@ -193,7 +219,7 @@ export function pushPrefToServer(
 // Every locally stored key, with its value and last-write time — authStore.ts's merge diffs this
 // against the server's own per-key map to decide, key by key, which side is newer.
 export function getAllPrefEntries(): Record<string, PrefEntry> {
-  return readEntries();
+  return structuredClone(readCache().entries);
 }
 
 // Writes one key's value locally without pushing it back to the server — used when a merge finds
