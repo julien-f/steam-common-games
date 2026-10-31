@@ -78,7 +78,6 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 
 - **C221 · minor · S** — `getProtonDbStatus` is called for every appid (`server.js:737`), DLC, soundtracks and hardware included; the cache holds `null` for all 49 such rows, so ~2% of calls to an undocumented upstream are certain misses. Chain it off the meta lookup like HLTB and skip non-played types — once confirmed ProtonDB never has reports for them (inferred from the cache), recorded in integrations.md.
 - **C40 · minor · S** — players `GetPlayerSummaries` omits are never cached (`lib/steam.js` `fetchPlayerBatch`), so a deleted or invalid account in a friends list is re-requested on every load. Cache the omission briefly once it's confirmed Steam omits only ids that really don't exist (not transiently); record that in integrations.md.
-- **C243 · minor · M** — key-less Steam calls (`fetchStoreBrowseItems`, GetWishlist, GetNewsForApp, GetGlobalAchievementPercentagesForApp) and ProtonDB ignore 429/Retry-After; only GetAppReviews pauses. On a cold load `tagLimit` keeps sending GetItems into a 429 (~1200 refused calls over 1196 games) while reviews on the same host back off. Route them through a pause, one shared by key-less `api.steampowered.com` calls if they share the quota (inferred: confirm and record in integrations.md).
 
 ## Tests
 

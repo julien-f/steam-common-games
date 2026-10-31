@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Games no longer all show no tags after Steam answers the tag list with an empty reply
 - Refreshing an account while Steam fails keeps its known name and avatar instead of showing its Steam ID
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
+- When Steam or ProtonDB asks the app to slow down, tags, wishlists, news, achievement rarity and Linux ratings wait instead of failing game after game
 
 ### Development
 
