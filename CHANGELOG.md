@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A table layout (columns, sort, filters, grouping) now changes only when you Save it, on every table: until then it's kept in the tab with Save and Discard, and saved layouts sync to your account
 - The desktop Filter pane highlights the column it shows
 - Sessions are stored hashed on the server, so everyone is signed out once and needs to sign in with Steam again
+- Prices, bundle games and friend names load faster for large lists
 
 ### Fixed
 
@@ -47,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Refreshing an account while Steam fails keeps its known name and avatar instead of showing its Steam ID
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
 - A Steam sign-in link copied from the server logs can no longer be reused to sign in
+- An unexpected reply from Steam or IsThereAnyDeal no longer breaks bundles for hours or shows a cryptic error: it fails that once and is retried
 
 ### Development
 

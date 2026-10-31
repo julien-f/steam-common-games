@@ -60,7 +60,7 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 
 ## Friends — documented, keyed endpoint
 
-- `getFriendList` calls `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={key}&steamid={id}` — sanctioned tier. It returns only `steamid`s; names and avatars come from the batched `GetPlayerSummaries` (at most 100 ids per call, Valve's documented limit; larger sets go out as sequential chunks).
+- `getFriendList` calls `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key={key}&steamid={id}` — sanctioned tier. It returns only `steamid`s; names and avatars come from the batched `GetPlayerSummaries` (at most 100 ids per call, Valve's documented limit; larger sets go out in chunks, 3 at a time: `mapChunks`, `lib/upstream.js`, which ITAD's batch lookups and prices use too).
 - A private friends list gets a `401`, so unlike the wishlist it's distinguishable: cached as `null` (not `[]`), and `POST /api/friends` reports those steamids as `unavailable`.
 
 ## Tags & demo link — store browse data

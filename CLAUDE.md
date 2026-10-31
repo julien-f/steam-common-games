@@ -33,7 +33,7 @@ Read the relevant one before changing that area. Two are load-bearing: **fronten
 ## Code conventions
 
 - **Types**: `tsc --noEmit`, strict, over `public/**/*.{ts,tsx}`, plus `e2e/` via `tsconfig.e2e.json` — the backend is plain JS.
-- **Error handling**: routes catch and map through `routeErrorStatus` (client error → 400, upstream → 502, timeout → 504) and reply `{ error }`. An optional source (HLTB, ProtonDB, reviews) that fails logs a `[tag]`-prefixed `console.warn` and degrades instead of failing the request; the UI then says the source didn't answer rather than showing no data.
+- **Error handling**: routes catch and map through `routeErrorStatus` (client error → 400, upstream → 502, timeout → 504, anything unmarked → 500) and reply `{ error }`, generic for a 500 or an unparseable upstream body: the detail stays in the log. Check an upstream body's shape before caching it, else throw `upstreamError`. An optional source (HLTB, ProtonDB, reviews) that fails logs a `[tag]`-prefixed `console.warn` and degrades instead of failing the request; the UI then says the source didn't answer rather than showing no data.
 - **Lint**: `eslint public --max-warnings=0`, via eslint-plugin-solid; stays at 0 problems (a warning fails it), and the few intended violations carry a targeted `eslint-disable-next-line` with a reason.
 - **Upstream workarounds**: the comment ends `Remove once <Bugzilla or GitHub issue URL> is fixed` (`id=TODO` until filed), so `node scripts/upstream-bugs.js` lists them with each bug's state.
 - **Format**: Prettier over the whole tree (`.prettierrc.json`); `npm run format` rewrites, `npm run format:check` verifies. Let it format instead of hand-formatting, and don't fight its output.

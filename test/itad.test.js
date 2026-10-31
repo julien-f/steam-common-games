@@ -185,6 +185,84 @@ test('resolveSteamAppIds: looks gids up in batches of at most 200', async (t) =>
   assert.equal(result.size, 450);
 });
 
+// Mocks ITAD with batch calls held in flight for one event-loop turn; counts them and the most at once.
+function mockBatchConcurrency(t, reply, { fail = () => false } = {}) {
+  const stats = { calls: 0, maxActive: 0 };
+  let active = 0;
+  Object.defineProperty(stats, 'active', { get: () => active }); // not enumerable: kept out of deepEqual
+  t.mock.method(globalThis, 'fetch', async (url, opts) => {
+    if (String(url).includes('/service/shops/')) return { ok: true, json: async () => SHOPS };
+    const n = stats.calls++;
+    stats.maxActive = Math.max(stats.maxActive, ++active);
+    await new Promise(setImmediate);
+    active--;
+    if (fail(n)) return { ok: false, status: 500 };
+    const sent = JSON.parse(opts.body);
+    return { ok: true, json: async () => reply(sent) };
+  });
+  return stats;
+}
+
+const ids1000 = (prefix) => Array.from({ length: 1000 }, (_, i) => `${prefix}${i}`);
+
+test('batch lookups send their 200-id chunks 3 at a time, the same number of calls', async (t) => {
+  _reset();
+  let stats = mockBatchConcurrency(t, (gids) => Object.fromEntries(gids.map((g) => [g, ['app/1']])));
+  assert.equal((await resolveSteamAppIds(ids1000('gid-'))).size, 1000);
+  assert.deepEqual(stats, { calls: 5, maxActive: 3 }, 'resolveSteamAppIds');
+
+  stats = mockBatchConcurrency(t, (keys) => Object.fromEntries(keys.map((k) => [k, `gid-${k}`])));
+  const appids = Array.from({ length: 1000 }, (_, i) => i + 1);
+  assert.equal((await resolveItadIds(appids)).get(1000), 'gid-app/1000');
+  assert.deepEqual(stats, { calls: 5, maxActive: 3 }, 'resolveItadIds');
+
+  stats = mockBatchConcurrency(t, (gids) => gids.map((id) => ({ ...PRICE_ENTRY, id })));
+  assert.equal((await getPrices(ids1000('p-'), { country: 'US' })).size, 1000);
+  assert.deepEqual(stats, { calls: 5, maxActive: 3 }, 'getPrices');
+});
+
+test('batch lookups start no chunk after one fails', async (t) => {
+  _reset();
+  const stats = mockBatchConcurrency(t, (gids) => gids.map((id) => ({ ...PRICE_ENTRY, id })), {
+    fail: (n) => n === 0,
+  });
+  await assert.rejects(
+    () => getPrices(ids1000('p-'), { country: 'US' }),
+    (err) => err.isUpstream === true,
+  );
+  assert.equal(stats.calls, 3, 'only the chunks already in flight');
+  assert.equal(stats.active, 0, 'rejects once those have settled, so a retry cannot resend them');
+});
+
+test('resolveItadIds: a failed chunk keeps the chunks that succeeded', async (t) => {
+  _reset();
+  const reply = (keys) => Object.fromEntries(keys.map((k) => [k, `gid-${k}`]));
+  const appids = Array.from({ length: 1000 }, (_, i) => i + 1);
+  let stats = mockBatchConcurrency(t, reply, { fail: (n) => n === 3 });
+  await assert.rejects(() => resolveItadIds(appids), { isUpstream: true });
+  stats = mockBatchConcurrency(t, reply);
+  assert.equal((await resolveItadIds(appids)).size, 1000);
+  assert.equal(stats.calls, 1, 'only the failed chunk is sent again');
+});
+
+test('getPrices and the id lookups: a reply of another shape is an upstream error', async (t) => {
+  const cases = [
+    ['getPrices', () => getPrices(['g'], { country: 'US' }), [null, { error: 'x' }]],
+    ['resolveItadIds', () => resolveItadIds([1]), [null, []]],
+    ['resolveSteamAppIds', () => resolveSteamAppIds(['g']), [null, []]],
+  ];
+  for (const [name, call, bodies] of cases) {
+    for (const body of bodies) {
+      _reset();
+      t.mock.method(globalThis, 'fetch', async (url) => ({
+        ok: true,
+        json: async () => (String(url).includes('/service/shops/') ? SHOPS : body),
+      }));
+      await assert.rejects(call, { isUpstream: true }, `${name} ${JSON.stringify(body)}`);
+    }
+  }
+});
+
 // Mocks the three-domain fetch graph resolveSteamAppIds' fallbacks can reach: ITAD's shop
 // lookup (`shopEntries`, keyed by gid), Steam's packagedetails/ajaxresolvebundles (`steam`,
 // keyed by "sub/<id>"/"bundle/<id>"), and ITAD's games/info/v2 (`info`, keyed by gid) —

@@ -192,6 +192,21 @@ test('getHLTB: returns null when best match is below 0.35 similarity', async (t)
   assert.equal(result, null);
 });
 
+test('getHLTB: a non-array `data` fails the search and is not cached', async (t) => {
+  _reset();
+  _resetAuth();
+  t.mock.method(console, 'warn', () => {});
+  let searches = 0;
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.includes('search/site/init')) return makeInitResponse();
+    searches++;
+    return makeSearchResponse({ game_name: 'Portal' });
+  });
+  await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
+  await assert.rejects(() => getHLTB(1, 'Portal'), /HLTB/);
+  assert.equal(searches, 2);
+});
+
 test('getHLTB: returns null when no results', async (t) => {
   _reset();
   _resetAuth();

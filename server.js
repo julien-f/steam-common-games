@@ -202,10 +202,16 @@ function routeErrorStatus(route, err) {
     return 504;
   }
   console.error(`[bug:${route}]`, err.stack || err.message);
-  return 400;
+  return 500;
 }
 
-const sendRouteError = (res, route, err) => res.status(routeErrorStatus(route, err)).json({ error: err.message });
+// The log keeps the detail: a bug's message shows internals, a parse error's quotes the upstream's body.
+function sendRouteError(res, route, err) {
+  const status = routeErrorStatus(route, err);
+  const error =
+    status === 500 ? 'Internal error' : err.name === 'SyntaxError' ? 'Unreadable reply from upstream' : err.message;
+  res.status(status).json({ error });
+}
 
 const app = express();
 if (TRUST_PROXY) app.set('trust proxy', TRUST_PROXY);
