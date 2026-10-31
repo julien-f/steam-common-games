@@ -3142,6 +3142,11 @@
     box-shadow: var(--glass-edge);
     color: #fff;
   }
+  /* Firefox for Android draws a video under a blur a few pixels lower: it jumped as the chrome showed and hid.
+     Remove once https://bugzilla.mozilla.org/show_bug.cgi?id=TODO is fixed. */
+  #screenshot-lightbox.lb--ff-android:has(.lb-video) .lb-glass {
+    backdrop-filter: none;
+  }
   :is(button.lb-glass, .lb-glass button):hover:not(:disabled) {
     background-color: rgb(0 0 0 / 0.7);
   }

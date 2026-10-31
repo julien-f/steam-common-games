@@ -4962,6 +4962,25 @@ test('M3 edge: on Firefox for Android, a trailer enters fullscreen unloaded, the
   await expect.poll(steps).toEqual(['unload', 'play fullscreen']);
 });
 
+test('M3 edge: on Firefox for Android, a trailer’s glass controls have no blur, a screenshot’s keep it', async ({
+  page,
+}) => {
+  // Blur over the video moves it a few pixels each time the controls show or hide.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Android 12; Mobile) Firefox/159.0' });
+  });
+  await fakePlayback(page);
+  await mockApi(page, { states: ['playable-trailers'] });
+  await page.goto('/game/1145360?shot=v1');
+  const blur = () =>
+    page.locator('#screenshot-lightbox .lb-next').evaluate((el) => getComputedStyle(el).backdropFilter);
+  await expect(page.locator('#screenshot-lightbox .lb-video')).toBeAttached();
+  expect(await blur()).toBe('none');
+  await page.goto('/game/1145360?shot=s1');
+  await expect(page.locator('#screenshot-lightbox .lb-img')).toBeVisible();
+  expect(await blur()).not.toBe('none');
+});
+
 test('M3 edge: without element fullscreen (an iPhone), only a trailer offers it, in the native player', async ({
   page,
 }) => {

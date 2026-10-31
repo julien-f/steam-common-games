@@ -846,7 +846,11 @@ function getFocusable(lb: HTMLElement): HTMLElement[] {
 function LightboxDom() {
   return (
     // A modal <dialog>: the page behind is inert. Fullscreen goes on `.lb-surface`, as a dialog can't be fullscreen.
-    <dialog id="screenshot-lightbox" aria-labelledby="lb-caption-text lb-title">
+    <dialog
+      id="screenshot-lightbox"
+      classList={{ 'lb--ff-android': FIREFOX_ANDROID }}
+      aria-labelledby="lb-caption-text lb-title"
+    >
       <div class="lb-surface" tabindex="-1" autofocus>
         <span id="lb-title" hidden>
           media viewer
