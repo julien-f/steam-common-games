@@ -93,9 +93,14 @@ const ITAD_UNAVAILABLE = "Bundles and prices aren't available on this instance: 
 const requireItad = (_req, res, next) =>
   isItadConfigured() ? next() : res.status(503).json({ error: ITAD_UNAVAILABLE });
 // Shared by every /api/bundles* route that takes a `country` query param — falls back to US
-// for anything that isn't a plain 2-letter code rather than rejecting the request outright,
-// same "trust but sanitize" treatment as the rest of this app's query params.
-const parseCountry = (req) => (/^[A-Za-z]{2}$/.test(req.query.country || '') ? req.query.country.toUpperCase() : 'US');
+// for anything outside the frontend's region list rather than rejecting the request outright,
+// same "trust but sanitize" treatment as the rest of this app's query params. Each country is
+// its own cache key and upstream call, hence the list rather than any 2-letter code.
+const REGION_CODES = new Set(require('./public/regions.json').map((r) => r.code));
+const parseCountry = (req) => {
+  const code = typeof req.query.country === 'string' ? req.query.country.toUpperCase() : '';
+  return REGION_CODES.has(code) ? code : 'US';
+};
 
 // Rate limiting is bypassed under NODE_ENV=test so the suite isn't throttled,
 // unless a test opts in with RATE_LIMIT_ENABLED=true to exercise the limiter.
@@ -106,18 +111,28 @@ const clientKey = (req) => rateLimit.ipKeyGenerator(req.ip);
 const isForceRefresh = (req) => req.query.refresh === '1' || req.query.refresh === 'true';
 
 // /api/bundles' query, shared with bundlesListLimit's skip so both compute the same cache key.
+const MAX_BUNDLES_OFFSET = 10_000; // 200 "Load more" pages: far past any real browsing
 function parseBundlesQuery(req) {
   return {
     country: parseCountry(req),
-    offset: Math.max(0, Number(req.query.offset) || 0),
-    limit: Math.min(50, Math.max(1, Number(req.query.limit) || 20)),
-    sort: typeof req.query.sort === 'string' && req.query.sort ? req.query.sort : '-publish',
+    offset: Math.min(MAX_BUNDLES_OFFSET, Math.max(0, Math.floor(Number(req.query.offset)) || 0)),
+    limit: Math.min(50, Math.max(1, Math.floor(Number(req.query.limit)) || 20)),
+    sort: '-publish', // the only order the frontend asks for (BundlesBrowseRoute's FETCH_SORT)
     expired: req.query.expired === '1' || req.query.expired === 'true',
   };
 }
 
-const isMemberList = (members) =>
-  Array.isArray(members) && members.every((u) => typeof u === 'string' && u.trim().length > 0);
+// A Steam64 id or custom-URL name, or a profile URL holding one (Compare and `u=` links send it raw).
+const STEAM_NAME_RE = /^[A-Za-z0-9_-]{2,32}$/;
+const STEAM_PROFILE_URL_RE =
+  /^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/[A-Za-z0-9_-]{2,32}\/?$/i;
+const isSteamIdentifier = (u) =>
+  typeof u === 'string' && (STEAM_NAME_RE.test(u.trim()) || STEAM_PROFILE_URL_RE.test(u.trim()));
+const isMemberList = (members) => Array.isArray(members) && members.every(isSteamIdentifier);
+
+// ITAD game ids are UUIDs; anything else would only cache a miss under a junk key.
+const ITAD_GID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isItadGid = (g) => typeof g === 'string' && ITAD_GID_RE.test(g);
 
 // `members` as Steam64 ids from resolveSteamId's cache alone, or null if any would need Steam.
 function cachedSteamIds(members) {
@@ -284,12 +299,17 @@ app.param('appid', (req, res, next, raw) => {
 // when invalid.
 function parseMembers(req, res) {
   const { members } = req.body;
-  if (!isMemberList(members) || members.length < 1) {
+  if (!Array.isArray(members) || members.length < 1) {
     res.status(400).json({ error: 'Provide at least 1 player' });
     return null;
   }
   if (members.length > MAX_USERS) {
     res.status(400).json({ error: `Too many users — maximum is ${MAX_USERS}` });
+    return null;
+  }
+  const invalid = members.find((u) => !isSteamIdentifier(u));
+  if (invalid !== undefined) {
+    res.status(400).json({ error: `Not a Steam account: "${String(invalid).slice(0, 40)}"` });
     return null;
   }
   return members;
@@ -918,9 +938,10 @@ app.get('/api/bundles/:id', bundlesByIdLimit, requireItad, async (req, res) => {
 const MAX_BUNDLE_RESOLVE_GAMES = 500;
 app.post('/api/bundles/resolve', bundlesResolveLimit, requireItad, async (req, res) => {
   const gids = req.body.gids;
-  if (!Array.isArray(gids) || gids.length === 0 || !gids.every((g) => typeof g === 'string' && g)) {
+  if (!Array.isArray(gids) || gids.length === 0) {
     return res.status(400).json({ error: 'Provide at least one game id' });
   }
+  if (!gids.every(isItadGid)) return res.status(400).json({ error: 'gids must be ITAD game ids' });
   if (gids.length > MAX_BUNDLE_RESOLVE_GAMES) {
     return res.status(400).json({ error: `Too many games — maximum is ${MAX_BUNDLE_RESOLVE_GAMES}` });
   }
@@ -967,9 +988,7 @@ app.post('/api/prices', pricesLimit, requireItad, async (req, res) => {
     // neither, or both — exactly one is required
     return res.status(400).json({ error: 'Provide exactly one of gids or appids' });
   }
-  if (byGid && !gids.every((g) => typeof g === 'string' && g)) {
-    return res.status(400).json({ error: 'gids must be non-empty strings' });
-  }
+  if (byGid && !gids.every(isItadGid)) return res.status(400).json({ error: 'gids must be ITAD game ids' });
   if (byAppid && !appids.every((a) => Number.isInteger(a) && a > 0)) {
     return res.status(400).json({ error: 'appids must be positive integers' });
   }

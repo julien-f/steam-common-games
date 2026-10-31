@@ -1,4 +1,5 @@
 import { getPref, setPref } from './prefs.ts';
+import REGIONS from './regions.json' with { type: 'json' };
 
 // The region preference's data and logic — the curated list, the detection heuristic, and
 // get/set/resolve for the stored value — with no DOM/UI code of its own (see prefsPopover.tsx
@@ -18,23 +19,12 @@ export interface CountryOption {
   currency: string; // the currency the region prices in
   label: string;
 }
-export const COUNTRY_OPTIONS: CountryOption[] = [
-  ['US', 'United States', 'USD'],
-  ['GB', 'United Kingdom', 'GBP'],
-  ['DE', 'Europe / Germany', 'EUR'],
-  ['CA', 'Canada', 'CAD'],
-  ['AU', 'Australia', 'AUD'],
-  ['JP', 'Japan', 'JPY'],
-  ['BR', 'Brazil', 'BRL'],
-  ['RU', 'Russia', 'RUB'],
-  ['TR', 'Turkey', 'TRY'],
-  ['UA', 'Ukraine', 'UAH'],
-  ['AR', 'Argentina', 'ARS'],
-  ['IN', 'India', 'INR'],
-  ['CN', 'China', 'CNY'],
-  ['KR', 'South Korea', 'KRW'],
-  ['MX', 'Mexico', 'MXN'],
-].map(([code, name, currency]) => ({ code, currency, label: `${name} (${currency})` }));
+// The list itself is in regions.json, shared with server.js, which accepts no other `country`.
+export const COUNTRY_OPTIONS: CountryOption[] = REGIONS.map(({ code, name, currency }) => ({
+  code,
+  currency,
+  label: `${name} (${currency})`,
+}));
 
 // IANA timezone → curated COUNTRY_OPTIONS code, used by detectCountry below as a stronger
 // location signal than `navigator.language` (see its own comment). Deliberately not
