@@ -115,6 +115,21 @@ test('migrate: version 9 tolerates a user with no prefs at all', () => {
   assert.deepEqual(rows, []);
 });
 
+test('migrate: version 11 signs everyone out, since sessions stored before it are keyed by the raw id', () => {
+  const db = new DatabaseSync(':memory:');
+  migrate(
+    db,
+    MIGRATIONS.filter((m) => m.version <= 10),
+  );
+  db.exec("INSERT INTO users (steamid, created_at, updated_at) VALUES ('1', 1000, 1000)");
+  db.exec("INSERT INTO sessions (id, steamid, expires_at) VALUES ('raw-id', '1', 9999999999999)");
+
+  migrate(db, MIGRATIONS);
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, 1);
+});
+
 test("requiring lib/db picks up default.env's DB_FILE even without a shell-level DB_FILE set", () => {
   // Regression test: lib/db.js used to read process.env.DB_FILE before lib/config.js had loaded
   // default.env (whichever of lib/db.js's requirers happened to require lib/config first), so it

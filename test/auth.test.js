@@ -6,6 +6,8 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const { db } = require('../lib/db');
 const {
   parseCookies,
   serializeCookie,
@@ -166,6 +168,20 @@ test('createSession + getSessionUser: round-trips to the steamid and its (initia
   upsertUser(steamid);
   const sessionId = createSession(steamid);
   assert.deepEqual(getSessionUser(sessionId), { steamid, prefs: {} });
+});
+
+test('createSession: db.sqlite holds only a SHA-256 of the session id, which does not sign anyone in', () => {
+  const steamid = '76561198000000109';
+  upsertUser(steamid);
+  const sessionId = createSession(steamid);
+  const stored = db.prepare('SELECT id FROM sessions WHERE steamid = ?').all(steamid);
+  assert.deepEqual(
+    stored.map((r) => r.id),
+    [crypto.createHash('sha256').update(sessionId).digest('hex')],
+  );
+  assert.equal(getSessionUser(stored[0].id), undefined);
+  destroySession(sessionId);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE steamid = ?').get(steamid).n, 0);
 });
 
 test('getSessionUser: undefined for an unknown or missing session id', () => {
