@@ -42,6 +42,7 @@ The `howlongtobeat` npm package was removed (it pulled in a vulnerable `axios`);
 - **Token**: cached in memory for 5 minutes (session-bound, not on disk). A 401/403 from search clears it.
   - A 403, or a 401 on the current fresh token (one no search has accepted yet), is a block: it holds off re-init for 30 s, and two in a row trip the breaker. Searches queued on a token already rejected count once, not each.
   - A 401 on a token searches already accepted is expiry: re-init at once. Assumed, not documented: HLTB's real token lifetime is unknown, so a fresh token idle long enough to expire reads as a block: a 30 s hold.
+  - A 200 counts as a success only with a `data` array: any other body fails that search uncached, without accepting the token or resetting the breaker's streak.
 - **Matching**: Levenshtein similarity (`stringSimilarity`); below 0.35 is discarded.
 - **What's searched**: the store metadata's `type` skips soundtracks, videos, series, episodes, hardware, demos and ads (`NOT_PLAYED_TYPES`, `server.js`), which read as no data rather than failed. Tools are still searched: none of the types the app knows (`TYPE_LABELS`) marks them — an assumption from observed data, not Steam's docs.
 - **Times** (`pickBestMatch`): `main` (`comp_main`), `extra` (`comp_plus`), `completionist` (`comp_100`) and `all` (`comp_all`), seconds converted to hours rounded to the half hour, as HLTB's own site shows them.
