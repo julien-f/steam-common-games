@@ -141,7 +141,7 @@ function cachedSteamIds(members) {
   if (!isMemberList(members)) return null;
   const ids = new Set();
   for (const raw of members) {
-    const hit = peekSteamId(raw, { record: false });
+    const hit = peekSteamId(raw);
     if (hit === undefined) return null;
     ids.add(hit);
   }
@@ -171,15 +171,6 @@ function namedRateLimit(name, { skip, ...opts }) {
   });
 }
 
-// Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
-// errors — anything else (including a genuine bug: a TypeError,
-// etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
-// one of lib/steam.js's deliberately-thrown, expected client-facing errors (bad Steam id,
-// private profile — see clientError() there). Those are still skipped here since they're
-// normal and frequent, not worth a log line, but now that they're explicitly marked
-// (isClientError), everything unmarked is logged too, on the assumption that an error
-// nobody bothered to mark expected is probably a bug worth being able to find later. Logs
-// the full stack, not just the message, since a bug needs its source line to be traceable.
 // The oldest write time across a set of cache keys, or null if any of them isn't cached (a
 // fresh fetch this request just made writes its own entry, so that case is rare) — what the
 // `fetchedAt` field on /api/common-games and /api/wishlist reports. Oldest, not newest, so the
@@ -198,6 +189,15 @@ function oldestOf(timestamps) {
   return oldest;
 }
 
+// Shared by every route's catch block below. Used to only log isUpstream/TimeoutError
+// errors — anything else (including a genuine bug: a TypeError,
+// etc.) fell through unlogged, because a plain, unmarked Error was indistinguishable from
+// one of lib/steam.js's deliberately-thrown, expected client-facing errors (bad Steam id,
+// private profile — see clientError() there). Those are still skipped here since they're
+// normal and frequent, not worth a log line, but now that they're explicitly marked
+// (isClientError), everything unmarked is logged too, on the assumption that an error
+// nobody bothered to mark expected is probably a bug worth being able to find later. Logs
+// the full stack, not just the message, since a bug needs its source line to be traceable.
 function routeErrorStatus(route, err) {
   if (err.isClientError) return 400;
   // Circuit-open errors (lib/steam.js's fetchStoreApi, while steam-store is blocked) are an
@@ -459,7 +459,7 @@ const achievementsLimit = namedRateLimit('achievements', {
     // schema+rarity above, both already confirmed cached — nothing left to check.
     if (!ids.length) return true;
     return ids.every((raw) => {
-      const id = peekSteamId(raw, { record: false });
+      const id = peekSteamId(raw);
       return id && isCached(playerAchievementsCacheKey(id, appid));
     });
   },
@@ -1077,6 +1077,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
   const force = isForceRefresh(req);
   try {
     const steamIds = await resolveSteamIds(rawIds);
+    const none = { achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length };
 
     // Cheap short-circuit: appdetails (already fetched/cached for this game via
     // fetchGameDetails, well before any panel opens) already tells us — for free — whether
@@ -1088,7 +1089,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     // the optimization, never breaks the route — by falling through to the schema fetch below.
     const meta = await getAppDetails(appid, { force: false }).catch(() => null);
     if (meta && meta.achievementCount === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+      return res.json(none);
     }
 
     // Sequenced rather than batched with the calls below: even when appdetails didn't confirm
@@ -1096,7 +1097,7 @@ app.get('/api/achievements/:appid', achievementsLimit, async (req, res) => {
     // calls until schema itself confirms there's something to annotate.
     const schema = await getGameSchema(appid, { force });
     if (!schema || schema.length === 0) {
-      return res.json({ achievements: [], total: 0, unlocked: 0, private: false, playerCount: steamIds.length });
+      return res.json(none);
     }
 
     let rarityFailed = false;
