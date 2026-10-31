@@ -99,5 +99,4 @@ Baseline for these items (2026-10-28, a 1196-game account, warm cache, real dev 
 
 ## Docs
 
-- **C264 · minor · S** — architecture.md's request flow gives `/api/common-games`' reply without `recentPlaytime` (and `players[].gameCount`). Add them.
 - **C265 · cleanup · S** — data.md's `db.sqlite` contents omit `metrics_daily`, and `default.env`'s comment says it holds only cache tables; `default.env`'s budget-group list misses five groups (point to observability.md instead); configuration.md and pitfalls.md restate `STORE_MIN_INTERVAL_MS`/`UPSTREAM_MIN_INTERVAL_MS` values. Fix the lists, drop the copied numbers.
