@@ -189,9 +189,7 @@ test("merge: leaves another session's uncommitted backlog edit unstaged", (t) =>
   const { execFileSync } = require('node:child_process');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'batch-merge-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  // Hooks export GIT_DIR and GIT_INDEX_FILE: inherited, they'd point every git call here at the real repo.
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
-  const git = (...args) => execFileSync('git', args, { cwd: dir, env, encoding: 'utf8' });
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
   const write = (file, text) => {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
     fs.writeFileSync(path.join(dir, file), text);
@@ -214,7 +212,7 @@ test("merge: leaves another session's uncommitted backlog edit unstaged", (t) =>
   const otherEdit = '# UX\n\n## Lists\n\n- **U1 · minor · L1** — c. Fix.\n- **U2 · minor · L1** — new. Fix.\n';
   write('docs/dev/improvements.md', otherEdit);
 
-  execFileSync('node', ['scripts/batch.js', 'merge', 'lane'], { cwd: dir, env, encoding: 'utf8' });
+  execFileSync('node', ['scripts/batch.js', 'merge', 'lane'], { cwd: dir, encoding: 'utf8' });
 
   assert.deepEqual(git('diff', '--cached', '--name-only').trim().split('\n'), ['docs/dev/code-backlog.md']);
   assert.equal(git('diff', '--name-only').trim(), 'docs/dev/improvements.md');

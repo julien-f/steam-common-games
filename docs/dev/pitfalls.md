@@ -195,8 +195,8 @@ Surprising behaviors, misleading errors and their fixes. One entry each: symptom
 - **Cause**: a merge that stages a whole backlog file sweeps in another session's uncommitted edits to it; `node scripts/batch.js merge` stages only the backlogs the lane changed or that conflict, so the edits came from a hand `git add`.
 - **Fix**: `git restore --source=HEAD^1 --staged <file>`, then `git commit --amend`: the swept-in edits leave the commit and stay in the working tree.
 
-## A test that runs `git` commits to the real repo from inside a hook
+## `fatal: this operation must be run in a work tree` after a commit
 
-- **Symptom**: after a commit, stray commits (from a test's throwaway repo) land on your branch or `main`, branches you never made appear, and other checkouts fail with `fatal: this operation must be run in a work tree` (`core.bare` turned `true`).
-- **Cause**: git exports `GIT_DIR` and `GIT_INDEX_FILE` to hooks; a test the hook runs that spawns `git` in a temp dir inherits them, so `git init`, `commit` and `checkout` act on the real repo instead.
-- **Fix**: spawn `git` (and any script that does) with every `GIT_*` variable removed from `env`, as `test/batch.test.js` does. To recover: `git config core.bare false`, then move the affected refs back with `git update-ref` (their reflogs show the previous commit).
+- **Symptom**: other checkouts fail with that error (`core.bare` turned `true`), stray commits from a test's throwaway repo sit on a branch, or branches you never made appear.
+- **Cause**: a test spawned `git` with the hook's `GIT_DIR`/`GIT_INDEX_FILE`, so it acted on the real repo; `npm test` strips `GIT_*` (`test/gitEnv.js`), so the test ran another way.
+- **Fix**: `git config core.bare false`, then move the affected refs back with `git update-ref` (their reflogs show the previous commit).

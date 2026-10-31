@@ -75,6 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - An HLTB outage logs one throttled [HLTB] warning instead of one line per game
 - Tests check that a coalesced lookup passes on another client's upstream failure, and that a failed metrics write never fails the call it counts
 - Merging a fix-batch lane no longer stages another session's uncommitted backlog edits.
+- Unit tests run with git's hook variables stripped, so a test can't write to the real repository.
 
 ## [0.12.0] - 2026-10-30
 

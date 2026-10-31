@@ -5,6 +5,7 @@
 - `node:test` + `supertest`, flat in `test/*.test.{js,ts}`.
 - `npm test` (~6 s) runs with `DB_FILE=`, so no real database is touched.
 - Single file: `npm run test:one test/<name>.test.js` — same env as `npm test`, which hardcodes its glob.
+- Both preload `test/gitEnv.js`, which strips `GIT_*` from the environment: hooks and `git rebase -x` export `GIT_DIR`/`GIT_INDEX_FILE`, which would point a test's git calls at the real repo.
 - `--conditions=browser` loads solid-js's browser build: under Node's default (server build) effects and memos never re-run and `createResource` throws, so reactivity couldn't be tested.
 
 ## End-to-end tests
