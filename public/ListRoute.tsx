@@ -2153,7 +2153,13 @@ export default function ListRoute() {
   function bindLayout(): void {
     unsyncView?.();
     const { id, store } = storedLayout();
-    const l = layoutDraft(viewTable, id, store, [SIMILARITY_KEY, TAG_MATCH_KEY], tableDefaults);
+    const l = layoutDraft(
+      viewTable,
+      id,
+      store,
+      { cols: [SIMILARITY_KEY, TAG_MATCH_KEY], ranges: kind === 'bundle' ? ['tierPrice'] : [] },
+      tableDefaults,
+    );
     setLayout(l);
     setSharedViewEdited(false);
     setViewingShared(l.restore());

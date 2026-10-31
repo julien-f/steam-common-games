@@ -123,17 +123,34 @@ function writeDraft(id: string, view: TableViewState | null): void {
   }
 }
 
-// What Save stores and the banner compares: no page, search or route-managed `temporaryCols` (a
-// similarity sort), and a field back to the table's default dropped, as getViewState drops it.
-function layoutOf(view: TableViewState, temporaryCols: readonly string[], defaults: TableViewState): TableViewState {
+// What a route manages itself, kept out of the layout: `cols` entirely (a similarity sort), `ranges`
+// only as range filters (a bundle's pressed tier, which means nothing on another bundle).
+export interface TemporaryKeys {
+  cols?: readonly string[];
+  ranges?: readonly string[];
+}
+
+const withoutRanges = (view: TableViewState, ranges: readonly string[]): TableViewState =>
+  view.rangeFilters && ranges.length
+    ? {
+        ...view,
+        rangeFilters: Object.fromEntries(Object.entries(view.rangeFilters).filter(([k]) => !ranges.includes(k))),
+      }
+    : view;
+
+// What Save stores and the banner compares: no page, search or temporary keys, and a field back to
+// the table's default dropped, as getViewState drops it.
+function layoutOf(view: TableViewState, temporary: TemporaryKeys, defaults: TableViewState): TableViewState {
+  const { cols = [], ranges = [] } = temporary;
   const v = stripTransientViewFields(view);
-  if (!temporaryCols.length) return v;
-  const keep = (key: string) => !temporaryCols.includes(key);
+  if (!cols.length && !ranges.length) return v;
+  const keep = (key: string) => !cols.includes(key);
+  const keepRange = (key: string) => keep(key) && !ranges.includes(key);
   const fields: Partial<TableViewState> = {
     sorts: v.sorts?.filter((e) => keep(e.key)),
     visibleCols: v.visibleCols?.filter(keep),
     columnOrder: v.columnOrder?.filter(keep),
-    rangeFilters: v.rangeFilters && Object.fromEntries(Object.entries(v.rangeFilters).filter(([k]) => keep(k))),
+    rangeFilters: v.rangeFilters && Object.fromEntries(Object.entries(v.rangeFilters).filter(([k]) => keepRange(k))),
   };
   for (const [field, value] of Object.entries(fields) as [keyof TableViewState, unknown][]) {
     if (value === undefined) continue;
@@ -168,15 +185,17 @@ export function layoutDraft(
   table: ViewStateApi,
   id: string,
   stored: ViewStore,
-  temporaryCols: readonly string[] = [],
+  temporary: TemporaryKeys = {},
   defaults: TableViewState = {},
 ): LayoutDraft {
   const [baseline, setBaseline] = createSignal<TableViewState>({});
-  const layout = (view: TableViewState) => layoutOf(view, temporaryCols, defaults);
+  const layout = (view: TableViewState) => layoutOf(view, temporary, defaults);
+  // A temporary range saved before it was one (a pressed tier) isn't restored.
+  const storedLayout = () => withoutRanges(stored.load(), temporary.ranges ?? []);
   const current = () => layout(table.getViewState());
   const capture = () => setBaseline(untrack(current));
   const store: ViewStore = {
-    load: () => readDraft(id) ?? stored.load(),
+    load: () => readDraft(id) ?? storedLayout(),
     save: (view) => {
       const { page, searchQuery } = view;
       const changed = diffViewLabels(untrack(baseline), layout(view)).length > 0;
@@ -185,7 +204,7 @@ export function layoutDraft(
   };
   return {
     restore() {
-      table.setViewState(stored.load());
+      table.setViewState(storedLayout());
       capture();
       const shared = takeSharedView();
       const draft = readDraft(id);
@@ -203,7 +222,7 @@ export function layoutDraft(
     discard() {
       writeDraft(id, null);
       const { page, searchQuery } = untrack(() => table.getViewState());
-      table.setViewState({ ...stored.load(), ...(page && { page }), ...(searchQuery && { searchQuery }) });
+      table.setViewState({ ...storedLayout(), ...(page && { page }), ...(searchQuery && { searchQuery }) });
       capture();
     },
   };

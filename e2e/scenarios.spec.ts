@@ -3774,7 +3774,7 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(hero).toContainText('the more you pick, the less each');
 });
 
-test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's tier filter", async ({ page }) => {
+test("B1 edge: a pressed tier is this bundle's view, not the layout every bundle shares", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);
   await expect(rows(page)).toHaveCount(4);
@@ -3783,17 +3783,10 @@ test("B1 edge: a Tier Price range set by hand isn't taken for another bundle's t
     .getByRole('button', { name: /5\.00.* tier$/ })
     .click();
   await expect(rows(page)).toHaveCount(2);
-  // The draft the press left, made a range no tier would set: min 6, max 12.
-  await page.evaluate(() => {
-    for (const key of Object.keys(sessionStorage).filter((k) => k.includes(':layout-draft:'))) {
-      const view = JSON.parse(sessionStorage.getItem(key)!);
-      if (view.rangeFilters?.tierPrice) view.rangeFilters.tierPrice = { min: '6', max: '12' };
-      sessionStorage.setItem(key, JSON.stringify(view));
-    }
-  });
+  await expect(page.getByText(/Unsaved changes/)).toHaveCount(0);
+  // Not kept as a draft either: the next bundle, or this one again, opens whole.
   await page.reload();
-  await expect(rows(page)).toHaveCount(2);
-  await expect(row(page, 'Overcooked! 2')).toHaveCount(1);
+  await expect(rows(page)).toHaveCount(4);
   await expect(page.locator('.list-hero button.bundle-tier-chip[aria-pressed="true"]')).toHaveCount(0);
 });
 
