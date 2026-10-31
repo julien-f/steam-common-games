@@ -30,6 +30,7 @@ const {
   getGlobalAchievementPercentages,
   getGameNews,
   _resetTagNameMap,
+  _resetPauses,
 } = require('../lib/steam');
 const { getSemaphoreStats, createSemaphore } = require('../lib/upstream');
 const { _reset, getCachedAt, setCache } = require('../lib/cache');
@@ -94,7 +95,7 @@ test('steam-store circuit breaker: requests already queued when it trips never r
   assert.ok(fetchMock.mock.callCount() <= 3, `${fetchMock.mock.callCount()} requests`);
 });
 
-test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers can skip re-logging it', async (t) => {
+test('fetchStoreApi: the circuit-open error is marked isLogged so callers can skip re-logging it', async (t) => {
   _reset();
   _resetCircuitBreakers();
   t.after(_resetCircuitBreakers);
@@ -104,7 +105,7 @@ test('fetchStoreApi: the circuit-open error is marked isCircuitOpen so callers c
   await assert.rejects(() => getAppDetails(421)); // trips it
   await assert.rejects(
     () => getAppDetails(422),
-    (err) => err.isCircuitOpen === true && err.isUpstream === true,
+    (err) => /circuit open/.test(err.message) && err.isLogged === true && err.isUpstream === true,
   );
 });
 
@@ -173,6 +174,48 @@ test('fetchStoreApi: a 429 holds every queued store request until Retry-After ha
   assert.equal(calls, 3, 'the retry and the queued request go out once it has passed');
   await Promise.all([first, second]);
 });
+
+// One pause per call group: the 429 shown is refused (no retry), the call queued after it waits out Retry-After.
+for (const [group, refused, queued, ok] of [
+  [
+    'key-less Steam API',
+    () => getWishlist('76561197960287930'),
+    () => getGameNews(620),
+    { ok: true, json: async () => ({ appnews: { newsitems: [] } }) },
+  ],
+  [
+    'store browse',
+    () => getStoreBrowseItem(620),
+    () => getStoreBrowseItem(400),
+    { ok: true, json: async () => ({ response: { store_items: [] } }) },
+  ],
+  ['ProtonDB', () => getProtonDbStatus(620), () => getProtonDbStatus(400), { ok: false, status: 404 }],
+]) {
+  test(`${group}: a 429 holds the group's next call until Retry-After has passed`, async (t) => {
+    _reset();
+    t.after(_resetPauses);
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+    const flush = async () => {
+      for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+    };
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () =>
+      ++calls === 1 ? { ok: false, status: 429, headers: new Headers({ 'retry-after': '2' }) } : ok,
+    );
+
+    await assert.rejects(refused, /429/);
+    const second = queued();
+    await flush();
+    t.mock.timers.tick(1999);
+    await flush();
+    assert.equal(calls, 1, 'nothing goes out before Retry-After');
+
+    t.mock.timers.tick(1);
+    await flush();
+    assert.equal(calls, 2, 'the queued call goes out once it has passed');
+    await second;
+  });
+}
 
 test('steam-store circuit breaker: consecutive403s exposes pre-trip state and resets on success', async (t) => {
   _reset();
@@ -1637,10 +1680,7 @@ test('getProtonDbStatus: two 403s in a row (a blanket bot-block) open the circui
 
   await assert.rejects(() => getProtonDbStatus(400));
   await assert.rejects(() => getProtonDbStatus(401));
-  await assert.rejects(
-    () => getProtonDbStatus(402),
-    (err) => err.isCircuitOpen === true,
-  );
+  await assert.rejects(() => getProtonDbStatus(402), /circuit open/);
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.ok(getCircuitBreakers().protondb.blockedUntil > Date.now());
 });

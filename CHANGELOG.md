@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
 - A Steam sign-in link copied from the server logs can no longer be reused to sign in
 - An unexpected reply from Steam or IsThereAnyDeal no longer breaks bundles for hours or shows a cryptic error: it fails that once and is retried
+- When Steam or ProtonDB asks the app to slow down, tags, wishlists, news, achievement rarity and Linux ratings wait instead of failing game after game
 
 ### Development
 

@@ -1584,7 +1584,7 @@ test('POST /api/game-details/stream: resolves HLTB name from store metadata', as
   assert.equal(gameEvent.hltb?.main, 10, 'HLTB result should be present, not short-circuited to null');
 });
 
-// fetchGameDetails' own logErr (server.js) is a second, separate consumer of the isCircuitOpen
+// fetchGameDetails' own logErr (server.js) is a second, separate consumer of the isLogged
 // flag besides routeErrorStatus (covered under GET /api/search-games below) — this closes the
 // loop on that one too, since a batch stream is exactly the "hundreds of near-identical lines"
 // scenario the flag exists to prevent.
@@ -1621,7 +1621,7 @@ test('POST /api/game-details/stream: does not log [game-details] for meta blocke
   warnMock.mock.resetCalls();
 
   // Another game while the circuit is still open — its meta call is immediately an
-  // isCircuitOpen error and must not log its own [game-details] line.
+  // circuit-open error and must not log its own [game-details] line.
   const res = await ssePost(server.address().port, '/api/game-details/stream', { games: [{ appid: 901 }] });
   const gameEvent = parseSseEvents(res.body).find((e) => e.appid === 901);
   assert.equal(gameEvent.meta, null);

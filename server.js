@@ -191,7 +191,7 @@ function routeErrorStatus(route, err) {
   // Same for an exhausted outbound budget: chargeBudget warns once per window. A client past its
   // own share is told to slow down (429); the service itself is fine for everyone else.
   if (err.isClientBudgetExhausted) return 429;
-  if (err.isCircuitOpen || err.isBudgetExhausted) return 502;
+  if (err.isLogged) return 502;
   // Only res.json() on an upstream's reply throws one: an HTML page (an error or challenge) with a 200.
   if (err.isUpstream || err.name === 'SyntaxError') {
     console.error(`[upstream:${route}]`, err.stack || err.message);
@@ -774,13 +774,13 @@ function fetchGameDetails(appid, { force = false } = {}) {
       // logErr also appends `.cause` when present: Node's fetch throws a generic "fetch failed"
       // TypeError for any network-level failure (DNS, connection reset, timeout, ...) and buries
       // the actual reason in `.cause` — without it every such failure looks identical and gives
-      // no signal about what actually went wrong. Skips isCircuitOpen and isBudgetExhausted errors — same reasoning
+      // no signal about what actually went wrong. Skips `isLogged` errors (a circuit trip, a spent
+      // budget, HLTB's throttled warning), already warned where they were thrown — same reasoning
       // as routeErrorStatus's own skip: a batch load hits this once per field per appid, so
       // without the skip a single already-logged circuit trip would print potentially hundreds
-      // of near-identical lines here alone (meta goes through fetchStoreApi). `isLogged` errors
-      // (HLTB's) were already warned, throttled, where they were thrown.
+      // of near-identical lines here alone (meta goes through fetchStoreApi).
       const logErr = (label, err) => {
-        if (err?.isCircuitOpen || err?.isBudgetExhausted || err?.isLogged) return;
+        if (err?.isLogged) return;
         console.warn(`[game-details] ${label} (appid ${appid}):`, err?.message, err?.cause ?? '');
       };
       if (ratingRes.status === 'rejected') logErr('rating', ratingRes.reason);
