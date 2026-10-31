@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Settings and lists are read faster, and an unchanged setting is no longer re-synced to your account
 - A table layout (columns, sort, filters, grouping) now changes only when you Save it, on every table: until then it's kept in the tab with Save and Discard, and saved layouts sync to your account
 - The desktop Filter pane highlights the column it shows
+- Sessions are stored hashed on the server, so everyone is signed out once and needs to sign in with Steam again
 
 ### Fixed
 
@@ -45,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Games no longer all show no tags after Steam answers the tag list with an empty reply
 - Refreshing an account while Steam fails keeps its known name and avatar instead of showing its Steam ID
 - Reloading the PC Game Pass list no longer runs into the rate limit when a game's title can't be found.
+- A Steam sign-in link copied from the server logs can no longer be reused to sign in
 
 ### Development
 

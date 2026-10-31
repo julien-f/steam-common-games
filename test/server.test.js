@@ -13,11 +13,13 @@ process.env.DB_FILE = '';
 const { beforeEach, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { until } = require('./until');
+const { freshNonce } = require('./openidNonce');
 const http = require('node:http');
 const zlib = require('node:zlib');
 const fs = require('node:fs');
 const path = require('node:path');
 const supertest = require('supertest');
+const morgan = require('morgan');
 const { app } = require('../server');
 const { _reset, setCache, getCachedAt } = require('../lib/cache');
 const { db } = require('../lib/db');
@@ -2836,7 +2838,8 @@ async function loginAs(t, steamid) {
   return agent;
 }
 
-// The openid.* params Steam appends to return_to after signing `steamid` in.
+// The openid.* params Steam appends to return_to after signing `steamid` in, each with its own
+// nonce: the callback rejects a reused one.
 function steamAssertion(steamid, returnTo) {
   const claimedId = `https://steamcommunity.com/openid/id/${steamid}`;
   return {
@@ -2846,7 +2849,7 @@ function steamAssertion(steamid, returnTo) {
     'openid.claimed_id': claimedId,
     'openid.identity': claimedId,
     'openid.return_to': returnTo,
-    'openid.response_nonce': '2026-10-10T00:00:00Z0123456789',
+    'openid.response_nonce': freshNonce(),
     'openid.assoc_handle': '1234567890',
     'openid.signed': 'signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle',
     'openid.sig': 'abc',
@@ -2925,6 +2928,13 @@ test("GET /auth/steam/callback: 400 for another site's assertion replayed with t
     .expect(400);
   assert.equal(fetchMock.mock.callCount(), 0);
   assert.ok(!String(res.headers['set-cookie']).includes('sid='));
+});
+
+test('request log: the Steam callback is logged without its query, which carries the signed assertion', () => {
+  const logUrl = (originalUrl) => morgan.url({ originalUrl, url: originalUrl }, {});
+  assert.equal(logUrl('/auth/steam/callback?state=s&openid.sig=abc'), '/auth/steam/callback');
+  assert.equal(logUrl('/AUTH/Steam/callback/?state=s&openid.sig=abc'), '/AUTH/Steam/callback/');
+  assert.equal(logUrl('/api/library?steamid=1'), '/api/library?steamid=1');
 });
 
 test('login flow → GET /api/me: returns the signed-in steamid and empty prefs on first login', async (t) => {

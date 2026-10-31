@@ -6,6 +6,9 @@ process.env.DB_FILE = '';
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
+const { db } = require('../lib/db');
+const { freshNonce } = require('./openidNonce');
 const {
   parseCookies,
   serializeCookie,
@@ -79,7 +82,7 @@ function assertion(overrides = {}) {
     'openid.claimed_id': VALID_CLAIMED_ID,
     'openid.identity': VALID_CLAIMED_ID,
     'openid.return_to': `${ORIGIN}/auth/steam/callback?state=${STATE}`,
-    'openid.response_nonce': '2026-10-10T00:00:00Z0123456789',
+    'openid.response_nonce': freshNonce(),
     'openid.assoc_handle': '1234567890',
     'openid.signed': 'signed,op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle',
     'openid.sig': 'abc',
@@ -125,6 +128,9 @@ for (const [why, overrides] of [
   ['a foreign op_endpoint', { 'openid.op_endpoint': 'https://evil.example/openid/login' }],
   ['an unsigned return_to', { 'openid.signed': 'signed,op_endpoint,claimed_id,identity,response_nonce,assoc_handle' }],
   ['a missing signed list', { 'openid.signed': undefined }],
+  ['a nonce older than 5 minutes', { 'openid.response_nonce': freshNonce(Date.now() - 6 * 60 * 1000) }],
+  ['a nonce without a timestamp', { 'openid.response_nonce': 'not-a-nonce' }],
+  ['a missing nonce', { 'openid.response_nonce': undefined }],
 ]) {
   test(`verifySteamAssertion: null for ${why}, without even calling Steam`, async (t) => {
     const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
@@ -133,6 +139,58 @@ for (const [why, overrides] of [
   });
 }
 
+// OpenID 2.0 §11.3: a logged assertion replayed later must not sign anyone in again.
+test('verifySteamAssertion: null for a nonce already used, without calling Steam again', async (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  assert.equal(await verify(query), '76561198000000001');
+  assert.equal(await verify(query), null);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('verifySteamAssertion: a nonce stays used for as long as its age lets it pass', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-10T00:00:00Z') });
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  assert.equal(await verify(query), '76561198000000001');
+  t.mock.timers.tick(4 * 60 * 1000);
+  assert.equal(await verify(query), null);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('verifySteamAssertion: a nonce Steam did not confirm stays usable', async (t) => {
+  const query = assertion();
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: false, status: 500 }));
+  assert.equal(await verify(query), null);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:false' }));
+  assert.equal(await verify(query), null);
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  assert.equal(await verify(query), '76561198000000001');
+});
+
+test('verifySteamAssertion: of two concurrent replays, only one signs in', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  const query = assertion();
+  const results = await Promise.all([verify(query), verify(query)]);
+  assert.deepEqual(results.sort(), ['76561198000000001', null]);
+});
+
+// A nonce is remembered for twice its window, so one dated as far ahead as allowed is still
+// remembered, or already stale, at any later replay.
+test('verifySteamAssertion: a nonce dated ahead of this clock is never accepted twice', async (t) => {
+  // Past every nonce the other tests left, so the sweep reaches this one; whole seconds, as nonces.
+  const now = Math.floor(Date.now() / 1000) * 1000 + 24 * 60 * 60 * 1000;
+  t.mock.timers.enable({ apis: ['Date'], now });
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, text: async () => 'is_valid:true' }));
+  assert.equal(await verify(assertion({ 'openid.response_nonce': freshNonce(now + 5 * 60 * 1000) })), null);
+  const query = assertion({ 'openid.response_nonce': freshNonce(now + 5 * 60 * 1000 - 1000) });
+  assert.equal(await verify(query), '76561198000000001');
+  for (const step of [9 * 60 * 1000, 59 * 1000, 1000]) {
+    t.mock.timers.tick(step);
+    assert.equal(await verify(query), null);
+  }
+});
+
 // ── users & sessions ──────────────────────────────────────────────────────────
 
 test('createSession + getSessionUser: round-trips to the steamid and its (initially empty) prefs', () => {
@@ -140,6 +198,20 @@ test('createSession + getSessionUser: round-trips to the steamid and its (initia
   upsertUser(steamid);
   const sessionId = createSession(steamid);
   assert.deepEqual(getSessionUser(sessionId), { steamid, prefs: {} });
+});
+
+test('createSession: db.sqlite holds only a SHA-256 of the session id, which does not sign anyone in', () => {
+  const steamid = '76561198000000109';
+  upsertUser(steamid);
+  const sessionId = createSession(steamid);
+  const stored = db.prepare('SELECT id FROM sessions WHERE steamid = ?').all(steamid);
+  assert.deepEqual(
+    stored.map((r) => r.id),
+    [crypto.createHash('sha256').update(sessionId).digest('hex')],
+  );
+  assert.equal(getSessionUser(stored[0].id), undefined);
+  destroySession(sessionId);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE steamid = ?').get(steamid).n, 0);
 });
 
 test('getSessionUser: undefined for an unknown or missing session id', () => {
