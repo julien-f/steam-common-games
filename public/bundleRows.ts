@@ -489,13 +489,18 @@ export function toBundleRow(bundle: BundleListItem, now: number = Date.now(), cu
   };
 }
 
-// A bundle's Tier Price groups, keyed by number so they sort as tiers: the base tiers at their
-// price, then add-ons (bought apart) after every base tier, then unpriced games.
-const ADDON_GROUP = 1e6;
-const VARIES_GROUP = 2e6;
+// Numeric keys sorting base tiers by price, then add-ons, then unpriced games; the offsets sit far
+// above any tier price in any currency (a ₩ tier runs to tens of thousands).
+const ADDON_GROUP = 1e12;
+const VARIES_GROUP = 2e12;
 export function tierGroupKey(row: { tierPrice?: number | null; addon?: boolean | null }): number {
   if (row.tierPrice == null) return VARIES_GROUP;
   return row.addon ? ADDON_GROUP + row.tierPrice : row.tierPrice;
+}
+
+// A tier key's price, and whether it's an add-on's (tierGroupKey's inverse, unpriced aside).
+export function tierKeyPrice(key: number): { price: number; addon: boolean } {
+  return key >= ADDON_GROUP ? { price: key - ADDON_GROUP, addon: true } : { price: key, addon: false };
 }
 
 // A Tier Price group's header: the tier's price (its range when ITAD doesn't say which tier holds
@@ -508,8 +513,7 @@ export function tierGroupLabel(
   target: string,
 ): string {
   if (key >= VARIES_GROUP) return 'Varies';
-  const addon = key >= ADDON_GROUP;
-  const price = addon ? key - ADDON_GROUP : key;
+  const { price, addon } = tierKeyPrice(key);
   const tier = tiers.find((t) => !!t.addon === addon && t.price === price);
   const currency = tier?.currency ?? target;
   const max = rangeMax.get(price);
@@ -519,9 +523,9 @@ export function tierGroupLabel(
       : formatWithEstimate(price, currency, target);
   if (addon) return `${money} add-on`;
   if (max != null) return `${money} · which tier isn't listed`;
-  if (model === 'fixed') return `${money} · every game`;
-  const below = filterTiers(tiers).filter((t) => t.price! < price);
-  const prev = below.at(-1);
+  const base = tiers.filter((t) => !t.addon && !t.quantity);
+  if (model === 'fixed' && base.every((t) => t.price != null)) return `${money} · every game`;
+  const prev = base.filter((t) => t.price != null && t.price < price).at(-1);
   return prev
     ? `${money} tier · +${formatMoney(price - prev.price!, currency)} over ${formatMoney(prev.price!, currency)}`
     : `${money} tier`;

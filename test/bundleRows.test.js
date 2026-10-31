@@ -602,6 +602,13 @@ test("tierGroupLabel: a tier's price and its step over the one below; a range, a
   assert.equal(label({ tierPrice: null }), 'Varies');
   assert.equal(tierGroupLabel(12, [usd(12)], 'fixed', new Map(), 'USD'), '$12.00 · every game');
   assert.match(tierGroupLabel(5, tiers, 'tiered', new Map(), 'EUR'), /^\$5\.00 \(≈ €[\d.]+\) tier$/);
+  // An unpriced base tier with games beside priced ones: no "every game", the step still from the priced ones.
+  const varies = { price: null, currency: null, gameCount: 3 };
+  assert.equal(tierGroupLabel(5, [usd(5), varies], 'fixed', new Map(), 'USD'), '$5.00 tier');
+  assert.equal(
+    tierGroupLabel(12, [usd(5), usd(12), varies], 'tiered', new Map(), 'USD'),
+    '$12.00 tier · +$7.00 over $5.00',
+  );
 });
 
 test('savingTier: the cheapest tier holding every new game, the pressed one, or none when unknown', () => {

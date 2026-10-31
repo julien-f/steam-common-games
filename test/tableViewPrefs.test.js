@@ -246,6 +246,9 @@ test('layoutDraft: a temporary range is no change, never saved, and dropped from
     // Sorting on the same column is still layout.
     table.setViewState({ ...table.getViewState(), sorts: [{ key: 'tierPrice', dir: 'asc' }] });
     assert.notDeepEqual(layout.changes(), []);
+    // The tab's draft, which every bundle shares, doesn't carry it either.
+    layout.store.save(table.getViewState());
+    assert.deepEqual(layout.store.load().rangeFilters ?? {}, {});
     layout.save();
     assert.deepEqual(getPref('libraryView').rangeFilters ?? {}, {});
     assert.deepEqual(getPref('libraryView').sorts, [{ key: 'tierPrice', dir: 'asc' }]);

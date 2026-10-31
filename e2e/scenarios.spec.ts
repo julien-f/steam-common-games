@@ -3780,6 +3780,32 @@ test('B1.4: a tier shows what paying it gets, and what of that is new to me', as
   await expect(hero).toContainText('the more you pick, the less each');
 });
 
+test('B1 edge: an add-on tier is bought apart: grouped after the tiers, never in what a tier gets', async ({
+  page,
+}) => {
+  await asPlayer(page, ALICE);
+  await page.route(`**/api/bundles/${BUNDLE.id}*`, (route) => {
+    const req = route.request();
+    const body = JSON.parse(respond(req.method(), new URL(req.url()), req.postData()).body);
+    // Terraria (a game the mock resolves) as a €2 add-on, cheaper than every tier.
+    body.bundle.tiers.push({
+      price: { amount: 2, amountInt: 200, currency: 'EUR' },
+      addon: true,
+      games: [{ id: 'pnm-terraria', slug: 'pnm-terraria', title: 'Terraria', type: 'game', assets: {} }],
+    });
+    return route.fulfill({ json: body });
+  });
+  await page.goto(`/lists/bundle/${BUNDLE.id}`);
+  await expect(rows(page)).toHaveCount(5);
+  await expect(groupRows(page)).toHaveText([/€5\.00 tier\b/, /€12\.00 tier/, /€2\.00 add-on/]);
+  await page
+    .locator('.list-hero')
+    .getByRole('button', { name: /5\.00.* tier$/ })
+    .click();
+  await expect(rows(page)).toHaveCount(2);
+  await expect(row(page, 'Terraria')).toHaveCount(0);
+});
+
 test("B1 edge: a pressed tier is this bundle's view, not the layout every bundle shares", async ({ page }) => {
   await asPlayer(page, ALICE);
   await page.goto(`/lists/bundle/${BUNDLE.id}`);

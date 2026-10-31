@@ -199,7 +199,7 @@ export function layoutDraft(
     save: (view) => {
       const { page, searchQuery } = view;
       const changed = diffViewLabels(untrack(baseline), layout(view)).length > 0;
-      writeDraft(id, changed || page || searchQuery ? view : null);
+      writeDraft(id, changed || page || searchQuery ? withoutRanges(view, temporary.ranges ?? []) : null);
     },
   };
   return {

@@ -221,6 +221,7 @@ import {
   savingTier,
   tierGroupKey,
   tierGroupLabel,
+  tierKeyPrice,
   type BundlePackage,
   type BundlePricingModel,
   type BundleTierSummary,
@@ -582,7 +583,7 @@ function renderTierPrice(v: unknown, row: Record<string, any>): Node {
         : v === 0
           ? 'Free'
           : row.tierPriceMax != null
-            ? `${formatMoney(Number(v), row.tierCurrency)}–${formatMoney(row.tierPriceMax, row.tierCurrency)}`
+            ? `${formatMoney(Number(v), row.tierCurrency)}–${formatWithEstimate(row.tierPriceMax, row.tierCurrency, regionCurrency())}`
             : formatWithEstimate(Number(v), row.tierCurrency, regionCurrency(), row.tierPerGame ? '/game' : '');
   const pkg: BundlePackage | null | undefined = row.bundlePackage;
   // A package-mate's pick is its lead row's, so only the lead carries the per-game rate.
@@ -686,8 +687,12 @@ function bundleColumns(
     ),
   );
   const target = regionCurrency();
+  // Keyed so an add-on sorts after the base tiers and a pressed tier's `<= price` range leaves it out.
   const column: ColumnDef<Record<string, any>> = {
     ...TIER_PRICE_COLUMN,
+    value: (row) => (row.tierPrice == null ? null : tierGroupKey(row)),
+    format: (v) => TIER_PRICE_COLUMN.format!(v == null ? v : tierKeyPrice(Number(v)).price),
+    render: (_v, row) => renderTierPrice(row.tierPrice, row),
     groupValue: (_v, row) => tierGroupKey(row),
     groupFormat: (key) => tierGroupLabel(Number(key), meta.tiers, meta.model, rangeMax, target),
     keepVisibleWhenGrouped: false,
@@ -3205,22 +3210,22 @@ export default function ListRoute() {
   }
   // The selected picks already owned (a package only when every row of it is): they cost a pick but
   // add nothing, so the saving leaves them out.
-  function selectedOwnedGids(): Set<string | number> {
+  const selectedOwnedGids = createMemo(() => {
     const owned = new Map<string | number, boolean>();
     for (const r of selectedRows()) {
       const key = gidOf(r.appid) ?? r.appid;
       owned.set(key, (owned.get(key) ?? true) && !!r.inLibrary);
     }
     return new Set([...owned].filter(([, all]) => all).map(([key]) => key));
-  }
-  // What the selection's picks not owned are worth at their best deals, in `currency`; boxed, so 0 still shows.
-  function pickDeals(currency: string): { amount: number } | null {
+  });
+  // What the plan saves over the picks not owned at their best deals; an object, so a 0 sum still shows.
+  function pickSaving(plan: PickPlan): { amount: number; text: string; overpays: boolean } | null {
     const owned = selectedOwnedGids();
     const amount = sumBestDeals(
       selectedRows().filter((r) => !owned.has(gidOf(r.appid) ?? r.appid)),
-      currency,
+      plan.currency,
     );
-    return amount == null ? null : { amount };
+    return amount == null ? null : { amount, ...savingsText(plan.cost, amount, plan.currency, regionCurrency()) };
   }
 
   // The pressed tier, read back from the filter so the table's own Clear filters unpresses it; a
@@ -3251,7 +3256,7 @@ export default function ListRoute() {
           meta.model === 'tiered'
             ? 'each includes the cheaper ones'
             : ratesUnknown
-              ? 'priced by how many you pick, on Fanatical'
+              ? 'priced by how many you pick, on the shop'
               : meta.model === 'pick'
                 ? 'the more you pick, the less each'
                 : undefined,
@@ -4606,18 +4611,14 @@ export default function ListRoute() {
                   </output>
                   <span class="selection-pick-detail">{pickPlanDetail(plan(), selectedPickCount())}</span>
                 </span>
-                <Show when={pickDeals(plan().currency)}>
-                  {(deals) => (
+                <Show when={pickSaving(plan())}>
+                  {(saving) => (
                     <span
                       class="selection-pick-savings"
-                      style={{
-                        color: savingsText(plan().cost, deals().amount, plan().currency, regionCurrency()).overpays
-                          ? 'var(--bad)'
-                          : 'var(--good)',
-                      }}
-                      title={`vs ${formatMoney(deals().amount, plan().currency)} for the games you don't own at their best deals`}
+                      style={{ color: saving().overpays ? 'var(--bad)' : 'var(--good)' }}
+                      title={`vs ${formatMoney(saving().amount, plan().currency)} for the games you don't own at their best deals`}
                     >
-                      {savingsText(plan().cost, deals().amount, plan().currency, regionCurrency()).text}
+                      {saving().text}
                     </span>
                   )}
                 </Show>
