@@ -6986,14 +6986,15 @@ test('I2 edge: the lightbox opens focused on its media, with no ring; Tab brings
   expect(await ring()).toBe(true);
 });
 
-test('I2 edge: Tab cycles the lightbox controls on a game with a single item', async ({ page }) => {
+test('I2 edge: Tab cycles the lightbox controls on a game with a single item', async ({ page }, testInfo) => {
   // Serves the cover from localhost, so it loads instead of showing its Retry.
   await mockApi(page, { states: ['slow-media'] });
   await asPlayer(page, ALICE);
   await page.goto('/lists/owned?game=620');
   await page.getByRole('button', { name: 'Open in lightbox' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.locator('.lb-img')).not.toHaveClass(/loading/);
+  const img = page.locator('.lb-img');
+  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('.lb-surface')).toBeFocused();
   const focused = () =>
     page.evaluate(() => {
@@ -7005,15 +7006,11 @@ test('I2 edge: Tab cycles the lightbox controls on a game with a single item', a
     await page.keyboard.press('Tab');
     seen.push(await focused());
   }
-  // No Zoom: the cover is shown at its full size.
-  expect(seen).toEqual([
-    'Previous game',
-    'Next game',
-    'Enter fullscreen',
-    'Close lightbox',
-    'Previous game',
-    'Next game',
-  ]);
+  // Zoom only where the 1280 px cover is drawn smaller: a phone, not desktop.
+  const cycle = ['Previous game', 'Next game', 'Enter fullscreen'];
+  if (testInfo.project.name === 'phone') cycle.push('Zoom');
+  cycle.push('Close lightbox');
+  expect(seen).toEqual([...cycle, ...cycle].slice(0, 6));
 });
 
 test('I2 edge: a focused lightbox control stays visible while the controls idle out', async ({ page }, testInfo) => {

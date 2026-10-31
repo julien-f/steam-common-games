@@ -1621,7 +1621,10 @@ function mountLightboxDom(): () => void {
   wireMouseHandlers(lb);
   wireTouchHandlers(lb);
   wireVideoControls(lb);
-  window.addEventListener('resize', () => isLightboxOpen() && syncLbZoomBtn(lb), { signal: _lbSignal });
+  // On the image's drawn size, not the window's: it can load before it's laid out (width 0).
+  const ro = new ResizeObserver(() => isLightboxOpen() && syncLbZoomBtn(lb));
+  ro.observe(lb.querySelector('.lb-img')!);
+  _lbSignal?.addEventListener('abort', () => ro.disconnect());
   return dispose;
 }
 
