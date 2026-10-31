@@ -361,7 +361,7 @@ test('getHLTB: throttles the "[HLTB] search failed" warning to once per 30s wind
   _reset();
   _resetAuth();
   // `now` must be passed explicitly — mock timers otherwise start the mocked clock at epoch 0,
-  // which would make _hltbAuthFailedAt/_hltbSearchWarnedAt's own "0 means never" sentinel
+  // which would make _hltbSearchWarnedAt's own "0 means never" sentinel
   // (reset by _resetAuth() above, before the mock takes over) look like "just failed at time
   // 0" instead, spuriously triggering the auth-retry backoff and short-circuiting getHLTB
   // before it ever reaches the search call this test means to exercise.

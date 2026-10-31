@@ -28,7 +28,6 @@ Last audited: simplify 2026-10-11 · correctness 2026-10-11 · security 2026-10-
 - **C255 · cleanup · S** — `resolveItadIds` repeats `lookupShopGids`' endpoint and chunk loop, and the ITAD JSON POST block appears four times (`lib/itad.js`). Have `resolveItadIds` cache around `lookupShopGids`, and add a small ITAD POST helper.
 - **C256 · cleanup · S** — small dead weight in the backend: `getShopId` exported with no outside user (`lib/itad.js`); `peekSteamId`'s `opts` always `{ record: false }`; `extractTagIds` with one caller (`lib/steam.js`; leave `fetchStoreBrowseItem` if C249 batches it); `routeErrorStatus`' logging comment sitting above `oldestCachedAt` (`server.js`); the empty-achievements reply written twice. Drop, hard-code, inline, move, share one const.
 - **C266 · cleanup · S** — three "already logged" flags (`isCircuitOpen`, `isBudgetExhausted`, `isLogged`) that `logErr` (`server.js`) and `routeErrorStatus` check differently, `getHLTB` (`lib/hltb.js`) marking a repeat by matching message text, and the circuit breaker's trip line still saying "repeated 403s" when HLTB's fresh-token 401s tripped it. One `isLogged` flag set where the warning is printed; a trip line naming blocks.
-- **C267 · cleanup · S** — the "hold off 30 s after a failure" pattern is written twice with its own constant: `HLTB_AUTH_RETRY_MS` (`lib/hltb.js`) and `TAG_NAMES_RETRY_MS` (`lib/steam.js`). One small helper in `lib/upstream.js`.
 
 ## Correctness
 
